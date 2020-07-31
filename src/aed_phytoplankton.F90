@@ -536,11 +536,11 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
      data%id_Pexctarget = aed_locate_variable(p_excretion_target_variable)
    ENDIF
    data%do_Nexc = n_excretion_target_variable .NE. ''
-   IF (data%do_Pexc) THEN
+   IF (data%do_Nexc) THEN
      data%id_Nexctarget = aed_locate_variable(n_excretion_target_variable)
    ENDIF
    data%do_Cexc = c_excretion_target_variable .NE. ''
-   IF (data%do_Pexc) THEN
+   IF (data%do_Cexc) THEN
      data%id_Cexctarget = aed_locate_variable(c_excretion_target_variable)
    ENDIF
    data%do_Siexc = si_excretion_target_variable .NE. ''
