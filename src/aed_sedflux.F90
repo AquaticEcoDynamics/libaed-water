@@ -518,7 +518,7 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
    AED_REAL :: Fsed_poc = 0., Fsed_doc = 0.
    AED_REAL :: Fsed_dic = 0., Fsed_frp = 0.
    AED_REAL :: Fsed_ch4 = 0., Fsed_feii = 0.
-   AED_REAL :: Fsed_n2o = 0.
+   AED_REAL :: Fsed_n2o = 0., Fsed_ch4_ebb = 0.
 !
 !-------------------------------------------------------------------------------
 !BEGIN

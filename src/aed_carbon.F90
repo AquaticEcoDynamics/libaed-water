@@ -74,7 +74,7 @@ MODULE aed_carbon
       INTEGER  :: id_ch4ox, id_pco2
       INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb, id_sed_ch4_ebb_3d
       INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb, id_sed_ch4_ebb_df
-      INTEGER  :: id_par, id_extc, id_dz, id_tau
+      INTEGER  :: id_par, id_extc, id_dz, id_tau, id_Fsed_ch4_ebb
 
       !# Model parameters
       AED_REAL :: Fsed_dic, Ksed_dic, theta_sed_dic
@@ -82,9 +82,11 @@ MODULE aed_carbon
       AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atm_co2, atm_ch4, ionic
       AED_REAL :: maxMPBProdn, IkMPB
       AED_REAL :: ch4_bub_aLL, ch4_bub_cLL, ch4_bub_kLL, ch4_bub_disf, ch4_bub_ws
+      AED_REAL :: ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp
+
 
       !# Model options
-      LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4
+      LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4, use_sed_model_ebb
       LOGICAL  :: simDIC, simCH4, simCH4ebb
       INTEGER  :: alk_mode, co2_model, co2_piston_model, ch4_piston_model
 
@@ -627,7 +629,7 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    AED_REAL :: dic, oxy, mpb, ph
 
    ! Temporary variables
-   AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4
+   AED_REAL :: dic_flux, ch4_flux, Fsed_dic, Fsed_ch4, ebb_flux, Fsed_ch4_ebb
    !AED_REAL, PARAMETER :: maxMPBProdn = 40.     ! mmolC/m2/day                     !
    !AED_REAL, PARAMETER :: IkMPB       = 180.0   ! Light sensitivity of MPB  !
 
@@ -674,7 +676,7 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
       IF( data%simCH4ebb ) THEN
         ebb_flux = Fsed_ch4_ebb * (data%theta_sed_ch4**(temp-20.0))
         ! Kinneret special lake level equations
-        ebb_flux = ebb_flux * ch4_bub_cLL * exp(data%ch4_bub_kLL*(data%ch4_bub_aLL-depth))
+        ebb_flux = ebb_flux * data%ch4_bub_cLL * exp(data%ch4_bub_kLL*(data%ch4_bub_aLL-depth))
       ENDIF
    ENDIF
 
