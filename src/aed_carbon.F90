@@ -710,7 +710,7 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
       _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*data%ch4_bub_disf
       _DIAG_VAR_S_(data%id_sed_ch4_ebb_df) = ebb_flux*data%ch4_bub_disf1 * secs_per_day ! (1/dz)
      ! Release the remainder to the atmosphere (mmol/m2/day)
-      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-data%ch4_bub_disf) * secs_per_day
+      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-data%ch4_bub_disf1) * secs_per_day
      ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
       _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
       ! Note the bubble flux, as the water sees it  (mmol/m2/day)
