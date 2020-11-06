@@ -52,7 +52,7 @@ MODULE aed_dummy
 ! aed_dummy --- dummy model
 !
 ! The AED module "dummy" contains only variables to provide vars required in
-! other modules but we dont provide (usually for debugging purposes
+! other modules that we didnt provide (usually for debugging purposes)
 !-------------------------------------------------------------------------------
    USE aed_core
 
@@ -64,17 +64,20 @@ MODULE aed_dummy
 !
    TYPE,extends(aed_model_data_t) :: aed_dummy_data_t
       !# Variable identifiers
-      INTEGER  :: num_v, num_dv, num_sv, num_dsv
+      INTEGER :: num_v, num_dv, num_sv, num_dsv
+      INTEGER :: id_sine, id_vsine
       INTEGER,ALLOCATABLE :: id_dummy_v(:), id_dummy_dv(:),           &
                              id_dummy_sv(:), id_dummy_dsv(:)
 
      CONTAINS
          PROCEDURE :: define            => aed_define_dummy
          PROCEDURE :: calculate         => aed_calculate_dummy
+         PROCEDURE :: calculate_benthic => aed_calculate_benthic_dummy
    END TYPE
 
 ! MODULE GLOBALS
    INTEGER :: diag_level = 10
+   AED_REAL :: today = 1.
 
 !===============================================================================
 CONTAINS
@@ -114,9 +117,9 @@ SUBROUTINE aed_define_dummy(data, namlst)
 !  %% END NAMELIST
 
    NAMELIST /aed_dummy/ dm_vars, dm_max, dm_min, dm_init,             &
-                         dm_dvars,                                     &
-                         dm_svars, dm_smax, dm_smin, dm_sinit,         &
-                         dm_dsvars
+                        dm_dvars,                                     &
+                        dm_svars, dm_smax, dm_smin, dm_sinit,         &
+                        dm_dsvars
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -167,6 +170,9 @@ SUBROUTINE aed_define_dummy(data, namlst)
       data%id_dummy_dsv(i) = aed_define_sheet_diag_variable(dm_dsvars(i), '', '', .FALSE.)
    ENDDO
 
+   data%id_vsine = aed_define_diag_variable('DUM_vol_sine', 'no units', 'DBG volume sine between 0.0 and 1.0')
+   data%id_sine = aed_define_sheet_diag_variable('DUM_sine', 'no units', 'DBG sine wave between 0.0 and 1.0', .FALSE.)
+
 END SUBROUTINE aed_define_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -174,7 +180,25 @@ END SUBROUTINE aed_define_dummy
 !###############################################################################
 SUBROUTINE aed_calculate_dummy(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Right hand sides of aed_dummy model
+!ARGUMENTS
+   CLASS (aed_dummy_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!
+!LOCALS
+!  INTEGER  :: i, count
+!  AED_REAL :: val, tot
+
+!-------------------------------------------------------------------------------
+!BEGIN
+   _DIAG_VAR_(data%id_vsine) = &
+        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
+END SUBROUTINE aed_calculate_dummy
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_dummy_data_t),INTENT(in) :: data
@@ -182,12 +206,20 @@ SUBROUTINE aed_calculate_dummy(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   INTEGER  :: i, count
-   AED_REAL :: val, tot
+   ! Environment
+!  AED_REAL :: temp
+
+   ! State
+!  AED_REAL :: ss, bottom_stress, matz
 
 !-------------------------------------------------------------------------------
 !BEGIN
-END SUBROUTINE aed_calculate_dummy
+
+   IF (layer_idx .EQ. 1) today = today + 1.0/36.5
+   _DIAG_VAR_S_(data%id_sine) = &
+        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
+
+END SUBROUTINE aed_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
