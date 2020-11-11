@@ -267,7 +267,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
       data%id_Fsed_ch4 = aed_locate_global_sheet(Fsed_ch4_variable)
 
    data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''
-   IF (data%use_sed_model_ch4) &
+   IF (data%use_sed_model_ebb) &
       data%id_Fsed_ch4_ebb = aed_locate_global_sheet(Fsed_ebb_variable)
 
    !# Register diagnostic variables
