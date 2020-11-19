@@ -269,14 +269,14 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    IF (phytos(group)%simDINUptake /= 0) THEN
      !uptake(inh4) = uptake(1) * (1.0-PNf) !inh4 == 2
      !uptake(ino3) = uptake(1) * PNf       !ino3 == 1
-      uptake(inh4) = uptake(1) * (PNf)     !inh4 == 2
-      uptake(ino3) = uptake(1) * (1.-PNf)  !ino3 == 1
+      uptake(2) = uptake(1) * (PNf)     !inh4 == 2
+      uptake(1) = uptake(1) * (1.-PNf)  !ino3 == 1
    ENDIF
    IF (phytos(group)%simDONUptake /= 0) THEN
-      uptake(idon) = 0.0                   !MH to fix  (idon == 3)
+      uptake(3) = 0.0                   !MH to fix  (idon == 3)
    ENDIF
    IF (phytos(group)%simNFixation /= 0 .AND. do_N2uptake) THEN
-      uptake(iN2) = a_nfix                 ! iN2 == 4
+      uptake(4) = a_nfix                 ! iN2 == 4
    ENDIF
 
 
