@@ -50,7 +50,7 @@ MODULE aed_bio_utils
    PUBLIC phyto_salinity, phyto_fN, phyto_fP, phyto_fSi
    PUBLIC phyto_internal_nitrogen, phyto_internal_phosphorus
    PUBLIC photosynthesis_irradiance, bio_respiration
-   PUBLIC ino3, inh4,idon, in2, ifrp, idop
+   PUBLIC ino3, inh4, idon, in2, ifrp, idop
    PUBLIC findMin
 !
    TYPE phyto_data
@@ -112,7 +112,8 @@ MODULE aed_bio_utils
    END TYPE
 
 !Module Locals
-   INTEGER  :: ino3, inh4,idon, in2, ifrp, idop
+   INTEGER,PARAMETER :: ino3 = 1, inh4 = 2, idon = 3, in2 = 4, ifrp = 1, idop = 2
+
 
 !===============================================================================
 CONTAINS
