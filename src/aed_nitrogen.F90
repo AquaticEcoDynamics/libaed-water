@@ -619,7 +619,10 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    ! Temporary variables
    AED_REAL :: amm_flux, nit_flux, n2o_flux, no2_flux
    AED_REAL :: Fsed_amm, Fsed_nit, Fsed_n2o, Fsed_no2
-   AED_REAL :: fTa, fTo
+   AED_REAL :: fTa, fTo, fNO3
+   AED_REAL :: Kdenitnit
+   
+   AED_REAL,PARAMETER :: Kno3 = 5.0      !Denit NO3 half-sat
 !
 !------------------------------------------------------------------------------+
 !BEGIN
@@ -629,6 +632,7 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    !-----------------------------------------------
    ! Retrieve local environmental conditions for this bottom water layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
+
 
    !-----------------------------------------------
    ! Set the maximum flux (@20C) to use in this cell, either constant or linked
@@ -655,7 +659,13 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
       if(data%Fsed_nit_model == 1) THEN
          nit_flux = Fsed_nit *           oxy/(data%Ksed_nit+oxy) * fTo
       ELSE
-         nit_flux = Fsed_nit * data%Ksed_nit/(data%Ksed_nit+oxy) * fTo    
+         nit = _STATE_VAR_(data%id_nox)  
+         IF(Kno3==zero_)THEN
+           fNO3 = one_
+         ELSE
+           fNO3 = nit/(Kno3+nit)
+         ENDIF
+         nit_flux = Fsed_nit * data%Ksed_nit/(data%Ksed_nit+oxy) * fTo * fNO3 
       ENDIF
 
       IF( data%simN2O>0 ) n2o_flux = Fsed_n2o * data%Ksed_n2o/(data%Ksed_n2o+oxy) * fTa
