@@ -620,7 +620,6 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    AED_REAL :: amm_flux, nit_flux, n2o_flux, no2_flux
    AED_REAL :: Fsed_amm, Fsed_nit, Fsed_n2o, Fsed_no2
    AED_REAL :: fTa, fTo, fNO3
-   AED_REAL :: Kdenitnit
    
    AED_REAL,PARAMETER :: Kno3 = 5.0      !Denit NO3 half-sat
 !
