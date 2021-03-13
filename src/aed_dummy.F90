@@ -68,6 +68,8 @@ MODULE aed_dummy
       INTEGER :: id_sine, id_vsine
       INTEGER,ALLOCATABLE :: id_dummy_v(:), id_dummy_dv(:),           &
                              id_dummy_sv(:), id_dummy_dsv(:)
+      AED_REAL,ALLOCATABLE :: dm_max(:), dm_min(:)
+      AED_REAL,ALLOCATABLE :: dm_smax(:), dm_smin(:)
 
      CONTAINS
          PROCEDURE :: define            => aed_define_dummy
@@ -146,6 +148,9 @@ SUBROUTINE aed_define_dummy(data, namlst)
    ALLOCATE(data%id_dummy_sv(num_sv))
    ALLOCATE(data%id_dummy_dsv(num_dsv))
 
+   ALLOCATE(data%dm_min(num_v))   ; ALLOCATE(data%dm_max(num_v))
+   ALLOCATE(data%dm_smin(num_sv)) ; ALLOCATE(data%dm_smax(num_sv))
+
    data%num_v   = num_v
    data%num_dv  = num_dv
    data%num_sv  = num_sv
@@ -156,10 +161,14 @@ SUBROUTINE aed_define_dummy(data, namlst)
    ! Register state variables
    DO i=1,data%num_v
       data%id_dummy_v(i) = aed_define_variable(dm_vars(i), '', '', dm_init(i), dm_min(i), dm_max(i), 0.)
+      data%dm_min(i) = dm_min(i)
+      data%dm_max(i) = dm_max(i)
    ENDDO
 
    DO i=1,data%num_sv
       data%id_dummy_sv(i) = aed_define_sheet_variable(dm_svars(i), '', '', dm_sinit(i), dm_smin(i), dm_smax(i), .FALSE.)
+      data%dm_smin(i) = dm_smin(i)
+      data%dm_smax(i) = dm_smax(i)
    ENDDO
 
    DO i=1,data%num_dv
@@ -188,11 +197,20 @@ SUBROUTINE aed_calculate_dummy(data,column,layer_idx)
 !LOCALS
 !  INTEGER  :: i, count
 !  AED_REAL :: val, tot
+   INTEGER :: i
+   AED_REAL :: scale, offs
 
 !-------------------------------------------------------------------------------
 !BEGIN
    _DIAG_VAR_(data%id_vsine) = &
         (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
+
+   DO i=1,data%num_v
+      scale = (data%dm_max(i) - data%dm_min(i)) / 2.
+      offs = data%dm_min(i) + scale
+      _STATE_VAR_(data%id_dummy_v(i)) = &
+        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * scale) + offs
+   ENDDO
 END SUBROUTINE aed_calculate_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -206,19 +224,22 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   ! Environment
-!  AED_REAL :: temp
-
-   ! State
-!  AED_REAL :: ss, bottom_stress, matz
+   INTEGER :: i
+   AED_REAL :: scale, offs
 
 !-------------------------------------------------------------------------------
 !BEGIN
-
    IF (layer_idx .EQ. 1) today = today + 1.0/36.5
+
    _DIAG_VAR_S_(data%id_sine) = &
         (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
 
+   DO i=1,data%num_sv
+      scale = (data%dm_smax(i) - data%dm_smin(i)) / 2.
+      offs = data%dm_smin(i) + scale
+      _STATE_VAR_S_(data%id_dummy_sv(i)) = &
+        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * scale) + offs
+   ENDDO
 END SUBROUTINE aed_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

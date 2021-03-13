@@ -49,7 +49,7 @@ ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -module ${moddir} -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-fPIC -warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check
   endif
@@ -59,6 +59,14 @@ ifeq ($(F90),ifort)
     FFLAGS+=-real-size 64
   endif
 else ifeq ($(F90),pgfortran)
+  DEBUG_FFLAGS=-g
+  OPT_FFLAGS=-O3
+  FFLAGS=-fPIC -module ${moddir} $(DEFINES) $(INCLUDES)
+  ifeq ($(WITH_CHECKS),true)
+    FFLAGS+=-Mbounds
+  endif
+  FFLAGS+=-r8
+else ifeq ($(F90),flang)
   DEBUG_FFLAGS=-g
   OPT_FFLAGS=-O3
   FFLAGS=-fPIC -module ${moddir} $(DEFINES) $(INCLUDES)

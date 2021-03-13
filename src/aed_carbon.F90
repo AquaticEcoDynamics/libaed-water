@@ -336,7 +336,7 @@ SUBROUTINE aed_calculate_carbon(data,column,layer_idx)
       ch4 = _STATE_VAR_(data%id_ch4)    ! CH4
 
       !# Retrieve current dependent state variable values.
-      IF (data%use_oxy) THEN 
+      IF (data%use_oxy) THEN
          oxy = _STATE_VAR_(data%id_oxy) ! O2
       ELSE
          oxy = 0.0
@@ -714,10 +714,10 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
 
      ! Release the remainder to the atmosphere (mmol/m2/day)
       _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
-      
+
      ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
       _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
-      
+
       ! Note the bubble flux, as the water sees it  (mmol/m3/day)
       _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
     ENDIF
