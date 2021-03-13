@@ -49,7 +49,7 @@ ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
-  FFLAGS=-fPIC -warn all -module ${moddir} -i-static -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
+  FFLAGS=-fPIC -warn all -module ${moddir} -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check
   endif
