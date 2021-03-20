@@ -53,6 +53,7 @@ MODULE aed_water
    USE aed_bio_particles
    USE aed_geochemistry
    USE aed_pathogens
+   USE aed_habitat_water
 
    USE aed_benthic
    USE aed_riparian
@@ -104,6 +105,7 @@ FUNCTION aed_new_model(modelname) RESULT(model)
       CASE ('aed_pathogens');      prefix = 'PAT'; ALLOCATE(aed_pathogens_data_t::model)
       CASE ('aed_totals');         prefix = 'TOT'; ALLOCATE(aed_totals_data_t::model)
       CASE ('aed_dummy');          prefix = 'DUM'; ALLOCATE(aed_dummy_data_t::model)
+      CASE ('aed_habitat_water');  prefix = 'HAB'; ALLOCATE(aed_habitat_water_data_t::model)
 !     CASE DEFAULT;                print *,'*** Unknown module ', TRIM(modelname)
    END SELECT
 
