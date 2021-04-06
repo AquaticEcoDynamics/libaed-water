@@ -83,7 +83,7 @@ MODULE aed_nitrogen
       LOGICAL  :: use_oxy, use_ph
       LOGICAL  :: use_sed_model_amm,use_sed_model_nit,use_sed_model_n2o,use_sed_model_no2
       LOGICAL  :: simNitrfpH,simNitrfLight,simDryDeposition,simWetDeposition
-      INTEGER  :: oxy_lim, simN2O, n2o_piston_model
+      INTEGER  :: oxy_lim, simN2O, n2o_piston_model, Fsed_nit_model
 
      CONTAINS
          PROCEDURE :: define            => aed_define_nitrogen
@@ -121,6 +121,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    INTEGER           :: oxy_lim = 1
    INTEGER           :: simN2O  = 0
    INTEGER           :: n2o_piston_model = 4
+   INTEGER           :: Fsed_nit_model = 1
    LOGICAL           :: simNitrfpH = .false.
    LOGICAL           :: simNitrfLight = .false.
    LOGICAL           :: simDryDeposition = .false.
@@ -166,6 +167,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    AED_REAL          :: atm_pn_dd     = zero_
    AED_REAL          :: f_dindep_nox  = 0.5
 
+
    CHARACTER(len=64) :: nitrif_reactant_variable=''
    CHARACTER(len=64) :: denit_product_variable=''
    CHARACTER(len=64) :: nitrif_ph_variable=''
@@ -186,7 +188,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
                 Ranammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
                 simNitrfpH, simNitrfLight, simDryDeposition, simWetDeposition, &
-                atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox
+                atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model
 !
 !------------------------------------------------------------------------------+
 !BEGIN
@@ -205,6 +207,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%simNitrfLight    = simNitrfLight
    data%simN2O           = simN2O
    data%oxy_lim          = oxy_lim
+   data%Fsed_nit_model   = Fsed_nit_model
 
    data%Rnitrif          = Rnitrif/secs_per_day
    data%Rdenit           = Rdenit/secs_per_day
@@ -616,7 +619,9 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    ! Temporary variables
    AED_REAL :: amm_flux, nit_flux, n2o_flux, no2_flux
    AED_REAL :: Fsed_amm, Fsed_nit, Fsed_n2o, Fsed_no2
-   AED_REAL :: fTa, fTo
+   AED_REAL :: fTa, fTo, fNO3
+   
+   AED_REAL,PARAMETER :: Kno3 = 5.0      !Denit NO3 half-sat
 !
 !------------------------------------------------------------------------------+
 !BEGIN
@@ -626,6 +631,7 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    !-----------------------------------------------
    ! Retrieve local environmental conditions for this bottom water layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
+
 
    !-----------------------------------------------
    ! Set the maximum flux (@20C) to use in this cell, either constant or linked
@@ -649,7 +655,18 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
       ! Sediment flux dependent on oxygen and temperature
       oxy = _STATE_VAR_(data%id_oxy)
       amm_flux = Fsed_amm * data%Ksed_amm/(data%Ksed_amm+oxy) * fTa
-      nit_flux = Fsed_nit *           oxy/(data%Ksed_nit+oxy) * fTo
+      if(data%Fsed_nit_model == 1) THEN
+         nit_flux = Fsed_nit *           oxy/(data%Ksed_nit+oxy) * fTo
+      ELSE
+         nit = _STATE_VAR_(data%id_nox)  
+         IF(Kno3==zero_)THEN
+           fNO3 = one_
+         ELSE
+           fNO3 = nit/(Kno3+nit)
+         ENDIF
+         nit_flux = Fsed_nit * data%Ksed_nit/(data%Ksed_nit+oxy) * fTo * fNO3 
+      ENDIF
+
       IF( data%simN2O>0 ) n2o_flux = Fsed_n2o * data%Ksed_n2o/(data%Ksed_n2o+oxy) * fTa
    ELSE
       ! Sediment flux dependent on temperature only
