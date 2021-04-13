@@ -45,6 +45,12 @@ endif
 
 INCLUDES=-I${incdir}
 
+ifeq ("$(HAVEPLUS)","true")
+  HAVEPLUS=-DHAVE_PLUS
+else
+  HAVEPLUS=""
+endif
+
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
@@ -120,7 +126,7 @@ OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_gclib.o \
      ${objdir}/aed_gcsolver.o \
      ${objdir}/aed_geochemistry.o \
-		 ${objdir}/aed_habitat_water.o \
+     ${objdir}/aed_habitat_water.o \
      ${objdir}/aed_nitrogen.o \
      ${objdir}/aed_noncohesive.o \
      ${objdir}/aed_organic_matter.o \
