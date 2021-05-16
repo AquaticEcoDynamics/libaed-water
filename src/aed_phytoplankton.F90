@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -27,6 +27,8 @@
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
 !# Created August 2011                                                         #
+!#                                                                             #
+!#  Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed-water
 !#                                                                             #
 !###############################################################################
 !                                                                              !
@@ -51,13 +53,6 @@ MODULE aed_phytoplankton
 !  aed_phytoplankton --- phytoplankton biogeochemical model
 !-------------------------------------------------------------------------------
    USE aed_core
-!  USE aed_util,ONLY : find_free_lun, &
-!                       exp_integral, &
-!                       aed_bio_temp_function, &
-!                       fTemp_function, &
-!                       water_viscosity, &
-!                       in_zone_set,
-!                       CSV_TYPE, NML_TYPE
    USE aed_util
    USE aed_bio_utils
 
@@ -507,23 +502,23 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    ENDIF
 
    ! Store species parameter values in our own derived type
-   ! NB: all rates must be provided in values per day,
+   ! Note: all rates are provided in values per day,
    !     and are converted in here to values per second.
    CALL aed_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,settling,resuspension)
 
-   CALL aed_bio_temp_function(data%num_phytos,              &
-                               data%phytos%theta_growth,     &
-                               data%phytos%T_std,            &
-                               data%phytos%T_opt,            &
-                               data%phytos%T_max,            &
-                               data%phytos%aTn,              &
-                               data%phytos%bTn,              &
-                               data%phytos%kTn,              &
+   CALL aed_bio_temp_function( data%num_phytos,                                &
+                               data%phytos%theta_growth,                       &
+                               data%phytos%T_std,                              &
+                               data%phytos%T_opt,                              &
+                               data%phytos%T_max,                              &
+                               data%phytos%aTn,                                &
+                               data%phytos%bTn,                                &
+                               data%phytos%kTn,                                &
                                data%phytos%p_name)
 
    ! Register microphytbenthos as a state variable
    IF (data%do_mpb>0) THEN
-     data%id_mpb = aed_define_sheet_variable( 'mpb',                          &
+     data%id_mpb = aed_define_sheet_variable(  'mpb',                          &
                                                'mmol/m**2',                    &
                                                'microphytobenthos biomass',    &
                                                 0.001,                         &

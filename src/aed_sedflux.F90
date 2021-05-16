@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -25,8 +25,8 @@
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
-!#   Created May 2012                                                          #
-!#   Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed2   #
+!#  Created May 2012                                                           #
+!#  Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed-water
 !#                                                                             #
 !###############################################################################
 !                                                                              !
@@ -343,10 +343,11 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Fsed_n2o  = MISVAL
 !  %% END NAMELIST
 
-   NAMELIST /aed_sed_constant/ nzones,                                           &
-                                Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp, &
-                                Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, Fsed_n2o, &
-                                Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_ch4_ebb
+   NAMELIST /aed_sed_constant/ nzones,                                          &
+                            Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,   &
+                            Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, Fsed_n2o,   &
+                            Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii,  &
+                            Fsed_ch4_ebb
 
 !
 !-------------------------------------------------------------------------------

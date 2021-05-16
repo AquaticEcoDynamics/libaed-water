@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -26,9 +26,9 @@
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
-!# Created 6 June 2011                                                         #
-!# Updated 11 May 2015 : Add refractory groups, based on Swan estuary model    #
-!# Updated 18 Oct 2016 : Add resuspension of POM and cleaned up input          #
+!#  Created June 2011                                                          #
+!#  Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed-water
+!#                                                                             #
 !#                                                                             #
 !###############################################################################
 !                                                                              !
@@ -70,46 +70,53 @@ MODULE aed_organic_matter
 !
    TYPE,extends(aed_model_data_t) :: aed_organic_matter_data_t
 
-      !# Variable identifiers
-      INTEGER  :: id_poc,id_doc           ! particulate & dissolved organic carbon
-      INTEGER  :: id_pon,id_don           ! particulate & dissolved organic nitrogen
-      INTEGER  :: id_pop,id_dop           ! particulate & dissolved organic phosphorus
+      !# Variable identifiers (OGM)
+      INTEGER  :: id_poc, id_doc          ! particulate & dissolved organic carbon
+      INTEGER  :: id_pon, id_don          ! particulate & dissolved organic nitrogen
+      INTEGER  :: id_pop, id_dop          ! particulate & dissolved organic phosphorus
       INTEGER  :: id_docr,id_donr,id_dopr ! dissolved refractory OM pools
       INTEGER  :: id_cpom                 ! coarse particulate OM (bulk) pool
-      INTEGER  :: id_photolysis           ! photolysis
-
-      INTEGER  :: id_oxy,id_dic
-      INTEGER  :: id_nit,id_no2,id_n2o,id_amm,id_frp,id_fe,id_ch4,id_so4
+      INTEGER  :: id_sed_pon, id_sed_don  ! sediment ON pool
+      INTEGER  :: id_sed_pop, id_sed_dop  ! sediment OP pool
+      INTEGER  :: id_sed_poc, id_sed_doc  ! sediment OC pool
+      !# Variable identifiers (links)
+      INTEGER  :: id_oxy,  id_dic
+      INTEGER  :: id_nit,  id_no2,  id_n2o, id_amm
+      INTEGER  :: id_frp,  id_fe,   id_ch4, id_so4
+      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_extc, id_rho, id_dz
+      INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop, id_Psed_cpom ! sedimentation rates
       INTEGER  :: id_Fsed_pon, id_Fsed_don ! sed. rate organic nitrogen
       INTEGER  :: id_Fsed_pop, id_Fsed_dop ! sed. rate organic phosphorus
       INTEGER  :: id_Fsed_poc, id_Fsed_doc ! sed. rate organic carbon
-      INTEGER  :: id_Psed_poc, id_Psed_pon, id_Psed_pop, id_Psed_cpom ! sedimentation rates
-      INTEGER  :: id_temp, id_salt, id_vis, id_uva, id_uvb, id_extc, id_rho, id_dz
-
-      INTEGER  :: id_pon_miner, id_don_miner
-      INTEGER  :: id_pop_miner, id_dop_miner
-      INTEGER  :: id_poc_miner, id_doc_miner
-      INTEGER  :: id_sed_pon, id_sed_don
-      INTEGER  :: id_sed_pop, id_sed_dop
-      INTEGER  :: id_sed_poc, id_sed_doc
-      INTEGER  :: id_bod, id_cdom
-      INTEGER  :: id_docr_miner, id_donr_miner, id_dopr_miner
-      INTEGER  :: id_pom_vvel, id_cpom_vvel
-      INTEGER  :: id_l_resus, id_denit, id_anaerobic
+      !# Variable identifiers (diags)
+      INTEGER  :: id_pon_miner,  id_don_miner
+      INTEGER  :: id_pop_miner,  id_dop_miner
+      INTEGER  :: id_poc_miner,  id_doc_miner
+      INTEGER  :: id_swi_pon,    id_swi_don
+      INTEGER  :: id_swi_pop,    id_swi_dop
+      INTEGER  :: id_swi_poc,    id_swi_doc
+      INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner
+      INTEGER  :: id_sed_toc,    id_sed_ton,     id_sed_top
+      INTEGER  :: id_l_resus,    id_denit,       id_anaerobic
+      INTEGER  :: id_pom_vvel,   id_cpom_vvel
+      INTEGER  :: id_bod,        id_cdom
+      INTEGER  :: id_photolysis
 
       !# Model options
       INTEGER  :: resuspension, settling
-      INTEGER  :: simDenitrification,simFeReduction,simSO4Reduction,simMethanogenesis
-      LOGICAL  :: simRPools,extra_diag,simphotolysis
-      LOGICAL  :: simSedimentOM
+      INTEGER  :: simDenitrification,simFeReduction,simSO4Reduction,simMethanogenesis,simSedimentOM
+      LOGICAL  :: simRPools,simPhotolysis
       LOGICAL  :: use_oxy,use_amm,use_frp,use_dic,use_nit,use_no2,use_n2o,use_fe3,use_ch4,use_so4
-      LOGICAL  :: use_Fsed_model,use_Psed_model
+      LOGICAL  :: use_Fsed_link_don, use_Fsed_link_dop, use_Fsed_link_doc
+      LOGICAL  :: use_Fsed_link_pon, use_Fsed_link_pop, use_Fsed_link_poc
+      LOGICAL  :: use_Psed_link_pon, use_Psed_link_pop, use_Psed_link_poc
+      LOGICAL  :: extra_diag
 
       !# Model parameters
-      AED_REAL :: Rpoc_hydrol, Rpon_hydrol, Rpop_hydrol, &
-                  Rdoc_minerl, Rdon_minerl, Rdop_minerl, Rdom_minerl, &
+      AED_REAL :: Rpoc_hydrol,  Rpon_hydrol,  Rpop_hydrol,                     &
+                  Rdoc_minerl,  Rdon_minerl,  Rdop_minerl, Rdom_minerl,        &
                   theta_hydrol, theta_minerl, Kpom_hydrol, Kdom_minerl, f_an
-      AED_REAL :: Rdomr_minerl, Rcpom_bdown, X_cpom_n, X_cpom_p
+      AED_REAL :: Rdomr_minerl, Rcpom_bdown,  X_cpom_n,    X_cpom_p
       AED_REAL :: Ko2_0,Kin_denitrat,Kin_denitrit,Kin_denitrous,Klim_denitrous,Klim_denitrit,Kpart_denitrit
       AED_REAL :: K_nit,K_so4,K_fe
       AED_REAL :: KeDOM, KePOM, KeDOMR, KeCPOM, photo_fmin
@@ -123,12 +130,11 @@ MODULE aed_organic_matter
          PROCEDURE :: calculate_benthic => aed_calculate_benthic_organic_matter
          PROCEDURE :: mobility          => aed_mobility_organic_matter
          PROCEDURE :: light_extinction  => aed_light_extinction_organic_matter
-!        PROCEDURE :: delete            => aed_delete_organic_matter
 
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10
    AED_REAL :: c
 
 !===============================================================================
@@ -138,17 +144,18 @@ CONTAINS
 !###############################################################################
 SUBROUTINE aed_define_organic_matter(data, namlst)
 !-------------------------------------------------------------------------------
-! Initialise the AED model
+! Initialise the AED module
 !
-!  Here, the aed namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  Here, the aed namelist is read and the variables required
+!  by the module are registered for AED simulation.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   INTEGER,INTENT(in)                               :: namlst
+   INTEGER,INTENT(in)                              :: namlst
    CLASS (aed_organic_matter_data_t),INTENT(inout) :: data
 !
 !LOCALS
    INTEGER                   :: status
+   AED_REAL                  :: initial_sedom
 
 !  %% NAMELIST
    !-- Default initial values and limits
@@ -185,10 +192,11 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    AED_REAL                  :: Kin_denitrat   = 20.0
    AED_REAL                  :: Kin_denitrit   =  0.297
    AED_REAL                  :: Kin_denitrous  =  0.205
-   AED_REAL                  :: K_nit          = 1.
-   AED_REAL                  :: Klim_denitrous = 1.
-   AED_REAL                  :: Klim_denitrit  = 1.
-   AED_REAL                  :: Kpart_denitrit = 1.
+   AED_REAL                  :: K_nit          =  1.
+   AED_REAL                  :: Klim_denitrous =  1.
+   AED_REAL                  :: Klim_denitrit  =  1.
+   AED_REAL                  :: Kpart_denitrit =  1.
+   CHARACTER(len=64)         :: denit_link     = 'NIT_denit'
    CHARACTER(len=64)         :: dom_miner_oxy_reactant_var=''
    CHARACTER(len=64)         :: dom_miner_nit_reactant_var=''
    CHARACTER(len=64)         :: dom_miner_no2_reactant_var=''
@@ -199,65 +207,67 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    CHARACTER(len=64)         :: doc_miner_product_variable=''
    CHARACTER(len=64)         :: don_miner_product_variable=''
    CHARACTER(len=64)         :: dop_miner_product_variable=''
-   CHARACTER(len=64)         :: denit_link     = 'NIT_denit'
 
    !-- Refractory organic matter (optional)
-   LOGICAL                   :: simRPools      = .false.
-   AED_REAL                  :: Rdomr_minerl   =   0.001
-   AED_REAL                  :: Rcpom_bdown    =   0.001
-   AED_REAL                  :: X_cpom_n       =  16./106.
-   AED_REAL                  :: X_cpom_p       =   1./106.
+   LOGICAL                   :: simRPools     = .false.
+   AED_REAL                  :: Rdomr_minerl  =   0.001
+   AED_REAL                  :: Rcpom_bdown   =   0.001
+   AED_REAL                  :: X_cpom_n      =  16./106.
+   AED_REAL                  :: X_cpom_p      =   1./106.
    CHARACTER(len=64)         :: docr_miner_product_variable='OGM_doc'
    CHARACTER(len=64)         :: donr_miner_product_variable='OGM_don'
    CHARACTER(len=64)         :: dopr_miner_product_variable='OGM_dop'
 
    !-- Light related parameters
-   AED_REAL                  :: KeDOM  = 0.0001
-   AED_REAL                  :: KePOM  = 0.0001
-   AED_REAL                  :: KeDOMR = 0.0001
-   AED_REAL                  :: KeCPOM = 0.0001
-   AED_REAL                  :: photo_fmin = 0.9
-   AED_REAL                  :: photo_c    = 7.52
+   AED_REAL                  :: KeDOM         = 0.0001
+   AED_REAL                  :: KePOM         = 0.0001
+   AED_REAL                  :: KeDOMR        = 0.0001
+   AED_REAL                  :: KeCPOM        = 0.0001
+   AED_REAL                  :: photo_fmin    = 0.9
+   AED_REAL                  :: photo_c       = 7.52
    LOGICAL                   :: simPhotolysis = .FALSE.
 
    !-- Particle settling parameters
-   INTEGER                   :: settling = 0
-   AED_REAL                  :: w_pom
-   AED_REAL                  :: d_pom
-   AED_REAL                  :: rho_pom
-   AED_REAL                  :: w_cpom
-   AED_REAL                  :: d_cpom
-   AED_REAL                  :: rho_cpom
+   INTEGER                   :: settling      = 0
+   AED_REAL                  :: w_pom         = zero_
+   AED_REAL                  :: d_pom         = zero_
+   AED_REAL                  :: rho_pom       = zero_
+   AED_REAL                  :: w_cpom        = zero_
+   AED_REAL                  :: d_cpom        = zero_
+   AED_REAL                  :: rho_cpom      = zero_
    CHARACTER(len=64)         :: Psed_poc_variable=''
    CHARACTER(len=64)         :: Psed_pon_variable=''
    CHARACTER(len=64)         :: Psed_pop_variable=''
    CHARACTER(len=64)         :: Psed_cpom_variable=''
 
    !-- Sediment interaction parameters (basic model)
-   INTEGER                   :: resuspension   = 0
-   AED_REAL                  :: sedimentOMfrac = 0.0
-   AED_REAL                  :: Xsc
-   AED_REAL                  :: Xsn
-   AED_REAL                  :: Xsp
-   AED_REAL                  :: Fsed_doc
-   AED_REAL                  :: Fsed_don
-   AED_REAL                  :: Fsed_dop
-   AED_REAL                  :: Ksed_dom
-   AED_REAL                  :: theta_sed_dom = 1.0
+   INTEGER                   :: resuspension     = 0
+   INTEGER                   :: simSedimentOM    = 0
+   AED_REAL                  :: sedimentOMfrac   = zero_
+   AED_REAL                  :: sedimentBulkDens = 1.3e3
+   AED_REAL                  :: sedimentDepth    = 0.5
+   AED_REAL                  :: Xsc              = zero_
+   AED_REAL                  :: Xsn              = zero_
+   AED_REAL                  :: Xsp              = zero_
+   AED_REAL                  :: Fsed_doc         = zero_
+   AED_REAL                  :: Fsed_don         = zero_
+   AED_REAL                  :: Fsed_dop         = zero_
+   AED_REAL                  :: Ksed_dom         = zero_
+   AED_REAL                  :: theta_sed_dom    = 1.0
+   CHARACTER(len=64)         :: resus_link       =''
    CHARACTER(len=64)         :: Fsed_poc_variable=''
    CHARACTER(len=64)         :: Fsed_doc_variable=''
    CHARACTER(len=64)         :: Fsed_pon_variable=''
    CHARACTER(len=64)         :: Fsed_don_variable=''
    CHARACTER(len=64)         :: Fsed_pop_variable=''
    CHARACTER(len=64)         :: Fsed_dop_variable=''
-   CHARACTER(len=64)         :: resus_link=''
 
    !-- Misc options
    LOGICAL                   :: extra_diag = .FALSE.
 !  %% END NAMELIST
 
    !-- Parameters to read in
-   NAMELIST /aed_organic_matter/   om_min, om_max,                            &
+   NAMELIST /aed_organic_matter/   om_min, om_max,                             &
                       poc_initial,pon_initial,pop_initial,                     &
                       doc_initial,don_initial,dop_initial,                     &
                       docr_initial, donr_initial, dopr_initial, cpom_initial,  &
@@ -267,39 +277,42 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
                       dom_miner_oxy_reactant_var, dom_miner_nit_reactant_var,  &
                       dom_miner_no2_reactant_var, dom_miner_n2o_reactant_var,  &
                       dom_miner_fe3_reactant_var, dom_miner_so4_reactant_var,  &
-                      dom_miner_ch4_reactant_var,doc_miner_product_variable,   &
-                      don_miner_product_variable,dop_miner_product_variable,   &
+                      dom_miner_ch4_reactant_var, doc_miner_product_variable,  &
+                      don_miner_product_variable, dop_miner_product_variable,  &
                       simRPools,Rdomr_minerl,                                  &
                       Rcpom_bdown,X_cpom_n,X_cpom_p,                           &
                       Kin_denitrat,Kin_denitrit,Kin_denitrous,K_nit,           &
                       Klim_denitrous,Klim_denitrit,Kpart_denitrit,             &
                       KeDOM, KePOM, KeDOMR, KeCPOM,                            &
-                      simphotolysis, photo_fmin, photo_c,                      &
+                      simPhotolysis, photo_fmin, photo_c,                      &
                       settling,w_pom,d_pom,rho_pom,w_cpom,d_cpom,rho_cpom,     &
                       Psed_poc_variable, Psed_pon_variable,                    &
                       Psed_pop_variable,Psed_cpom_variable,                    &
-                      resuspension, resus_link, sedimentOMfrac, Xsc, Xsn, Xsp, &
+                      resuspension, resus_link,                                &
+                      sedimentOMfrac,sedimentBulkDens,sedimentDepth,           &
+                      Xsc,Xsn,Xsp,                                             &
                       Fsed_doc,Fsed_don,Fsed_dop,Ksed_dom,theta_sed_dom,       &
                       Fsed_poc_variable, Fsed_doc_variable,                    &
                       Fsed_pop_variable, Fsed_dop_variable,                    &
                       Fsed_pon_variable, Fsed_don_variable,                    &
                       simDenitrification, simFeReduction,                      &
-                      simSO4Reduction, simMethanogenesis,                      &
+                      simSO4Reduction, simMethanogenesis, simSedimentOM,       &
                       extra_diag, diag_level
 
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_organic_matter initialization"
 
-   ! Default parameters set above
-
+   ! Default parameters set above at declaration
 
    ! Read the namelist
    read(namlst,nml=aed_organic_matter,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed_organic_matter'
 
-   ! Store parameter values in the modules dat structure
-   !   NB: all rates are provided in values per day,
+   IF( extra_diag )   diag_level = 10           ! legacy use of extra_diag
+
+   ! Store parameter values in the modules data structure
+   !   Note: all rates are provided via input as values per day,
    !       and are converted here to values per second.
 
    !-- Breakdown and mineralisation (basic pool)
@@ -337,7 +350,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%KePOM               = KePOM
    data%KeDOMR              = KeDOMR
    data%KeCPOM              = KeCPOM
-   data%simphotolysis       = simphotolysis
+   data%simPhotolysis       = simPhotolysis
    data%photo_fmin          = photo_fmin
    c = photo_c
    !-- Particle settling parameters
@@ -353,6 +366,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    ENDIF
    !-- Sediment interaction parameters (basic model)
    data%resuspension        = resuspension
+   data%simSedimentOM       = simSedimentOM
    data%sedimentOMfrac      = sedimentOMfrac
    data%Xsc                 = Xsc
    data%Xsn                 = Xsn
@@ -365,10 +379,9 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    !-- Misc options
    data%extra_diag          = extra_diag
 
-   data%id_docr = 0 ; data%id_donr = 0
-   data%id_dopr = 0 ; data%id_cpom = 0
 
    ! Register state variables
+
    data%id_doc = aed_define_variable('doc','mmol/m**3','dissolved organic carbon', &
                                     doc_initial,minimum=om_min,maximum=om_max)
    data%id_poc = aed_define_variable('poc','mmol/m**3','particulate organic carbon', &
@@ -381,6 +394,9 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
                                     dop_initial,minimum=om_min,maximum=om_max)
    data%id_pop = aed_define_variable('pop','mmol/m**3','particulate organic phosphorus', &
                                     pop_initial,minimum=om_min,maximum=om_max,mobility=data%w_pom)
+
+   data%id_docr = 0 ; data%id_donr = 0
+   data%id_dopr = 0 ; data%id_cpom = 0
    IF (simRPools) THEN
      data%id_docr = aed_define_variable('docr','mmol/m**3',&
                                          'refractory dissolved organic carbon',&
@@ -396,7 +412,56 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
                                          cpom_initial,minimum=zero_,mobility=data%w_cpom)
    ENDIF
 
-   ! Register external state variable dependencies
+   IF (simSedimentOM>0) THEN
+     ! Initialise OM pools here.
+     ! simSedimentOM = 1 - initialise to zero and look at relative evolution
+     ! simSedimentOM = 2 - initialise mass based %OM and bulk density (assume 50:50 POM:DOM)
+     initial_sedom = zero_
+     IF (simSedimentOM>1) &
+       initial_sedom = sedimentBulkDens * sedimentDepth * sedimentOMfrac * Xsc * 0.5 / (12.0/1e3)
+     data%id_sed_doc = aed_define_sheet_variable( 'sed_doc',                   &
+                                                  'mmol/m**2',                 &
+                                                  'sediment doc mass',         &
+                                                  initial_sedom,               &
+                                                  minimum=-1e10)
+     IF (simSedimentOM>1) &
+       initial_sedom = sedimentBulkDens * sedimentDepth * sedimentOMfrac * Xsn * 0.5 / (14.0/1e3)
+     data%id_sed_don = aed_define_sheet_variable( 'sed_don',                   &
+                                                  'mmol/m**2',                 &
+                                                  'sediment don mass',         &
+                                                  initial_sedom,               &
+                                                  minimum=-1e10)
+     IF (simSedimentOM>1) &
+       initial_sedom = sedimentBulkDens * sedimentDepth * sedimentOMfrac * Xsp * 0.5 / (30.9/1e3)
+     data%id_sed_dop = aed_define_sheet_variable( 'sed_dop',                   &
+                                                  'mmol/m**2',                 &
+                                                  'sediment dop mass',         &
+                                                  initial_sedom,               &
+                                                  minimum=-1e10)
+     IF (simSedimentOM>1) &
+       initial_sedom = sedimentBulkDens * sedimentDepth * sedimentOMfrac * Xsc * 0.5 / (12.0/1e3)
+     data%id_sed_poc = aed_define_sheet_variable( 'sed_poc',                   &
+                                                  'mmol/m**2',                 &
+                                                  'sediment poc mass',         &
+                                                  initial_sedom,               &
+                                                  minimum=-1e10)
+     IF (simSedimentOM>1) &
+       initial_sedom = sedimentBulkDens * sedimentDepth * sedimentOMfrac * Xsn * 0.5 / (14.0/1e3)
+     data%id_sed_pon = aed_define_sheet_variable( 'sed_pon',                   &
+                                                  'mmol/m**2',                 &
+                                                  'sediment pon mass',         &
+                                                  initial_sedom,               &
+                                                  minimum=-1e10)
+     IF (simSedimentOM>1) &
+       initial_sedom = sedimentBulkDens * sedimentDepth * sedimentOMfrac * Xsp * 0.5 / (30.9/1e3)
+     data%id_sed_pop = aed_define_sheet_variable( 'sed_pop',                   &
+                                                  'mmol/m**2',                 &
+                                                  'sediment pop mass',         &
+                                                  initial_sedom,               &
+                                                  minimum=-1e10)
+   ENDIF
+
+   ! Register external (linked) state variable dependencies
    !-- oxygen & oxidants
    data%use_nit = .FALSE. ; data%use_no2 = .FALSE. ; data%use_n2o = .FALSE.
    data%use_oxy = dom_miner_oxy_reactant_var .NE. '' !This means oxygen module switched on
@@ -465,39 +530,42 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_Fsed_pon = -1 ; data%id_Fsed_pop = -1 ; data%id_Fsed_poc = -1
    data%id_Fsed_don = -1 ; data%id_Fsed_dop = -1 ; data%id_Fsed_doc = -1
 
-   data%use_Fsed_model = Fsed_pon_variable .NE. ''
-   IF (data%use_Fsed_model) THEN
-     data%id_Fsed_pon = aed_locate_global_sheet(Fsed_pon_variable)
-     IF (Fsed_don_variable .NE. '') &
-        data%id_Fsed_don = aed_locate_global_sheet(Fsed_don_variable)
-     IF (Fsed_pop_variable .NE. '') &
-        data%id_Fsed_pop = aed_locate_global_sheet(Fsed_pop_variable)
-     IF (Fsed_dop_variable .NE. '') &
-        data%id_Fsed_dop = aed_locate_global_sheet(Fsed_dop_variable)
-     IF (Fsed_poc_variable .NE. '') &
-        data%id_Fsed_poc = aed_locate_global_sheet(Fsed_poc_variable)
-     IF (Fsed_doc_variable .NE. '') &
-        data%id_Fsed_doc = aed_locate_global_sheet(Fsed_doc_variable)
-   ENDIF
+   data%use_Fsed_link_doc = Fsed_doc_variable .NE. ''
+   IF (data%use_Fsed_link_doc) data%id_Fsed_doc = aed_locate_global_sheet(Fsed_doc_variable)
+   data%use_Fsed_link_don = Fsed_don_variable .NE. ''
+   IF (data%use_Fsed_link_don) data%id_Fsed_don = aed_locate_global_sheet(Fsed_don_variable)
+   data%use_Fsed_link_dop = Fsed_dop_variable .NE. ''
+   IF (data%use_Fsed_link_dop) data%id_Fsed_dop = aed_locate_global_sheet(Fsed_dop_variable)
+   data%use_Fsed_link_poc = Fsed_poc_variable .NE. ''
+   IF (data%use_Fsed_link_poc) data%id_Fsed_poc = aed_locate_global_sheet(Fsed_poc_variable)
+   data%use_Fsed_link_pon = Fsed_pon_variable .NE. ''
+   IF (data%use_Fsed_link_pon) data%id_Fsed_pon = aed_locate_global_sheet(Fsed_pon_variable)
+   data%use_Fsed_link_pop = Fsed_pop_variable .NE. ''
+   IF (data%use_Fsed_link_pop) data%id_Fsed_pop = aed_locate_global_sheet(Fsed_pop_variable)
 
    !-- sedimentation link variables
    data%id_Psed_poc = -1 ; data%id_Psed_pon = -1 ; data%id_Psed_pop = -1
-   data%use_Psed_model = Psed_poc_variable .NE. ''
-   IF (data%use_Psed_model) THEN
-     ! locate link variables
+
+   data%use_Psed_link_poc = Psed_poc_variable .NE. ''
+   IF (data%use_Psed_link_poc) THEN
      data%id_Psed_poc = aed_locate_global_sheet(Psed_poc_variable)
-     IF (Psed_pon_variable .NE. '') &
-        data%id_Psed_pon = aed_locate_global_sheet(Psed_pon_variable)
-     IF (Psed_pop_variable .NE. '') &
-        data%id_Psed_pop = aed_locate_global_sheet(Psed_pop_variable)
    ELSE
-     ! make some diagnostics for internal use
      data%id_Psed_poc = aed_define_diag_variable('Psed_poc','mmol/m**2/s',  'POC sedimentation')
-     data%id_Psed_pon = aed_define_diag_variable('Psed_pon','mmol/m**2/s',  'POC sedimentation')
-     data%id_Psed_pop = aed_define_diag_variable('Psed_pop','mmol/m**2/s',  'POC sedimentation')
      IF (simRPools) &
        data%id_Psed_cpom = aed_define_diag_variable('Psed_cpom','mmol/m**2/s',  'CPOM sedimentation')
    ENDIF
+   data%use_Psed_link_pon = Psed_pon_variable .NE. ''
+   IF (data%use_Psed_link_pon) THEN
+     data%id_Psed_pon = aed_locate_global_sheet(Psed_pon_variable)
+   ELSE
+     data%id_Psed_pon = aed_define_diag_variable('Psed_pon','mmol/m**2/s',  'PON sedimentation')
+   ENDIF
+   IF (data%use_Psed_link_pop) THEN
+     data%id_Psed_pop = aed_locate_global_sheet(Psed_pop_variable)
+   ELSE
+     data%id_Psed_pop = aed_define_diag_variable('Psed_pop','mmol/m**2/s',  'POP sedimentation')
+   ENDIF
+
 
    !-- resuspension link variable
    IF ( resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
@@ -509,64 +577,70 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
 
    !-- light
    IF (simRPools) THEN
-     data%id_vis= aed_locate_global('par')
-     data%id_uva= aed_locate_global('uva')
-     data%id_uvb= aed_locate_global('uvb')
-     data%id_extc=aed_locate_global('extc_coef')
-     data%id_dz=  aed_locate_global('layer_ht')
+     data%id_vis = aed_locate_global('par')
+     data%id_uva = aed_locate_global('uva')
+     data%id_uvb = aed_locate_global('uvb')
+     data%id_extc= aed_locate_global('extc_coef')
+     data%id_dz  = aed_locate_global('layer_ht')
    ENDIF
 
    ! Register diagnostic variables
-   data%id_cdom = aed_define_diag_variable('CDOM','/m',  'Chromophoric DOM (CDOM)')
-
-   data%id_sed_poc = 0
-   data%id_sed_doc = 0
-   data%id_sed_pon = 0
-   data%id_sed_don = 0
-   data%id_sed_pop = 0
-   data%id_sed_dop = 0
-   data%id_poc_miner = 0
-   data%id_doc_miner = 0
-   data%id_pon_miner = 0
-   data%id_don_miner = 0
-   data%id_pop_miner = 0
-   data%id_dop_miner = 0
-   data%id_denit = 0
-   data%id_bod = 0
+   data%id_swi_poc    = 0
+   data%id_swi_doc    = 0
+   data%id_swi_pon    = 0
+   data%id_swi_don    = 0
+   data%id_swi_pop    = 0
+   data%id_swi_dop    = 0
+   data%id_poc_miner  = 0
+   data%id_doc_miner  = 0
+   data%id_pon_miner  = 0
+   data%id_don_miner  = 0
+   data%id_pop_miner  = 0
+   data%id_dop_miner  = 0
+   data%id_denit      = 0
+   data%id_bod        = 0
    data%id_photolysis = 0
    data%id_docr_miner = 0
    data%id_donr_miner = 0
    data%id_dopr_miner = 0
 
-   IF (extra_diag) THEN
-     data%id_sed_poc = aed_define_sheet_diag_variable('sed_poc','mmol/m**2/d',  'Net POC sediment flux')
-     data%id_sed_doc = aed_define_sheet_diag_variable('sed_doc','mmol/m**2/d',  'DOC sediment flux')
-     data%id_sed_pon = aed_define_sheet_diag_variable('sed_pon','mmol/m**2/d',  'Net PON sediment flux')
-     data%id_sed_don = aed_define_sheet_diag_variable('sed_don','mmol/m**2/d',  'DON sediment flux')
-     data%id_sed_pop = aed_define_sheet_diag_variable('sed_pop','mmol/m**2/d',  'Net POP sediment flux')
-     data%id_sed_dop = aed_define_sheet_diag_variable('sed_dop','mmol/m**2/d',  'DOP sediment flux')
-     data%id_poc_miner = aed_define_diag_variable('poc_hydrol','mmol/m**3/d','POC hydrolosis')
-     data%id_doc_miner = aed_define_diag_variable('doc_miner','mmol/m**3/d','DOC mineralisation')
-     data%id_pon_miner = aed_define_diag_variable('pon_hydrol','mmol/m**3/d','PON hydrolosis')
-     data%id_don_miner = aed_define_diag_variable('don_miner','mmol/m**3/d','DON mineralisation')
-     data%id_pop_miner = aed_define_diag_variable('pop_hydrol','mmol/m**3/d','POP hydrolysis')
-     data%id_dop_miner = aed_define_diag_variable('dop_miner','mmol/m**3/d','DOP mineralisation')
-     data%id_anaerobic = aed_define_diag_variable('anaerobic','mmol/m**3/d','anaerobic metabolism')
-     data%id_denit = aed_define_diag_variable('denit','mmol/m**3/d','denitrification')
-     
-     
-    IF (simRPools) THEN
+    IF ( diag_level>0 ) THEN
+      data%id_cdom = aed_define_diag_variable('CDOM','/m',  'Chromophoric DOM (CDOM)')
+      data%id_sed_toc  = aed_define_sheet_diag_variable('sed_toc','mmol/m**2',  'Sediment TOC mass')
+      data%id_sed_ton  = aed_define_sheet_diag_variable('sed_ton','mmol/m**2',  'Sediment TON mass')
+      data%id_sed_top  = aed_define_sheet_diag_variable('sed_top','mmol/m**2',  'Sediment TOP mass')
+    ENDIF
+
+   IF ( diag_level>1 ) THEN
+     data%id_swi_poc  = aed_define_sheet_diag_variable('swi_poc','mmol/m**2/d',  'Net POC flux @ the SWI')
+     data%id_swi_doc  = aed_define_sheet_diag_variable('swi_doc','mmol/m**2/d',  'Net DOC flux @ the SWI')
+     data%id_swi_pon  = aed_define_sheet_diag_variable('swi_pon','mmol/m**2/d',  'Net PON flux @ the SWI')
+     data%id_swi_don  = aed_define_sheet_diag_variable('swi_don','mmol/m**2/d',  'Net DON flux @ the SWI')
+     data%id_swi_pop  = aed_define_sheet_diag_variable('swi_pop','mmol/m**2/d',  'Net POP flux @ the SWI')
+     data%id_swi_dop  = aed_define_sheet_diag_variable('swi_dop','mmol/m**2/d',  'Net DOP flux @ the SWI')
+     data%id_poc_miner= aed_define_diag_variable('poc_hydrol','mmol/m**3/d','POC hydrolosis')
+     data%id_doc_miner= aed_define_diag_variable('doc_miner' ,'mmol/m**3/d','DOC mineralisation')
+     data%id_pon_miner= aed_define_diag_variable('pon_hydrol','mmol/m**3/d','PON hydrolosis')
+     data%id_don_miner= aed_define_diag_variable('don_miner' ,'mmol/m**3/d','DON mineralisation')
+     data%id_pop_miner= aed_define_diag_variable('pop_hydrol','mmol/m**3/d','POP hydrolysis')
+     data%id_dop_miner= aed_define_diag_variable('dop_miner' ,'mmol/m**3/d','DOP mineralisation')
+     data%id_anaerobic= aed_define_diag_variable('anaerobic' ,'mmol/m**3/d','anaerobic metabolism')
+     data%id_denit    = aed_define_diag_variable('denit'     ,'mmol/m**3/d','denitrification')
+
+     IF (simRPools) THEN
         data%id_docr_miner = aed_define_diag_variable('docr_miner','mmol/m**3/d','DOCR mineralisation')
         data%id_donr_miner = aed_define_diag_variable('donr_miner','mmol/m**3/d','DONR mineralisation')
         data%id_dopr_miner = aed_define_diag_variable('dopr_miner','mmol/m**3/d','DOPR mineralisation')
-    ENDIF
+     ENDIF
 
      data%id_bod = aed_define_diag_variable('BOD5','mg O2/L',  'Biochemical Oxygen Demand (BOD)')
-     IF ( simphotolysis .and. simRpools  ) data%id_photolysis = &
+
+     IF ( simPhotolysis .and. simRpools  ) data%id_photolysis = &
        aed_define_diag_variable('photolysis','mmol C/m3/d',  'photolysis rate of breakdown of DOC')
 
-     data%id_pom_vvel = aed_define_diag_variable('pom_vvel','m/d','POM vertical velocity')
+     data%id_pom_vvel  = aed_define_diag_variable('pom_vvel','m/d','POM vertical velocity')
      data%id_cpom_vvel = aed_define_diag_variable('cpom_vvel','m/d','CPOM vertical velocity')
+
    ENDIF
 
    ! Register environmental dependencies
@@ -575,43 +649,6 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_rho  = aed_locate_global('density')
 
 END SUBROUTINE aed_define_organic_matter
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-AED_REAL FUNCTION photo(Q, cdom, band)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   AED_REAL,INTENT(in) :: Q          ! [W/m2] incoming light intensity
-   AED_REAL,INTENT(in) :: cdom       ! [/m] current cdom absorbance (based on doc)
-   INTEGER, INTENT(in) :: band       ! [-] bandwidth identifier (VIS, UVA, UVB)
-!LOCALS
-!  AED_REAL,PARAMETER :: c = 7.52    ! in NML as photo_c and module global c
-   AED_REAL,PARAMETER :: d = 0.0122  ! ref
-   AED_REAL,PARAMETER :: S = 0.0188  ! ref
-   AED_REAL,PARAMETER :: x = 440.    ! [nm] wavelength at which cdom is measured
-   AED_REAL,PARAMETER :: lamda(3) = (/440., 358., 298./) ! [nm] wavelengths
-   ! vis = 390-700 nanometers
-   ! uva = 315-400 nanometers
-   ! uvb = 280-315 nanometers
-!
-   AED_REAL :: phi, alpha, QQ
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   ! convert incoming light to quantum units: [mol photons /m2 /hr]
-   QQ = Q * 4.53 * 1e-6 * 3.6e3
-
-   ! apparent quantum yield [mol produced /(mol absorbed photons) /nm-1]
-   phi = c * 10.**(-(d*lamda(band)))
-
-   ! absorption coefficient (/m)
-   alpha = cdom*exp(S*(x-lamda(band)))
-
-   ! return the rate at which DOC is broken down [mmol C /m3 /s]
-   photo = phi * QQ * alpha * 1e3 / 3.6e3
-
-END FUNCTION photo
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -651,23 +688,23 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    !---------------------------------------------------------------------------+
 
    !# Initialisations
-   photolysis = zero_
-   photo_fmin = data%photo_fmin
-   denitrification = zero_
    nit = zero_
+   docr = zero_
+   photolysis = zero_
+   denitrification = zero_
+   photo_fmin = data%photo_fmin
 
    !# Retrieve current environmental conditions.
-   temp = _STATE_VAR_(data%id_temp) ! temperature
+   temp = _STATE_VAR_(data%id_temp)  ! temperature
 
    !# Retrieve current (local) state variable values.
-   poc = _STATE_VAR_(data%id_poc) ! particulate organic carbon
-   pon = _STATE_VAR_(data%id_pon) ! particulate organic nitrogen
-   pop = _STATE_VAR_(data%id_pop) ! particulate organic phosphorus
-   doc = _STATE_VAR_(data%id_doc) ! dissolved organic carbon
-   don = _STATE_VAR_(data%id_don) ! dissolved organic nitrogen
-   dop = _STATE_VAR_(data%id_dop) ! dissolved organic phosphorus
+   poc = _STATE_VAR_(data%id_poc)    ! particulate organic carbon
+   pon = _STATE_VAR_(data%id_pon)    ! particulate organic nitrogen
+   pop = _STATE_VAR_(data%id_pop)    ! particulate organic phosphorus
+   doc = _STATE_VAR_(data%id_doc)    ! dissolved organic carbon
+   don = _STATE_VAR_(data%id_don)    ! dissolved organic nitrogen
+   dop = _STATE_VAR_(data%id_dop)    ! dissolved organic phosphorus
 
-   docr = zero_
    IF(data%simRPools) THEN
       docr = _STATE_VAR_(data%id_docr)
       donr = _STATE_VAR_(data%id_donr)
@@ -685,33 +722,33 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    IF (data%id_denit>0) denitrification = _DIAG_VAR_(data%id_denit) / secs_per_day
 
    IF (data%use_oxy) THEN
-      oxy = _STATE_VAR_(data%id_oxy)! oxygen
+      oxy = _STATE_VAR_(data%id_oxy) ! oxygen
    ELSE
       oxy = 300.0
    ENDIF
    IF (data%use_nit) THEN
-      nit = _STATE_VAR_(data%id_nit)! nitrate
+      nit = _STATE_VAR_(data%id_nit) ! nitrate
    ELSE
       nit = 300.0
    ENDIF
    IF (data%use_no2) THEN
-      no2 = _STATE_VAR_(data%id_no2)! nitrite
+      no2 = _STATE_VAR_(data%id_no2) ! nitrite
    ELSE
       no2 = 300.0
    ENDIF
    IF (data%use_n2o) THEN
-      n2o = _STATE_VAR_(data%id_n2o)! nitrous oxide
+      n2o = _STATE_VAR_(data%id_n2o) ! nitrous oxide
    ELSE
       n2o = 300.0
    ENDIF
    IF (data%use_dic) THEN
-      dic = _STATE_VAR_(data%id_dic)! dissolved inorganic carbon
+      dic = _STATE_VAR_(data%id_dic) ! dissolved inorganic carbon
    ENDIF
    IF (data%use_amm) THEN
-      amm = _STATE_VAR_(data%id_amm)! ammonium
+      amm = _STATE_VAR_(data%id_amm) ! ammonium
    ENDIF
    IF (data%use_frp) THEN
-      frp = _STATE_VAR_(data%id_frp)! phosphate
+      frp = _STATE_VAR_(data%id_frp) ! phosphate
    ENDIF
    IF (data%use_fe3) THEN
       feiii = _STATE_VAR_(data%id_fe)
@@ -728,6 +765,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    ELSE
       ch4 = 0.
    ENDIF
+
 
    !---------------------------------------------------------------------------+
    !# Reaction rates
@@ -803,7 +841,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    ENDIF
 
    !---------------------------------------------------------------------------+
-   !# Set temporal derivatives : Oxidants
+   !# Set temporal derivatives : OXIDANTS
    doc_min_aerobic   = doc_mineralisation * (oxy/(data%Kdom_minerl+oxy))
    doc_min_anaerobic = doc_mineralisation - doc_min_aerobic
 
@@ -875,7 +913,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    doc_min_anaerobic = doc_min_anaerobic - methanogenesis
 
    !---------------------------------------------------------------------------+
-   ! Set temporal derivatives : Products of mineralisation
+   ! Set temporal derivatives : PRODUCTS of mineralisation
    if (data%use_dic) THEN
       _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (doc_mineralisation)
       IF ( data%simRPools ) _FLUX_VAR_(data%id_dic) =  &
@@ -903,15 +941,17 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
 
    !-- CDOM computed as a function of DOC amount, as empirically defined by
    !   Kostoglidis et al 2005 for Swan-Canning
-   IF ( data%simRPools ) THEN
+   IF ( diag_level>0 ) THEN
+     IF ( data%simRPools ) THEN
         cdoc = MIN(doc+docr,1.e4)
-   ELSE
+     ELSE
         cdoc = MIN(doc,1.e4)
+     ENDIF
+     _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(cdoc)*(12./1e3))
    ENDIF
-   _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(cdoc)*(12./1e3))
 
    !-- Extra diagnostics
-   IF (data%extra_diag) THEN
+   IF ( diag_level>1 ) THEN
      ! General breakdown rates
      _DIAG_VAR_(data%id_poc_miner) = poc_hydrolysis*secs_per_day
      _DIAG_VAR_(data%id_pon_miner) = pon_hydrolysis*secs_per_day
@@ -919,7 +959,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
      _DIAG_VAR_(data%id_doc_miner) = doc_mineralisation*secs_per_day
      _DIAG_VAR_(data%id_don_miner) = don_mineralisation*secs_per_day
      _DIAG_VAR_(data%id_dop_miner) = dop_mineralisation*secs_per_day
-     
+
      IF ( data%simRPools ) THEN
        _DIAG_VAR_(data%id_docr_miner) = docr_mineralisation*secs_per_day
        _DIAG_VAR_(data%id_donr_miner) = donr_mineralisation*secs_per_day
@@ -929,16 +969,14 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
      ! BOD5 is computed as the amount of oxygen consumed over a 5-day period (mgO2/L)
      _DIAG_VAR_(data%id_bod) = 32./12.*(doc_mineralisation*secs_per_day*12./1e3)*5.0
 
-     IF ( data%simphotolysis ) &
+     IF ( data%simPhotolysis ) &
         _DIAG_VAR_(data%id_photolysis) = photolysis*secs_per_day
 
      ! Anaerobic OM mineralisation
      _DIAG_VAR_(data%id_denit)     = denitrification*secs_per_day
      _DIAG_VAR_(data%id_anaerobic) = doc_min_anaerobic*secs_per_day
-
      IF ( data%simDenitrification>1 ) &
-        _DIAG_VAR_(data%id_denit) = denitratation + denitritation + denitrousation
-
+          _DIAG_VAR_(data%id_denit) = denitratation + denitritation + denitrousation
    ENDIF
 
 END SUBROUTINE aed_calculate_organic_matter
@@ -948,8 +986,8 @@ END SUBROUTINE aed_calculate_organic_matter
 !###############################################################################
 SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Calculate pelagic bottom fluxes and benthic sink and source terms of AED nitrogen.
-! Everything in units per surface area (not volume!) per time.
+! Calculate pelagic bottom fluxes and benthic sink / source terms of AED OGM.
+! Everything here is in units per surface area (not volume!) per time.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_organic_matter_data_t),INTENT(in) :: data
@@ -965,58 +1003,71 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    AED_REAL :: doc, don, dop
 
    ! Temporary variables
+   AED_REAL :: Psed_poc = 0., Psed_pon = 0., Psed_pop = 0.
    AED_REAL :: poc_flux,doc_flux
    AED_REAL :: pon_flux,don_flux
    AED_REAL :: pop_flux,dop_flux
    AED_REAL :: Fsed_poc,Fsed_doc
    AED_REAL :: Fsed_pon,Fsed_don
    AED_REAL :: Fsed_pop,Fsed_dop
-   AED_REAL :: Psed_poc, Psed_pon = 0., Psed_pop = 0.
    AED_REAL :: fT, fDO, fDOM
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   Fsed_doc = 0.0 ; Fsed_poc = 0.0 ; Fsed_dop = 0.0 ; Fsed_pop = 0.0 ; Fsed_don = 0.0 !## CAB [-Wmaybe-uninitialized]
+   Fsed_doc = 0.0 ; Fsed_poc = 0.0 ; Fsed_dop = 0.0 ; Fsed_pop = 0.0 ; Fsed_don = 0.0 ; Fsed_pon = 0.0
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
-   temp = _STATE_VAR_(data%id_temp)                   ! local temperature
-   oxy = 300. ; IF (data%use_oxy) oxy = _STATE_VAR_(data%id_oxy)
+   temp = _STATE_VAR_(data%id_temp)    ! local temperature
+   oxy  = 300. ; IF (data%use_oxy) oxy = _STATE_VAR_(data%id_oxy)
 
    ! Retrieve current (local) state variable values.
-   poc = _STATE_VAR_(data%id_poc) ! particulate organic carbon
-   doc = _STATE_VAR_(data%id_doc) ! dissolved organic carbon
-   pon = _STATE_VAR_(data%id_pon) ! particulate organic nitrogen
-   don = _STATE_VAR_(data%id_don) ! dissolved organic nitrogen
-   pop = _STATE_VAR_(data%id_pop) ! particulate organic phosphorus
-   dop = _STATE_VAR_(data%id_dop) ! dissolved organic phosphorus
+   poc = _STATE_VAR_(data%id_poc)      ! particulate organic carbon
+   doc = _STATE_VAR_(data%id_doc)      ! dissolved organic carbon
+   pon = _STATE_VAR_(data%id_pon)      ! particulate organic nitrogen
+   don = _STATE_VAR_(data%id_don)      ! dissolved organic nitrogen
+   pop = _STATE_VAR_(data%id_pop)      ! particulate organic phosphorus
+   dop = _STATE_VAR_(data%id_dop)      ! dissolved organic phosphorus
 
-   ! Set flux rate of organic matter pools
-   IF (data%use_Fsed_model) THEN
-      ! Get the flux value from the linked variable in aed_sedflux
-      Fsed_pon = _STATE_VAR_S_(data%id_Fsed_pon)
-      IF ( data%id_Fsed_don .NE. -1 ) Fsed_don = _STATE_VAR_S_(data%id_Fsed_don)
-      IF ( data%id_Fsed_pop .NE. -1 ) Fsed_pop = _STATE_VAR_S_(data%id_Fsed_pop)
-      IF ( data%id_Fsed_dop .NE. -1 ) Fsed_dop = _STATE_VAR_S_(data%id_Fsed_dop)
-      IF ( data%id_Fsed_poc .NE. -1 ) Fsed_poc = _STATE_VAR_S_(data%id_Fsed_poc)
-      IF ( data%id_Fsed_doc .NE. -1 ) Fsed_doc = _STATE_VAR_S_(data%id_Fsed_doc)
+   ! Set flux rate of dissolved organic matter pools
+   fT = data%theta_sed_dom**(temp-20.0)
+   fDO = data%Ksed_dom/(data%Ksed_dom+oxy)
+   fDOM = 1.
+
+   IF (data%use_Fsed_link_doc) THEN !Get the flux value from the linked variable
+     Fsed_doc = _STATE_VAR_S_(data%id_Fsed_doc)
+   ELSE                             !Compute directly
+     Fsed_doc = data%Fsed_doc * fDO * fT * fDOM
+   ENDIF
+   IF (data%use_Fsed_link_don) THEN
+     Fsed_don = _STATE_VAR_S_(data%id_Fsed_don)
    ELSE
-      ! Compute directly
-      !-- DOM fluxes
-      fT = data%theta_sed_dom**(temp-20.0)
-      fDO = data%Ksed_dom/(data%Ksed_dom+oxy)
-      fDOM = 1.
-      Fsed_doc = data%Fsed_doc * fDO * fT * fDOM
-      Fsed_don = data%Fsed_don * fDO * fT * fDOM
-      Fsed_dop = data%Fsed_dop * fDO * fT * fDOM
-      !-- POM fluxes
-      Fsed_poc = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsc *(bottom_stress - data%tau_0) / data%tau_r
-      Fsed_pon = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsn *(bottom_stress - data%tau_0) / data%tau_r
-      Fsed_pop = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsp *(bottom_stress - data%tau_0) / data%tau_r
-      IF( data%resuspension>0 )THEN
-        Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsc
-        Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsn
-        Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsp
-      ENDIF
+     Fsed_don = data%Fsed_don * fDO * fT * fDOM
+   ENDIF
+   IF (data%use_Fsed_link_dop) THEN
+     Fsed_dop = _STATE_VAR_S_(data%id_Fsed_dop)
+   ELSE
+     Fsed_dop = data%Fsed_dop * fDO * fT * fDOM
+   ENDIF
+
+
+   ! Set flux rate of particulate organic matter pools
+   IF (data%use_Fsed_link_poc) THEN
+     Fsed_poc = _STATE_VAR_S_(data%id_Fsed_poc)
+   ELSE ! Compute directly
+     Fsed_poc = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsc *(bottom_stress - data%tau_0) / data%tau_r
+     IF( data%resuspension>0 ) Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsc
+   ENDIF
+   IF (data%use_Fsed_link_pon) THEN
+     Fsed_pon = _STATE_VAR_S_(data%id_Fsed_pon)
+   ELSE ! Compute directly
+     Fsed_pon = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsn *(bottom_stress - data%tau_0) / data%tau_r
+     IF( data%resuspension>0 ) Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsn
+   ENDIF
+   IF (data%use_Fsed_link_pop) THEN
+     Fsed_pop = _STATE_VAR_S_(data%id_Fsed_pop)
+   ELSE ! Compute directly
+     Fsed_pop = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsp *(bottom_stress - data%tau_0) / data%tau_r
+     IF( data%resuspension>0 ) Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsp
    ENDIF
 
    ! Set bottom fluxes for the pelagic variables, note this doesnt consdier
@@ -1028,40 +1079,53 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    _FLUX_VAR_(data%id_pon) = _FLUX_VAR_(data%id_pon) + Fsed_pon
    _FLUX_VAR_(data%id_pop) = _FLUX_VAR_(data%id_pop) + Fsed_pop
 
-   ! Get sedimentation flux (mmmol/m2/s) loss into the benthos
-   IF (data%use_Psed_model) THEN
-       !-- linked variable requires populating
-       Psed_poc = data%w_pom * max(zero_,poc)
-       IF ( data%id_Psed_pon .NE. -1 ) Psed_pon = data%w_pom * max(zero_,pon)
-       IF ( data%id_Psed_pop .NE. -1 ) Psed_pop = data%w_pom * max(zero_,pop)
-       !?
+   ! Get sedimentation flux (mmmol/m2/s) loss into the sediment, crossing the SWI
+   IF (data%use_Psed_link_poc) THEN
+     !-- linked variable requires populating
+     Psed_poc = data%w_pom * max(zero_,poc)
    ELSE
-       !-- diagnostic was set in mobility
-       Psed_poc = _DIAG_VAR_(data%id_Psed_poc)
-       Psed_pon = _DIAG_VAR_(data%id_Psed_pon)
-       Psed_pop = _DIAG_VAR_(data%id_Psed_pop)
+     Psed_poc = _DIAG_VAR_(data%id_Psed_poc)
+   ENDIF
+   IF (data%use_Psed_link_pon) THEN
+     !-- linked variable requires populating
+     Psed_pon = data%w_pom * max(zero_,pon)
+   ELSE
+     Psed_pon = _DIAG_VAR_(data%id_Psed_pon)
+   ENDIF
+   IF (data%use_Psed_link_pop) THEN
+     !-- linked variable requires populating
+     Psed_pop = data%w_pom * max(zero_,pop)
+   ELSE
+     !-- diagnostic was set in mobility
+     Psed_pop = _DIAG_VAR_(data%id_Psed_pop)
    ENDIF
 
-   ! Set sink & source terms for the sediment pools (change per surface area per second)
-   ! Note that this must include fluxes to and from the pelagic.
-   IF( data%simSedimentOM ) THEN
-    !_FLUX_VAR_B_(data%id_sed_poc) = _FLUX_VAR_B_(data%id_sed_poc) - poc_flux
-    !_FLUX_VAR_B_(data%id_sed_pon) = _FLUX_VAR_B_(data%id_sed_pon) - pon_flux
-    !_FLUX_VAR_B_(data%id_sed_pop) = _FLUX_VAR_B_(data%id_sed_pop) - pop_flux
-    !_FLUX_VAR_B_(data%id_sed_doc) = _FLUX_VAR_B_(data%id_sed_doc) - doc_flux
-    !_FLUX_VAR_B_(data%id_sed_don) = _FLUX_VAR_B_(data%id_sed_don) - don_flux
-    !_FLUX_VAR_B_(data%id_sed_dop) = _FLUX_VAR_B_(data%id_sed_dop) - dop_flux
+   ! Store the net sediment fluxes across the SWI as diag variables (mmol/m2/day)
+   IF ( diag_level>1 ) THEN
+     _DIAG_VAR_S_(data%id_swi_poc) = secs_per_day*(Fsed_poc + Psed_poc) ! resus & settling
+     _DIAG_VAR_S_(data%id_swi_doc) = secs_per_day*(Fsed_doc)            ! dissolved flux
+     _DIAG_VAR_S_(data%id_swi_pon) = secs_per_day*(Fsed_pon + Psed_pon) ! resus & settling
+     _DIAG_VAR_S_(data%id_swi_don) = secs_per_day*(Fsed_don)            ! dissolved flux
+     _DIAG_VAR_S_(data%id_swi_pop) = secs_per_day*(Fsed_pop + Psed_pop) ! resus & settling
+     _DIAG_VAR_S_(data%id_swi_dop) = secs_per_day*(Fsed_dop)            ! dissolved flux
+   ENDIF
+
+   ! Set source & sink terms for the sediment pools (change per surface area per second)
+   ! Note that this includes fluxes to and from the pelagic.
+   IF( data%simSedimentOM>0 ) THEN
+    _FLUX_VAR_B_(data%id_sed_poc) = _FLUX_VAR_B_(data%id_sed_poc) -(Fsed_poc + Psed_poc)
+    _FLUX_VAR_B_(data%id_sed_pon) = _FLUX_VAR_B_(data%id_sed_pon) -(Fsed_pon + Psed_pon)
+    _FLUX_VAR_B_(data%id_sed_pop) = _FLUX_VAR_B_(data%id_sed_pop) -(Fsed_pop + Psed_pop)
+    _FLUX_VAR_B_(data%id_sed_doc) = _FLUX_VAR_B_(data%id_sed_doc) - Fsed_doc
+    _FLUX_VAR_B_(data%id_sed_don) = _FLUX_VAR_B_(data%id_sed_don) - Fsed_don
+    _FLUX_VAR_B_(data%id_sed_dop) = _FLUX_VAR_B_(data%id_sed_dop) - Fsed_dop
+    IF ( diag_level>0 ) THEN
+      _DIAG_VAR_S_(data%id_sed_toc) = _STATE_VAR_S_(data%id_sed_poc)+_STATE_VAR_S_(data%id_sed_doc)
+      _DIAG_VAR_S_(data%id_sed_ton) = _STATE_VAR_S_(data%id_sed_pon)+_STATE_VAR_S_(data%id_sed_don)
+      _DIAG_VAR_S_(data%id_sed_top) = _STATE_VAR_S_(data%id_sed_pop)+_STATE_VAR_S_(data%id_sed_dop)
+    ENDIF
   ENDIF
 
-   ! Also store net sediment fluxes as diagnostic variable (mmol/m2/day)
-   IF (data%extra_diag) THEN
-     _DIAG_VAR_S_(data%id_sed_poc) = secs_per_day*(Fsed_poc + Psed_poc) ! resus & settling
-     _DIAG_VAR_S_(data%id_sed_doc) = secs_per_day*(Fsed_doc)            ! dissolved flux
-     _DIAG_VAR_S_(data%id_sed_pon) = secs_per_day*(Fsed_pon + Psed_pon) ! resus & settling
-     _DIAG_VAR_S_(data%id_sed_don) = secs_per_day*(Fsed_don)            ! dissolved flux
-     _DIAG_VAR_S_(data%id_sed_pop) = secs_per_day*(Fsed_pop + Psed_pop) ! resus & settling
-     _DIAG_VAR_S_(data%id_sed_dop) = secs_per_day*(Fsed_dop)            ! dissolved flux
-   ENDIF
 END SUBROUTINE aed_calculate_benthic_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1173,7 +1237,7 @@ SUBROUTINE aed_mobility_organic_matter(data,column,layer_idx,mobility)
       _DIAG_VAR_(data%id_Psed_pop) = mobility(data%id_pop)*_STATE_VAR_(data%id_pop)
       IF(data%simRPools) _DIAG_VAR_(data%id_Psed_cpom) = mobility(data%id_cpom)*_STATE_VAR_(data%id_cpom)
 
-      IF(data%extra_diag) THEN
+      IF ( diag_level>1 ) THEN
         _DIAG_VAR_(data%id_pom_vvel) = vvel*secs_per_day
         IF(data%simRPools) _DIAG_VAR_(data%id_cpom_vvel) = vvel_cpom*secs_per_day
       ENDIF
@@ -1351,5 +1415,43 @@ PURE AED_REAL FUNCTION R_dom(Rdom_minerl,Ko2_an,f_an,theta,oxy,temp)
 
 END FUNCTION R_dom
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+AED_REAL FUNCTION photo(Q, cdom, band)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: Q          ! [W/m2] incoming light intensity
+   AED_REAL,INTENT(in) :: cdom       ! [/m] current cdom absorbance, based on DOC
+   INTEGER, INTENT(in) :: band       ! [-] bandwidth identifier (VIS, UVA, UVB)
+!LOCALS
+!  AED_REAL,PARAMETER :: c = 7.52    ! in NML as photo_c and module global c
+   AED_REAL,PARAMETER :: d = 0.0122  ! ref
+   AED_REAL,PARAMETER :: S = 0.0188  ! ref
+   AED_REAL,PARAMETER :: x = 440.    ! [nm] wavelength at which cdom is measured
+   AED_REAL,PARAMETER :: lamda(3) = (/440., 358., 298./) ! [nm] wavelengths
+   ! vis = 390-700 nanometers
+   ! uva = 315-400 nanometers
+   ! uvb = 280-315 nanometers
+!
+   AED_REAL :: phi, alpha, QQ
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ! convert incoming light to quantum units: [mol photons /m2 /hr]
+   QQ = Q * 4.53 * 1e-6 * 3.6e3
+
+   ! apparent quantum yield [mol produced /(mol absorbed photons) /nm-1]
+   phi = c * 10.**(-(d*lamda(band)))
+
+   ! absorption coefficient (/m)
+   alpha = cdom*exp(S*(x-lamda(band)))
+
+   ! return the rate at which DOC is broken down [mmol C /m3 /s]
+   photo = phi * QQ * alpha * 1e3 / 3.6e3
+
+END FUNCTION photo
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 END MODULE aed_organic_matter
