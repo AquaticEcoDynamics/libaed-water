@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -27,6 +27,8 @@
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
 !# Created March 2012                                                          #
+!#  Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed-water
+!#                                                                             #
 !#                                                                             #
 !###############################################################################
 !                                                                              !
@@ -380,7 +382,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    AED_REAL :: temp, salt, wind, S, T, depth, vel
 
    ! State
-   AED_REAL :: dic,pH,ch4,talk = 0.,TCO2 = 0.
+   AED_REAL :: dic,pHin,ch4,talk = 0.,TCO2 = 0.
 
    ! Temporary variables
 
@@ -391,6 +393,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    AED_REAL :: a,b,c,dcf
    AED_REAL :: ca, bc, cb, carba, bicarb, carb, om_cal, om_arg
    AED_REAL :: p00,p10,p01,p20,p11,p02
+   AED_REAL :: phdum,tadum,co2dum,pHout,pH,deltapH
+   INTEGER  :: iter
 
    INTEGER  :: ii
 
@@ -398,7 +402,6 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 !BEGIN
 
    IF(.NOT.data%simDIC .AND. .NOT.data%simCH4) RETURN
-
 
    !----------------------------------------------------------------------------
    !# Get dependent state variables from physical driver
@@ -417,40 +420,47 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
    Tabs = temp + 273.15
 
-   !# Solubility, Ko (mol/L/atm)
-   Ko = -58.0931+90.5069*(100.0/Tabs) + 22.294*log(Tabs/100.0) &
-                                 + 0.027766*salt - 0.025888*salt*(Tabs/100.0)
-   Ko = Ko + 0.0050578*salt*(Tabs/100.0)*(Tabs/100.0)
-   Ko = exp(Ko)
-
-
    !----------------------------------------------------------------------------
    !# CO2 concentration in the surface layer, depends on DIC, TA
    IF(data%simDIC) THEN
 
       !# Retrieve current (local) state variable values.
-     dic = _STATE_VAR_(data%id_dic)! Concentration of carbon in surface layer
-     pH  = _STATE_VAR_(data%id_pH)  ! Concentration of carbon in surface layer
+     dic  = _STATE_VAR_(data%id_dic)! Concentration of carbon in surface layer
+     pHin = _STATE_VAR_(data%id_pH)  ! Concentration of carbon in surface layer
 
-
-     IF( data%co2_model == 1 ) THEN
-       !# Use the Haltafall CO2 code for computing pCO2 & pH
+     IF ( data%co2_model == 1 ) THEN
+       !# Use the CO2SYS code for computing pCO2 & pH
 
        S=salt; T=temp
+       dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
+                - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+       TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-       IF( data%alk_mode == 1 ) THEN
+       IF( data%alk_mode == 0 ) THEN
+         ! Freshwater system - carbonate alkalinity assumed
+         pH = pHin
+         deltapH = 5.
+         ! As carbonate alkalinity depends on H+, lets iterate
+         DO WHILE (abs(deltapH) > 1e-10)
+           ! Use CO2SYS to estimate TA, from past pH
+           CALL CO2SYS(1,T,S,zero_,tadum,TCO2,pH,pHdum,co2dum,talk)
+           ! Use CO2SYS to re-estimate pH, from TA
+           CALL CO2SYS(0,T,S,zero_,talk,TCO2,phdum,pHout,pCO2,tadum)
+           deltapH = pH-pHout
+           pH = pHout
+          ! print *,'ss',talk
+           iter = iter+1
+           IF(iter>100) then
+             print *, 'note pH-TA convergance failure',pH
+             exit
+           ENDIF
+         END DO
+
+       ELSEIF( data%alk_mode == 1 ) THEN
          ! talk = 520.1 + 51.24*S  ! Atlantic (Millero 1998) from fabm, not suitable for estuaries
          ! talk = 1136.1 + 1.2*S*S + 2.8*S !Chesapeake Bay (George et al., 2013)
          talk =  1627.4 + 22.176*S   !regression from Naomi's data on Caboolture
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-         ! next, use the CO2 module (same to CDIAC module) to calc pCO2
-         talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+         talk  = talk / 1.0D6      ! change unit to mol/kgSW
 
        ELSEIF( data%alk_mode == 2 ) THEN
          p00  =       1063
@@ -459,90 +469,72 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
          p20  =     0.2266
          p11  =  -0.001252
          p02  =  0.0002546
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-             talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+         talk = talk / 1.0D6      ! change unit to mol/kgSW
 
-         ELSEIF( data%alk_mode == 3 ) THEN
+       ELSEIF( data%alk_mode == 3 ) THEN
          p00 =      -258.8
          p10 =       34.59
          p01 =      0.9923
          p20 =      0.8186
          p11 =    -0.03101
          p02 =   0.0001045
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-             talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+         talk = talk / 1.0D6      ! change unit to mol/kgSW
 
-         ELSEIF( data%alk_mode == 4 ) THEN
-         p00 =      -47.51
-         p10 =      -17.21
-         p01 =        1.32
-         p20 =      0.1439
-         p11 =     0.01224
-         p02 =  -0.0002055
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+        ELSEIF( data%alk_mode == 4 ) THEN
+          p00 =      -47.51
+          p10 =      -17.21
+          p01 =        1.32
+          p20 =      0.1439
+          p11 =     0.01224
+          p02 =  -0.0002055
+          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
+          talk = talk / 1.0D6      ! change unit to mol/kgSW
 
-         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-             talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
-
-         ELSEIF( data%alk_mode == 5 ) THEN
-         p00 =       157.7
-         p10 =       4.298
-         p01 =      0.6448
-         p20 =      0.2107
-         p11 =   -0.002072
-         p02 =   0.0001239
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-             talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+        ELSEIF( data%alk_mode == 5 ) THEN
+          p00 =       157.7
+          p10 =       4.298
+          p01 =      0.6448
+          p20 =      0.2107
+          p11 =   -0.002072
+          p02 =   0.0001239
+          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
+          talk = talk / 1.0D6      ! change unit to mol/kgSW
 
        ENDIF
 
-       CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
+       !CALL CO2DYN ( TCO2, talk, T, S, pCO2, pH, HENRY, ca, bc, cb)
+       !CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
-       ! Adjust outputs back to units used in the parent model code (e.g. mmol/m3) if appropriate
-       ! note the output pCO2 is in unit of ATM
-       ! pCO2 = pCO2*1.0D6   ! partial pressure of co2 in water
-       ! _STATE_VAR_(data%id_talk) = talk*(1.0D6)           ! total alkalinity (umol/kg)
+       ! Return pH and pCO2 based on TA (alkalinity)
+       CALL CO2SYS(0,T,S,zero_,talk,TCO2,phdum,pHout,pCO2,tadum)
+
        _DIAG_VAR_(data%id_pco2) = pCO2
+       ! _STATE_VAR_(data%id_talk) = talk*(1.0D6)           ! total alkalinity (umol/kg)
+
+    !   print *,'pHout',pHout, talk, pCO2
 
      ELSEIF ( data%co2_model == 2 ) THEN
        !# Use the Butler CO2 code for computing pCO2 & pH
+
+       !# Solubility, Ko (mol/L/atm)
+       Ko = -58.0931+90.5069*(100.0/Tabs) + 22.294*log(Tabs/100.0) &
+                                        + 0.027766*salt - 0.025888*salt*(Tabs/100.0)
+       Ko = Ko + 0.0050578*salt*(Tabs/100.0)*(Tabs/100.0)
+       Ko = exp(Ko)
+
        pCO2 = aed_carbon_co2(data%ionic,temp,dic,ph)*1e-6 / Ko  !(=atm), use Yanti's script for pCO2
        _DIAG_VAR_(data%id_pco2) = pCO2
 
      ELSEIF ( data%co2_model == 0 ) THEN
-       !# Use the aed_geochem module for computing pCO2 & pH
+       !# Use the aed_geochemistry module for computing pCO2 & pH
        pCO2 = _DIAG_VAR_(data%id_pco2)  ! this diagnostic is getting set in aed_geocehmistry
 
      ENDIF
 
      !# Now compute piston velocity, k
-     kCO2 = aed_gas_piston_velocity(windHt,wind,temp,salt,  &
+     kCO2 = aed_gas_piston_velocity(windHt,wind,temp,salt,                     &
          vel=vel,depth=depth,schmidt_model=2,piston_model=data%co2_piston_model)
 
 
@@ -744,44 +736,62 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
 !
 !LOCALS
    ! State
-   AED_REAL :: dic, pH, pCO2, temp, salt
+   AED_REAL :: dic, pHin, pCO2, temp, salt
    AED_REAL :: S,T,a,b,c,dcf,talk = 0.,TCO2 = 0.,ca,bc,cb,HENRY
    AED_REAL :: p00,p10,p01,p20,p11,p02
+
+   AED_REAL :: Tabs, Ko
+   AED_REAL :: K_h, Kw, Ka1, Ka2, i_f
+   AED_REAL :: H, CO2, HCO3, CO3, TA
+   AED_REAL :: phdum,tadum,co2dum,pHout,pH,deltapH
+   INTEGER  :: iter
 
 !-------------------------------------------------------------------------------
 !BEGIN
    IF(.NOT.data%simDIC) RETURN
 
     pCO2 = zero_
-    pH   = _STATE_VAR_(data%id_pH) ! pH   = zero_
 
     !# Retrieve current (local) state variable values.
-    dic  = _STATE_VAR_(data%id_dic) ! Concentration of DIC in the cell
-    salt = _STATE_VAR_(data%id_salt) ! Concentration of DIC in the cell
-    temp = _STATE_VAR_(data%id_temp) ! Concentration of DIC in the cell
+    dic  = _STATE_VAR_(data%id_dic)  ! Concentration of DIC in the cell
+    salt = _STATE_VAR_(data%id_salt) ! Salinity
+    temp = _STATE_VAR_(data%id_temp) ! Temperature
+    pHin = _STATE_VAR_(data%id_pH)   ! pH (from previous time-step)
 
 
     IF ( data%co2_model == 1 ) THEN
-      !# Use the Haltafall CO2 code for computing pCO2 & pH
+      !# Use the CO2SYS code for computing pCO2 & pH
 
       S=salt; T=temp
+      dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
+               - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
+      TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
-      IF( data%alk_mode == 1 ) THEN
 
-        S=salt; T=temp
+      IF( data%alk_mode == 0 ) THEN
+        ! Freshwater system - carbonate alkalinity assumed
+        pH = pHin
+        deltapH = 5.
+        ! As carbonate alkalinity depends on H+, lets iterate
+        DO WHILE (abs(deltapH) > 1e-10)
+          ! Use CO2SYS to estimate TA, from past pH
+          CALL CO2SYS(1,T,S,zero_,tadum,TCO2,pH,pHdum,co2dum,talk)
+          ! Use CO2SYS to re-estimate pH, from TA
+          CALL CO2SYS(0,T,S,zero_,talk,TCO2,phdum,pHout,pCO2,tadum)
+          deltapH = pH-pHout
+          pH = pHout
+          iter = iter+1
+          IF(iter>100) then
+            print *, 'note pH-TA convergance failure',pH
+            exit
+          ENDIF
+        END DO
 
+      ELSEIF( data%alk_mode == 1 ) THEN
         ! talk = 520.1 + 51.24*S  ! Atlantic (Millero 1998) from fabm, not suitable for estuaries
         ! talk = 1136.1 + 1.2*S*S + 2.8*S !Chesapeake Bay (George et al., 2013)
         talk =  1627.4 + 22.176*S   !regression from Naomi's data on Caboolture
-        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-        c    =  4.8314d-4
-        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                 - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
-        ! next, use the CO2 module (same to CDIAC module) to calc pCO2
         talk  = talk / 1.0D6      ! change unit to mol/kgSW
-        TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
       ELSEIF( data%alk_mode == 2 ) THEN
         p00  =       1063
@@ -790,15 +800,8 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
         p20  =     0.2266
         p11  =  -0.001252
         p02  =  0.0002546
-        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-        c    =  4.8314d-4
-        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
-             talk = talk / 1.0D6      ! change unit to mol/kgSW
-        TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+        talk = talk / 1.0D6      ! change unit to mol/kgSW
 
       ELSEIF( data%alk_mode == 3 ) THEN
         p00 =      -258.8
@@ -807,15 +810,8 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
         p20 =      0.8186
         p11 =    -0.03101
         p02 =   0.0001045
-        a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-        b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-        c    =  4.8314d-4
-        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
         talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
         talk = talk / 1.0D6      ! change unit to mol/kgSW
-        TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
        ELSEIF( data%alk_mode == 4 ) THEN
          p00 =      -47.51
@@ -824,15 +820,8 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
          p20 =      0.1439
          p11 =     0.01224
          p02 =  -0.0002055
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
          talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
        ELSEIF( data%alk_mode == 5 ) THEN
          p00 =       157.7
@@ -841,27 +830,76 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
          p20 =      0.2107
          p11 =   -0.002072
          p02 =   0.0001239
-         a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
-         b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
-         c    =  4.8314d-4
-         dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
-                      - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
          talk = talk / 1.0D6      ! change unit to mol/kgSW
-         TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
       ENDIF
 
       !CALL CO2DYN ( TCO2, talk, T, S, pCO2, pH, HENRY, ca, bc, cb)
+      !CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
-      CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
+      ! Return pH and pCO2 based on TA (alkalinity)
+      CALL CO2SYS(0,T,S,zero_,talk,TCO2,phdum,pHout,pCO2,tadum)
+      pH = pHout
+  !    print *,'pH',pH,talk,pCO2
+
+    ELSEIF ( data%co2_model == 2 ) THEN
+      !# Use the Butler CO2 code for computing pCO2 & pH
+
+      !# Solubility, Ko (mol/L/atm)
+      Tabs = temp + 273.15
+      Ko = -58.0931+90.5069*(100.0/Tabs) + 22.294*log(Tabs/100.0) &
+                                    + 0.027766*salt - 0.025888*salt*(Tabs/100.0)
+      Ko = Ko + 0.0050578*salt*(Tabs/100.0)*(Tabs/100.0)
+      Ko = exp(Ko)
+
+      ! Acidity constants temperature dependence
+      K_h = -0.000075324675*temp*temp + 0.016279653680*temp + 1.110424242424
+      Ka1 =  0.000142121212*temp*temp - 0.012648181818*temp + 6.577539393939
+      Ka2 =  0.000113679654*temp*temp - 0.014687186147*temp + 10.625769696970
+      Kw  =  0.000201991342*temp*temp - 0.043419653680*temp + 14.949709090909
+
+      ! Ionic strength dependence, 1st calculate function f
+      i_f = (((SQRT(data%ionic)) / (1+SQRT(data%ionic))) -0.20*data%ionic) * (298.0/(Tabs))**0.666667
+
+      ! pKh = pKh(0) + bI;  b = 0.105 (Butler, 1982)
+      K_h = K_h + 0.105*data%ionic
+
+      ! pKw = pKw(0) - f
+      Kw = Kw - i_f
+
+      ! pKa1 = pKa1(0) - f - bI
+      Ka1 = Ka1 - i_f - 0.105*data%ionic
+
+      !pKa2 = pKa2(0) - 2f
+      Ka2 = Ka2 + 2.0*i_f
+
+      ! Convert from pK etc to Kh, Kw, Ka1, Ka2
+      K_h = 10.**(-K_h)
+      Ka1 = 10.**(-Ka1)
+      Ka2 = 10.**(-Ka2)
+      Kw  = 10.**(-Kw)
+
+      ! Calculate H, from pH at the last timestep
+      H    = 10.**(-pH)
+
+      ! Calculate TA
+      TA = dic * (Ka1*H + 2.0*Ka1*Ka2) / (H*H + Ka1*H + Ka1*Ka2)
+      TA = TA + (Kw/H) - H
+
+      ! Assuming TA is constant (CO2 has changed due to reactions, but this
+      ! doesn't change the alkalinity directly), now calculate new H conc
+      H =  calcPH(dic,TA,H,Ka1,Ka2,Kw)
+      IF(H > zero_) pH = -log10(H)
+
+      pCO2 = aed_carbon_co2(data%ionic,temp,dic,pH)*1e-6 / Ko  !(=atm)
 
     ENDIF
 
-    !# SET PCO2 & pH as returned
+
+    !# Set pCO2 & pH as returned
     _DIAG_VAR_(data%id_pco2) = pCO2
-    _STATE_VAR_(data%id_pH)  =  pH
+    _STATE_VAR_(data%id_pH)  = pH
 
 END SUBROUTINE aed_equilibrate_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -907,12 +945,6 @@ PURE AED_REAL FUNCTION aed_carbon_co2(ionic, temp, dic, pH)
 !BEGIN
 
    ! Acidity constants temperature dependence
-
-   ! pKh  =  -0.000075324675x2 + 0.016279653680x + 1.110424242424
-   ! pKa1 = 0.000142121212x2 - 0.012648181818x + 6.577539393939
-   ! pKa2 =  0.000113679654x2 - 0.014687186147x + 10.625769696970
-   ! pKw  =   0.000201991342x2 - 0.043419653680x + 14.949709090909
-
    K_h = -0.000075324675*temp*temp + 0.016279653680*temp + 1.110424242424
    Ka1 =  0.000142121212*temp*temp - 0.012648181818*temp + 6.577539393939
    Ka2 =  0.000113679654*temp*temp - 0.014687186147*temp + 10.625769696970
@@ -966,45 +998,184 @@ PURE AED_REAL FUNCTION aed_carbon_co2(ionic, temp, dic, pH)
 END FUNCTION aed_carbon_co2
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
 
-  REAL,    INTENT(IN)   :: Tem, Sal
-  REAL,    INTENT(IN)   :: TC0, TA0
-  REAL,    INTENT(OUT)  :: fCO2xx,pH00
+
+!###############################################################################
+! Function to calculate H+ conc given total alkalinity and DIC
+!-----------------------------------------------------------------------
+ FUNCTION calcPH(CT,TA,H,Ka1,Ka2,Kw) RESULT(rett)
+   !-- Incoming
+   AED_REAL,  INTENT(INOUT) :: CT      ! DIC
+   AED_REAL,  INTENT(INOUT) :: TA      ! Total Alkalinity
+   AED_REAL,  INTENT(INOUT) :: H       ! old H+ conc
+   AED_REAL,  INTENT(INOUT) :: Ka1     ! 1st Acidity Const
+   AED_REAL,  INTENT(INOUT) :: Ka2     ! 2nd Acidity Const
+   AED_REAL,  INTENT(INOUT) :: Kw      ! ion product H2O
+   !-- Returns the H+ conc at the forward time step
+   AED_REAL :: rett
+   !-- Local
+   AED_REAL :: tmp
+
+   ! 1st iterative sequence using high search bounds and coarse resolution
+   tmp = 2.5
+   rett = iteratepH(CT,TA,H,Ka1,Ka2,Kw,100,tmp)
+   ! 2nd iterative sequence using low search bounds and fine resolution
+   tmp = 0.5
+   rett = iteratepH(CT,TA,rett,Ka1,Ka2,Kw,200,tmp)
+
+ END FUNCTION calcPH
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+! Solves the Total Alkalinity equation for H+ using an iterative        !
+! solution                                                              !
+!-----------------------------------------------------------------------!
+ FUNCTION iteratePH(CT,TA,H,Ka1,Ka2,Kw,numElements,bounds) RESULT(pH)
+   !-- Incoming
+   AED_REAL,  INTENT(IN) :: CT                      ! DIC
+   AED_REAL,  INTENT(IN) :: TA                      ! Total Alkalinity
+   AED_REAL,  INTENT(IN) :: H                       ! old H+ conc
+   AED_REAL,  INTENT(IN) :: Ka1                     ! 1st Acidity Const
+   AED_REAL,  INTENT(IN) :: Ka2                     ! 2nd Acidity Const
+   AED_REAL,  INTENT(IN) :: Kw                      ! ion product H2O
+   AED_REAL,  INTENT(IN) :: bounds
+   INTEGER               :: numElements
+   !-- Returns the H+ conc at the forward time step
+   AED_REAL   :: pH
+   !-- Local
+   AED_REAL   :: startpH,endpH,increment,lowValue
+   INTEGER    :: lowValueLoc1,lowValueLoc2,c
+   AED_REAL, DIMENSION(:), ALLOCATABLE :: Hvec
+   AED_REAL, DIMENSION(:), ALLOCATABLE :: estTA
+   AED_REAL, DIMENSION(:), ALLOCATABLE :: residual
+   LOGICAL :: pmode
+
+   pmode = .true.
+
+   ALLOCATE(Hvec(numElements))
+   ALLOCATE(estTA(numElements))
+   ALLOCATE(residual(numElements))
+
+     startpH = -log10(H) - bounds
+     endpH   = -log10(H) + bounds
+     increment = (endpH - startpH)/REAL(numElements)
+
+     DO c=1, numElements
+       Hvec(c) = startpH + ((c-1)*increment)
+     END DO
+
+     ! Get into H+ conc
+     Hvec = 10**(-Hvec)
+
+     ! Now estimate TA based on the spectrum of H+ concs
+     estTA = CT * (Ka1*Hvec + 2.0*Ka1*Ka2) / &
+                   (Hvec*Hvec + Ka1*Hvec + Ka1*Ka2) + (Kw/Hvec) - Hvec
+
+     ! now calc residual
+     residual = estTA - TA
+
+     lowValue = 100.0
+     lowValueLoc1 = 0
+     lowValueLoc2 = 0
+     DO c = 1,numElements
+       IF(ABS(residual(c)) < ABS(lowValue)) THEN
+         lowValueLoc1 = c
+         lowValue = residual(c)
+       END IF
+     END DO
+
+
+     IF(lowValueLoc1 >= SIZE(residual)) THEN
+       ! Solution hasn't converged and residuals are high
+       lowValueLoc1 = SIZE(residual) - 1
+       IF(pmode) THEN
+         print *,'pH iteration convergence problems -'
+         print *,'   consider reducing your timestep'
+       END IF
+     END IF
+     IF(lowValueLoc1 <= 1) THEN
+       ! Solution hasn't converged and residuals are high
+       lowValueLoc1 = 2
+       IF(pmode) THEN
+         print *,'pH iteration convergence problems -'
+         print *,'   consider reducing your timestep'
+       END IF
+     END IF
+
+
+     IF (lowValue <= zero_ .AND. residual(lowValueLoc1+1)>zero_) THEN
+        lowValueLoc2 = lowValueLoc1 + 1
+     ELSE IF (lowValue <= zero_ .AND. residual(lowValueLoc1-1)>zero_) THEN
+        lowValueLoc2 = lowValueLoc1 - 1
+     ELSE IF (lowValue > zero_ .AND. residual(lowValueLoc1+1)<zero_) THEN
+        lowValueLoc2 = lowValueLoc1 + 1
+     ELSE IF (lowValue > zero_ .AND. residual(lowValueLoc1-1)<zero_) THEN
+        lowValueLoc2 = lowValueLoc1 - 1
+     ELSE
+        ! emergency
+        lowValueLoc2 = lowValueLoc1 + 1
+     END IF
+
+     pH = Hvec(lowValueLoc1) + &
+     (residual(lowValueLoc1) * ABS(Hvec(lowValueLoc1) - Hvec(lowValueLoc2))  &
+             / (ABS(residual(lowValueLoc1)) + ABS(residual(lowValueLoc2))))
+
+
+   DEALLOCATE(Hvec)
+   DEALLOCATE(estTA)
+   DEALLOCATE(residual)
+
+ END FUNCTION iteratePH
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+SUBROUTINE CO2SYS(mode,temp,salt,pres,TAin,TCin,pHin,pHout,fCO2out,TAout)
+
+  INTEGER, INTENT(IN)   :: mode
+  REAL,    INTENT(IN)   :: temp, salt, pres
+  REAL,    INTENT(IN)   :: TCin, TAin, pHin
+  REAL,    INTENT(OUT)  :: fCO2out, pHout, TAout
   ! LOCAL
-  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi = 0., K1, K2, TB, TP, TS, TF, TSi, TC, TA
+  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi=0., &
+                           K1, K2, TB, TP, TS, TF, TSi, TC, TA
 
   !===========Initialize the conditions =========================!
 
   TB  = 0.
-  TP  = 0./1.e6
   TS  = 0.
   TF  = 0.
+  TP  = 0./1.e6
   TSi = 0./1.e6
 
-  TC  = TC0 !/1.e6
-  TA  = TA0 !/1.e6
+  PRE = 0.  ! Fix up link to pressure, pres
 
-  PRE = 0.
+  Call Cal_constants(temp, salt, PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3,   &
+                         & KSi, K1, K2, TB, TP, TS, TF)
 
-  Call Cal_constants(Tem, Sal, PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, &
-                         & KSi,  K1, K2, TB, TP, TS, TF)
+  IF (mode==0) THEN
+    TC  = TCin !/1.e6
+    TA  = TAin !/1.e6
+    Call Cal_pHfromTATC(TA,TC,pHout,K1,K2,TB,KB,KW,KP1,KP2,KP3,TP,TSi,TS,KS,KSi,TF,KF)
+    Call Cal_fCO2fromTCpH(TC,pHout,fCO2out,K1,K2,K0)
 
-  Call Cal_pHfromTATC(TA, TC, pH00, K1, K2, TB, KB, KW, KP1, KP2, KP3,&
-                           & TP, TSi, TS, KS, KSi, TF, KF)
+  ELSEIF (mode==1) THEN
 
-  Call Cal_fCO2fromTCpH(TC,pH00,fCO2xx,K1,K2,K0)
+    Call Cal_TAfromTCpH(TCin,pHin,TAout,K1,K2,KW,KP1,KP2,KP3,TP,TSi,KSi,TB,KB,TS,KS,TF,KF)
+
+  ENDIF
+
+END SUBROUTINE CO2SYS
 
 
-  END SUBROUTINE CO2SYS
-
-  SUBROUTINE Cal_constants(TempC, Sal, PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, &
-                         & KSi,  K1, K2, TB, TP, TS, TF)
+SUBROUTINE Cal_constants(TempC, Sal, PRE, K0, KS, kF, fH, KB, KW, KP1, KP2,    &
+                         & KP3, KSi, K1, K2, TB, TP, TS, TF)
 
   REAL,   INTENT(in)      :: TempC, Sal, PRE
   REAL,   INTENT(out)     :: K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi,  K1, K2
   REAL,   INTENT(inout)   :: TB, TP, TS, TF
-
   ! local
   REAL                    :: TempK, RT, logTempK, sqrSal, TempK100, Pbar
   REAL                    :: lnK0, IonS, lnKS, lnKF, lnKBtop, lnKB, lnKW, lnKP1, &
@@ -1016,47 +1187,46 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
                            & KP3fac, KSifac, pHfactor, Delta, b, P1atm, FugFac,  &
                            & VPWP, VPCorrWP, VPSWWP, VPFac, lnKBfac, KBfac
 
-  TempK = TempC + 273.15
-  RT    = 83.1451*TempK
+  TempK    = TempC + 273.15
+  RT       = 83.1451*TempK
   logTempK = log(TempK)
   sqrSal   = sqrt(Sal)
   Pbar     = PRE/10.
 
-  TB    = (0.000232/10.811)*(Sal/1.80655) ! Total Borate, mol/kg-sw
-  TF    = (0.000067/18.998)*(Sal/1.80655) ! Total Fluoride, mol/kg-sw
-  TS    = (0.14/96.062)*(Sal/1.80655)     ! Total Sulfate, mol/kg-sw
+  TB       = (0.000232/10.811)*(Sal/1.80655) ! Total Borate, mol/kg-sw
+  TF       = (0.000067/18.998)*(Sal/1.80655) ! Total Fluoride, mol/kg-sw
+  TS       = (0.14/96.062)*(Sal/1.80655)     ! Total Sulfate, mol/kg-sw
 
   !---------- CO2 solubility -------------------!
   TempK100 = TempK/100.
-  lnK0 = -60.2409 + 93.4517 / TempK100 + 23.3585 * log(TempK100) + Sal* &
-     & (0.023517 - 0.023656*TempK100 + 0.0047036 * (TempK100**2.))
-  K0   = exp(lnK0)   ! mol/kg-sw/atm
+  lnK0     = -60.2409 + 93.4517 / TempK100 + 23.3585 * log(TempK100) + Sal*    &
+           & (0.023517 - 0.023656*TempK100 + 0.0047036 * (TempK100**2.))
+  K0       = exp(lnK0)   ! mol/kg-sw/atm
 
   !----------- Ion Strength --------------------!
   IonS     = 19.924 * Sal / (1000. - 1.005 * Sal)
 
   !-------- KS for the bisulfate ion -----------!
-  lnKS = -4276.1/TempK + 141.328 - 23.093*logTempK + &
-     & (-13856./TempK + 324.57 - 47.986*logTempK)*sqrt(IonS) + &
-     & (35474./TempK - 771.54 + 114.723*logTempK)*IonS + &
-     & (-2698./TempK)*sqrt(IonS)*IonS + (1776./TempK)*(IonS**2)
-  KS   = exp(lnKS) * (1. - 0.001005*Sal)  ! mol/kg-sw
+  lnKS     = -4276.1/TempK + 141.328 - 23.093*logTempK +                       &
+           & (-13856./TempK + 324.57 - 47.986*logTempK)*sqrt(IonS) +           &
+           & (35474./TempK - 771.54 + 114.723*logTempK)*IonS +                 &
+           & (-2698./TempK)*sqrt(IonS)*IonS + (1776./TempK)*(IonS**2)
+  KS       = exp(lnKS) * (1. - 0.001005*Sal)  ! mol/kg-sw
 
   !-------- KF for hydrogen fluoride -----------!
-  lnKF = 1590.2/TempK - 12.641 + 1.525*sqrt(IonS)
-  KF   = exp(lnKS) * (1. - 0.001005*Sal)  ! mol/kg-sw
+  lnKF     = 1590.2/TempK - 12.641 + 1.525*sqrt(IonS)
+  KF       = exp(lnKS) * (1. - 0.001005*Sal)  ! mol/kg-sw
   SWStoTOT  = (1 + TS/KS)/(1 + TS/KS + TF/KF)
   FREEtoTOT =  1 + TS/KS
 
   !---fH, activity coefficient of the H+ ion ---!
-  fH   = 1.2948 - 0.002036*TempK + (0.0004607 - 0.000001475*TempK)*(Sal**2)
+  fH      = 1.2948 - 0.002036*TempK + (0.0004607 - 0.000001475*TempK)*(Sal**2)
 
   !--------KB for boric acid --------------------!
   lnKBtop = -8966.9 - 2890.53*sqrSal - 77.942*Sal + 1.728*sqrSal*Sal - 0.0996*(Sal**2)
   lnKB    = lnKBtop/TempK + 148.0248 + 137.1942*sqrSal + 1.62142*Sal + (-24.4344 - 25.085*sqrSal &
         & - 0.2474*Sal)*logTempK + 0.053105*sqrSal*TempK
   KB      = exp(lnKB)/SWStoTOT          ! convert to SWS pH scale
-
 
   !--------- KW for water -----------------------!
   lnKW = 148.9802 - 13847.26/TempK - 23.6521*logTempK + (-5.977 + &
@@ -1163,29 +1333,27 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
   VPSWWP = VPWP*VPCorrWP
   VPFac = 1. - VPSWWP
 
-  END SUBROUTINE Cal_constants
+END SUBROUTINE Cal_constants
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  SUBROUTINE Cal_pHfromTATC(TAx, TCx, pHx, K1F, K2F, TBF, KBF, KWF, KP1F, KP2F, KP3F,&
+SUBROUTINE Cal_pHfromTATC(TAx, TCx, pHx, K1F, K2F, TBF, KBF, KWF, KP1F, KP2F, KP3F,&
                            & TPF, TSiF, TSF, KSF, KSiF, TFF, KFF)
 
   REAL,     INTENT(in) :: TAx, TCx
   REAL,     INTENT(in) :: K1F, K2F, TBF, KBF, KWF, KP1F, KP2F, KP3F, TPF, TSiF, TSF, KSF, TFF, KFF, KSiF
   REAL,     INTENT(out):: pHx
-
   !local
-
   REAL                 :: H, Denom, CAlk, BAlk, OH, PhosTop, PhosBot, PAlk, SiAlk, &
                         & FREEtoTOT, Hfree, HSO4, HF, Residual, Slope, deltapH, pHTol, ln10
+  INTEGER              :: count
+  INTEGER              :: max_count
 
-  INTEGER :: count
-  INTEGER :: max_count
+  pHx       = 8.        !This is the first guess
+  pHTol     = 0.0001    !tolerance for iterations end
+  ln10      = log(10.)
+  deltapH   = pHTol + 1
 
-  pHx      = 8.        !This is the first guess
-  pHTol    = 0.0001    !tolerance for iterations end
-  ln10     = log(10.)
-  deltapH  = pHTol + 1
-
-  count = 0
+  count     = 0
   max_count = 100
 
   DO WHILE (abs(deltapH) > pHTol .AND. count < max_count)
@@ -1212,23 +1380,56 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
     END DO
 
     pHx       = pHx + deltapH  !% Is on the same scale as K1 and K2 were calculated...
-    count = count + 1
+    count     = count + 1
   END DO
 
-  END SUBROUTINE Cal_pHfromTATC
+END SUBROUTINE Cal_pHfromTATC
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  SUBROUTINE Cal_fCO2fromTCpH(TCx,pHx,fCO2x,K1,K2,K0)
+SUBROUTINE Cal_fCO2fromTCpH(TCx,pHx,fCO2x,K1,K2,K0)
 
-  REAL,     INTENT(in) :: TCx, pHx, K1, K2, K0
-  REAL,     INTENT(out):: fCO2x
-
-  REAL                 :: H  ! local
+  REAL, INTENT(in) :: TCx, pHx, K1, K2, K0
+  REAL, INTENT(out):: fCO2x
+  REAL             :: H  ! local
 
   H           = 10.**(-pHx)
   fCO2x       = TCx*H*H/(H*H + K1*H + K1*K2)/K0
 
 END SUBROUTINE Cal_fCO2fromTCpH
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+SUBROUTINE Cal_TAfromTCpH(TCx,pHx,TAx,K1,K2,KW,KP1,KP2,KP3,TP,TSi,KSi,TB,KB,TS,KS,TF,KF)
+! SUB CalculateTAfromTCpH, version 02.02, 10-10-97, written by Ernie Lewis.
+! Inputs: TC, pH, K(...), T(...)
+! Output: TA
+! This calculates TA from TC and pH.
+! Though it is coded for H on the total pH scale, for the pH values occuring
+! in seawater (pH > 6) it will be equally valid on any pH scale (H terms
+! negligible) as long as the K Constants are on that scale.
+
+  REAL, INTENT(in) :: TCx, pHx
+  REAL, INTENT(in) :: K1, K2, KW, KP1, KP2, KP3, TP, TSi, KSi, TB, KB, TS, KS, TF, KF
+  REAL, INTENT(out):: TAx
+  ! local
+  REAL             :: H,CAlk,BAlk,OH,PhosTop,PhosBot,PAlk,SiAlk,FREEtoTOT,Hfree,HSO4,HF
+
+  H         = 10.**(-pHx)
+  CAlk      = TCx*K1*(H + 2.*K2)/(H*H + K1*H + K1*K2)
+  BAlk      = TB*KB/(KB + H)
+  OH        = KW/H
+  PhosTop   = KP1*KP2*H + 2.*KP1*KP2*KP3 - H*H*H
+  PhosBot   = H*H*H + KP1*H*H + KP1*KP2*H + KP1*KP2*KP3
+  PAlk      = TP*PhosTop/PhosBot
+  SiAlk     = TSi*KSi/(KSi + H)
+  FREEtoTOT = (1 + TS/KS)             ! pH scale conversion factor
+  Hfree     = H/FREEtoTOT             ! for H on the total scale
+  HSO4      = TS/(1 + KS/Hfree)       ! since KS is on the free scale
+  HF        = TF/(1 + KF/Hfree)       ! since KF is on the free scale
+  TAx       = CAlk + BAlk + OH + PAlk + SiAlk - Hfree - HSO4 - HF
+
+END SUBROUTINE Cal_TAfromTCpH
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 END MODULE aed_carbon

@@ -111,7 +111,7 @@ MODULE aed_phytoplankton
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10
    AED_REAL :: dtlim = 0.9 * 3600
    LOGICAL  :: extra_diag = .false.
 
