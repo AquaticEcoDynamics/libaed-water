@@ -56,6 +56,7 @@
 		<File RelativePath="..\src\aed_gcsolver.F90"/>
 		<File RelativePath="..\src\aed_gctypes.F90"/>
 		<File RelativePath="..\src\aed_geochemistry.F90"/>
+		<File RelativePath="..\src\aed_habitat_water.F90"/>
 		<File RelativePath="..\src\aed_nitrogen.F90"/>
 		<File RelativePath="..\src\aed_noncohesive.F90"/>
 		<File RelativePath="..\src\aed_organic_matter.F90"/>
