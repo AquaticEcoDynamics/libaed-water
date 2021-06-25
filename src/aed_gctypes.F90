@@ -226,7 +226,7 @@ MODULE aed_gctypes
       INTEGER  :: OMapproach       !# 1
       INTEGER  :: OMModel          !# 1
       INTEGER  :: FTemswitch       !# 2
-      INTEGER  :: fancyNswitch         !# 1
+      INTEGER  :: fancyNswitch     !# 1
       INTEGER  :: FTswitch
       INTEGER  :: FBIOswitch       !# 1
       INTEGER  :: FINswitch        !# 2
@@ -437,7 +437,7 @@ MODULE aed_gctypes
       SED_REAL :: YAerOAc     !# 17.25 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YDenOAc     !# 16.82 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YDenH2      !# 04.49 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
-      SED_REAL :: YManH2      !#
+      SED_REAL :: YManH2      !#    CAB - Not Used?
       SED_REAL :: YManOAc     !# 14.14 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YIroOAc     !# 18.70 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011 |  #9.0/CellWeight #Watson 2003
       SED_REAL :: YIroH2      !# 04.54 ! /CellWeight #gB/mol H2  / g/mol cell Roden and Jin 2011 |  #9.0/CellWeight #Watson 2003

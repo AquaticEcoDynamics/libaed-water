@@ -9,7 +9,7 @@
 #                                                                             #
 #      http://aquatic.science.uwa.edu.au/                                     #
 #                                                                             #
-#  Copyright 2013 - 2020 -  The University of Western Australia               #
+#  Copyright 2013 - 2021 -  The University of Western Australia               #
 #                                                                             #
 #   GLM is free software: you can redistribute it and/or modify               #
 #   it under the terms of the GNU General Public License as published by      #
@@ -57,7 +57,7 @@ ifeq ($(F90),ifort)
   OPT_FFLAGS=-O3
   FFLAGS=-fPIC -warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
-    FFLAGS+=-check
+    FFLAGS+=-check all -check noarg_temp_created
   endif
   ifeq ($(SINGLE),true)
     FFLAGS+=-real-size 32
