@@ -416,6 +416,9 @@ SUBROUTINE aed_light_extinction_noncohesive(data,column,layer_idx,extinction)
 !
 !-----------------------------------------------------------------------
 !BEGIN
+
+   IF ( .NOT. ALLOCATED(data%id_ss) ) RETURN
+   
    DO ss_i=1,ubound(data%id_ss,1)
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_ss(ss_i))
