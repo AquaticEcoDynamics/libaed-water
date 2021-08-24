@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -40,14 +40,24 @@ MODULE aed_core
 
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
    PUBLIC aed_init_core, aed_get_var, aed_core_status, aed_set_prefix
-   PUBLIC aed_define_variable,        aed_define_sheet_variable,    &
-          aed_locate_sheet_variable,  aed_locate_variable,          &
-          aed_define_diag_variable,   aed_define_sheet_diag_variable
-   PUBLIC aed_locate_global, aed_locate_global_sheet
+
+   PUBLIC aed_define_variable,         aed_define_sheet_variable
+   PUBLIC aed_define_diag_variable,    aed_define_sheet_diag_variable
+   PUBLIC aed_locate_variable,         aed_locate_sheet_variable
+
+   PUBLIC aed_provide_global,          aed_provide_sheet_global
+   PUBLIC aed_locate_global,           aed_locate_sheet_global
+
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC cur_model_name, model_list, last_model
 
+   !#---------------------------------------------------------------------------
+   TYPE :: aed_prefix_list_t
+      CHARACTER(len=4)  :: aed_model_prefix
+      CLASS(aed_prefix_list_t),POINTER :: next => null()
+   END TYPE aed_prefix_list_t
+   !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_variable_t
@@ -62,6 +72,7 @@ MODULE aed_core
       AED_REAL          :: light_extinction
       LOGICAL           :: sheet, diag, extern, found
       LOGICAL           :: top, bot
+      CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -164,15 +175,97 @@ END FUNCTION aed_init_core
 
 
 !###############################################################################
-INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd)
+SUBROUTINE display_var(var)
 !-------------------------------------------------------------------------------
 ! Status of the aed model library core routines
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-     INTEGER,INTENT(out) :: n_v, n_sv, n_d, n_sd
+   TYPE(aed_variable_t),INTENT(in) :: var
+!
+!LOCALS
+   CHARACTER(256) :: line
+   CLASS(aed_prefix_list_t),POINTER :: req => null()
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+! I_o                   FV                    2D                        -                           OGM, PHY, MAG
+! Wind                  FV                    2D                        -                           OGM, PHY, MAG
+! Temp                  FV                    3D                        -                           OXY,CAR,NIT,OGM, PHY, MAG
+
+   line = TRIM(var%name) // '             '
+   IF ( var%found ) THEN
+       line = line // var%model_name // '             '
+   ELSE
+      line = line // '???             '
+!     print*,'Requested variable ', TRIM(var%name), ' not defined.'
+   ENDIF
+
+   IF ( var%sheet ) THEN
+       line = line // '2D       '
+   ELSE
+       line = line // '3D       '
+   ENDIF
+
+   req => var%req
+
+   IF ( ASSOCIATED(req) ) THEN
+      line = line // req%aed_model_prefix
+   ENDIF
+
+   DO WHILE ( ASSOCIATED(req%next) )
+      req => req%next
+      line = line // ", " // req%aed_model_prefix
+   ENDDO
+
+   print *, line
+END SUBROUTINE display_var
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
+!-------------------------------------------------------------------------------
+! Status of the aed model library core routines
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(out) :: n_v, n_sv, n_d, n_sd
+   LOGICAL,INTENT(in),OPTIONAL :: logit
+!
+!LOCALS
+   INTEGER :: i
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   print*,'Var name    |       Module.      |.          Type          !' // &
+       '           ID              |             Usage   (ie who linked to me)'
+   print*
+   print*,'ENVIRONMENT:'
+   DO i=1,n_aed_vars
+      IF ( all_vars(i)%extern ) CALL display_var(all_vars(i))
+   ENDDO
+
+   print*
+   print*,'STATE:'
+   n_vars = 0 ; n_sheet_vars = 0
+   DO i=1,n_aed_vars
+      IF ( .NOT. all_vars(i)%extern .AND. .NOT. all_vars(i)%diag ) THEN
+         CALL display_var(all_vars(i))
+         IF ( all_vars(i)%sheet ) THEN ; n_sheet_vars = n_sheet_vars + 1
+         ELSE ; n_vars = n_vars + 1 ; ENDIF
+      ENDIF
+   ENDDO
+
+   print*
+   print*,'DIAGNOSTIC:'
+   n_diags = 0 ; n_sheet_diags = 0;
+   DO i=1,n_aed_vars
+      IF ( .NOT. all_vars(i)%extern .AND. all_vars(i)%diag ) THEN
+         CALL display_var(all_vars(i))
+         IF ( all_vars(i)%sheet ) THEN ; n_sheet_diags = n_sheet_diags + 1
+         ELSE ; n_diags = n_diags + 1 ; ENDIF
+      ENDIF
+   ENDDO
+
    n_v = n_vars;  n_sv = n_sheet_vars
    n_d = n_diags; n_sd = n_sheet_diags
    aed_core_status = n_aed_vars
@@ -184,7 +277,7 @@ END FUNCTION aed_core_status
 SUBROUTINE aed_set_prefix(prefix)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CHARACTER(len=4),POINTER :: prefix
+   CHARACTER(len=4),POINTER, INTENT(in) :: prefix
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -251,162 +344,6 @@ END SUBROUTINE extend_allocated_variables
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-!# These define names and defaults for variables, returning their index:
-
-!###############################################################################
-SUBROUTINE aed_create_variable(name, longname, units)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: name, longname, units
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-!print*,"Variable '",trim(name),"' long name '",trim(longname),"' with units '",trim(units),"'"
-   IF (n_aed_vars .GE. a_vars) CALL extend_allocated_variables(n_aed_vars+1-a_vars)
-   n_aed_vars = n_aed_vars + 1
-   IF ( ASSOCIATED(aed_cur_prefix) .AND. units /= '' ) THEN
-      all_vars(n_aed_vars)%name = TRIM(aed_cur_prefix)//"_"//name
-   ELSE
-      all_vars(n_aed_vars)%name = name
-   ENDIF
-   all_vars(n_aed_vars)%model_name = cur_model_name
-   all_vars(n_aed_vars)%longname = longname
-   all_vars(n_aed_vars)%units = units
-
-   all_vars(n_aed_vars)%sheet = .false.
-   all_vars(n_aed_vars)%diag = .false.
-   all_vars(n_aed_vars)%extern = .false.
-   all_vars(n_aed_vars)%found = .false.
-END SUBROUTINE aed_create_variable
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-FUNCTION aed_define_variable(name, units, longname, initial, minimum, maximum, mobility) RESULT(ret)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: name, longname, units
-   AED_REAL,INTENT(in),OPTIONAL :: initial, minimum, maximum
-   AED_REAL,INTENT(in),OPTIONAL :: mobility
-!
-!LOCALS
-   INTEGER :: ret
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   CALL aed_create_variable(name, longname, units)
-   n_vars = n_vars + 1
-
-   if ( present(initial) ) all_vars(n_aed_vars)%initial = initial
-   if ( present(minimum) ) all_vars(n_aed_vars)%minimum = minimum
-   if ( present(maximum) ) all_vars(n_aed_vars)%maximum = maximum
-   if ( present(mobility) ) all_vars(n_aed_vars)%mobility = mobility
-
-!  all_vars(n_aed_vars)%sheet = .false.
-!  all_vars(n_aed_vars)%diag = .false.
-!  all_vars(n_aed_vars)%extern = .false.
-   all_vars(n_aed_vars)%found = .true.
-
-   ret = n_aed_vars
-END FUNCTION aed_define_variable
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maximum, surf) RESULT(ret)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: name, longname, units
-   AED_REAL,INTENT(in),OPTIONAL :: initial, minimum, maximum
-   LOGICAL,INTENT(in),OPTIONAL :: surf
-!
-!LOCALS
-   INTEGER :: ret
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   CALL aed_create_variable(name, longname, units)
-   n_sheet_vars = n_sheet_vars + 1
-
-   if ( present(initial) ) all_vars(n_aed_vars)%initial = initial
-   if ( present(minimum) ) all_vars(n_aed_vars)%minimum = minimum
-   if ( present(maximum) ) all_vars(n_aed_vars)%maximum = maximum
-
-   all_vars(n_aed_vars)%sheet = .true.
-!  all_vars(n_aed_vars)%diag = .false.
-!  all_vars(n_aed_vars)%extern = .false.
-   all_vars(n_aed_vars)%found = .true.
-
-   IF ( PRESENT(surf) ) THEN
-      all_vars(n_aed_vars)%bot = .NOT. surf
-      all_vars(n_aed_vars)%top = surf
-   ELSE
-      all_vars(n_aed_vars)%bot = .TRUE.
-   ENDIF
-
-   ret = n_aed_vars
-END FUNCTION aed_define_sheet_variable
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname) RESULT(ret)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: name, longname, units
-!
-!LOCALS
-   INTEGER :: ret
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   CALL aed_create_variable(name, longname, units)
-   n_diags = n_diags + 1
-
-!  all_vars(n_aed_vars)%sheet = .false.
-   all_vars(n_aed_vars)%diag = .true.
-!  all_vars(n_aed_vars)%extern = .false.
-   all_vars(n_aed_vars)%found = .true.
-
-   ret = n_aed_vars
-END FUNCTION aed_define_diag_variable
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf) RESULT(ret)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: name, longname, units
-   LOGICAL,INTENT(in),OPTIONAL :: surf
-!
-!LOCALS
-   INTEGER :: ret
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   CALL aed_create_variable(name, longname, units)
-   n_sheet_diags = n_sheet_diags + 1
-
-   all_vars(n_aed_vars)%sheet = .true.
-   all_vars(n_aed_vars)%diag = .true.
-!  all_vars(n_aed_vars)%extern = .false.
-   all_vars(n_aed_vars)%found = .true.
-
-   IF ( PRESENT(surf) ) THEN
-      all_vars(n_aed_vars)%bot = .NOT. surf
-      all_vars(n_aed_vars)%top = surf
-   ELSE
-      all_vars(n_aed_vars)%bot = .TRUE.
-   ENDIF
-
-   ret = n_aed_vars
-END FUNCTION aed_define_sheet_diag_variable
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!# These return the index for the named variable :
-
 !###############################################################################
 FUNCTION aed_find_variable(name) RESULT(ret)
 !-------------------------------------------------------------------------------
@@ -430,6 +367,254 @@ END FUNCTION aed_find_variable
 
 
 !###############################################################################
+SUBROUTINE extend_requested(var, prefix)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   TYPE(aed_variable_t),INTENT(inout) :: var
+   CHARACTER(len=4), INTENT(in) :: prefix
+!
+!LOCALS
+   CLASS(aed_prefix_list_t),POINTER :: req => null()
+!-------------------------------------------------------------------------------
+!BEGIN
+   req => var%req
+
+   IF ( .NOT. ASSOCIATED(req) ) THEN
+      ALLOCATE(var%req)
+      var%req%aed_model_prefix = prefix
+      var%req%next => null()
+      return
+   ENDIF
+
+   !# if we already have it, get out ...
+   IF ( req%aed_model_prefix == prefix ) RETURN
+
+   DO WHILE ( ASSOCIATED(req%next) )
+      req => req%next
+      IF ( req%aed_model_prefix == prefix ) RETURN
+   ENDDO
+   ALLOCATE(req%next)
+   req%next%aed_model_prefix = prefix
+   req%next%next => null()
+END SUBROUTINE extend_requested
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+   LOGICAL, INTENT(in) :: place
+!
+!LOCALS
+   INTEGER :: ret
+   CHARACTER(len=64) :: tname
+!-------------------------------------------------------------------------------
+!BEGIN
+   IF ( ASSOCIATED(aed_cur_prefix) .AND. .NOT. place ) THEN
+      tname = TRIM(aed_cur_prefix)//"_"//name
+   ELSE
+      tname = name
+   ENDIF
+
+   !# First see if it already exists
+   ret = aed_find_variable(tname)
+   IF ( ret == 0 ) THEN
+      IF (n_aed_vars .GE. a_vars) CALL extend_allocated_variables(n_aed_vars+1-a_vars)
+      n_aed_vars = n_aed_vars + 1
+      ret = n_aed_vars
+
+      all_vars(ret)%name = tname
+print*,"CREATE Variable '",trim(tname),"' long name '",trim(longname),"' with units '",trim(units),"'"
+
+      all_vars(ret)%model_name = cur_model_name
+      all_vars(ret)%longname = longname
+      all_vars(ret)%units = units
+
+      all_vars(ret)%sheet = .false.
+      all_vars(ret)%diag = .false.
+      all_vars(ret)%extern = .false.
+      all_vars(ret)%found = .false.
+   ENDIF
+   IF ( ASSOCIATED(aed_cur_prefix) ) THEN
+      CALL extend_requested(all_vars(ret), aed_cur_prefix)
+   ENDIF
+END FUNCTION aed_create_variable
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!# These define names and defaults for variables, returning their index:
+
+!###############################################################################
+FUNCTION aed_define_variable(name, units, longname, initial, minimum, maximum, mobility) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+   AED_REAL,INTENT(in),OPTIONAL :: initial, minimum, maximum
+   AED_REAL,INTENT(in),OPTIONAL :: mobility
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .false.)
+
+   if ( present(initial) ) all_vars(ret)%initial = initial
+   if ( present(minimum) ) all_vars(ret)%minimum = minimum
+   if ( present(maximum) ) all_vars(ret)%maximum = maximum
+   if ( present(mobility) ) all_vars(ret)%mobility = mobility
+
+!  all_vars(ret)%sheet = .false.
+!  all_vars(ret)%diag = .false.
+!  all_vars(ret)%extern = .false.
+   all_vars(ret)%found = .true.
+END FUNCTION aed_define_variable
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maximum, surf) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+   AED_REAL,INTENT(in),OPTIONAL :: initial, minimum, maximum
+   LOGICAL,INTENT(in),OPTIONAL :: surf
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .false.)
+
+   if ( present(initial) ) all_vars(ret)%initial = initial
+   if ( present(minimum) ) all_vars(ret)%minimum = minimum
+   if ( present(maximum) ) all_vars(ret)%maximum = maximum
+
+   all_vars(ret)%sheet = .true.
+!  all_vars(ret)%diag = .false.
+!  all_vars(ret)%extern = .false.
+   all_vars(ret)%found = .true.
+
+   IF ( PRESENT(surf) ) THEN
+      all_vars(ret)%bot = .NOT. surf
+      all_vars(ret)%top = surf
+   ELSE
+      all_vars(ret)%bot = .TRUE.
+   ENDIF
+END FUNCTION aed_define_sheet_variable
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_define_diag_variable(name, units, longname) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .false.)
+   n_diags = n_diags + 1
+
+!  all_vars(ret)%sheet = .false.
+   all_vars(ret)%diag = .true.
+!  all_vars(ret)%extern = .false.
+   all_vars(ret)%found = .true.
+END FUNCTION aed_define_diag_variable
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+   LOGICAL,INTENT(in),OPTIONAL :: surf
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .false.)
+   n_sheet_diags = n_sheet_diags + 1
+
+   all_vars(ret)%sheet = .true.
+   all_vars(ret)%diag = .true.
+!  all_vars(ret)%extern = .false.
+   all_vars(ret)%found = .true.
+
+   IF ( PRESENT(surf) ) THEN
+      all_vars(ret)%bot = .NOT. surf
+      all_vars(ret)%top = surf
+   ELSE
+      all_vars(ret)%bot = .TRUE.
+   ENDIF
+
+   ret = n_aed_vars
+END FUNCTION aed_define_sheet_diag_variable
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_provide_global(name, longname, units) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .false.)
+
+!  all_vars(ret)%sheet = .false.
+!  all_vars(ret)%diag = .false.
+   all_vars(ret)%extern = .true.
+   all_vars(ret)%found = .true.
+END FUNCTION aed_provide_global
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_provide_sheet_global(name, longname, units, surf) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+   LOGICAL,INTENT(in),OPTIONAL :: surf
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .false.)
+
+   all_vars(ret)%sheet = .true.
+!  all_vars(ret)%diag = .false.
+   all_vars(ret)%extern = .true.
+   all_vars(ret)%found = .true.
+
+   IF ( PRESENT(surf) ) THEN
+      all_vars(ret)%bot = .NOT. surf
+      all_vars(ret)%top = surf
+   ELSE
+      all_vars(ret)%bot = .TRUE.
+   ENDIF
+END FUNCTION aed_provide_sheet_global
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!# These return the index for the named variable :
+
+!###############################################################################
 FUNCTION aed_locate_variable(name) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -440,19 +625,9 @@ FUNCTION aed_locate_variable(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ret = aed_find_variable(name)
-   IF ( ret == 0 ) THEN
-!print*,'Variable ',trim(name),' not found'
-!stop
-      CALL aed_create_variable(name, '', '')
-!     all_vars(n_aed_vars)%sheet = .false.
-!     all_vars(n_aed_vars)%diag = .false.
-!     all_vars(n_aed_vars)%extern = .true.
+   ret = aed_create_variable(name, '', '', .true.)
 
-      ret = n_aed_vars
-      RETURN
-   ENDIF
-   IF ( all_vars(ret)%sheet .OR. all_vars(ret)%diag ) ret = 0
+   IF ( all_vars(ret)%extern .OR. all_vars(ret)%sheet ) ret = 0
 END FUNCTION aed_locate_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -468,18 +643,9 @@ FUNCTION aed_locate_sheet_variable(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ret = aed_find_variable(name)
-   IF ( ret == 0 ) THEN
-      CALL aed_create_variable(name, '', '')
-      all_vars(n_aed_vars)%name = name
-      all_vars(n_aed_vars)%sheet = .true.
-!     all_vars(n_aed_vars)%diag = .false.
-!     all_vars(n_aed_vars)%extern = .true.
+   ret = aed_create_variable(name, '', '', .true.)
 
-      ret = n_aed_vars
-      RETURN
-   ENDIF
-   IF ( (.NOT. all_vars(ret)%sheet) .OR. all_vars(ret)%diag ) ret = 0
+   IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
 END FUNCTION aed_locate_sheet_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -499,24 +665,15 @@ FUNCTION aed_locate_global(name) RESULT(ret)
        ret = -1
        IF ( .NOT. host_has_cell_vel ) RETURN
    ENDIF
-   ret = aed_find_variable(name)
-   IF ( ret == 0 ) THEN
-!     print *,"variable ",trim(name)," not found"
-      CALL aed_create_variable(name, '', '')
-!     all_vars(n_aed_vars)%sheet = .false.
-!     all_vars(n_aed_vars)%diag = .false.
-      all_vars(n_aed_vars)%extern = .true.
 
-      ret = n_aed_vars
-      RETURN
-   ENDIF
-   IF ( all_vars(ret)%sheet ) ret = 0
+   ret = aed_create_variable(name, '', '', .true.)
+   all_vars(ret)%extern = .true.
 END FUNCTION aed_locate_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-FUNCTION aed_locate_global_sheet(name) RESULT(ret)
+FUNCTION aed_locate_sheet_global(name) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
@@ -526,19 +683,11 @@ FUNCTION aed_locate_global_sheet(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   ret = aed_find_variable(name)
-   IF ( ret == 0 ) THEN
-!     print *,"sheet var ",trim(name)," not found"
-      CALL aed_create_variable(name, '', '')
-      all_vars(n_aed_vars)%sheet = .true.
-!     all_vars(n_aed_vars)%diag = .false.
-      all_vars(n_aed_vars)%extern = .true.
+   ret = aed_create_variable(name, '', '', .true.)
 
-      ret = n_aed_vars
-      RETURN
-   ENDIF
-   IF ( .NOT. all_vars(ret)%sheet ) ret = 0
-END FUNCTION aed_locate_global_sheet
+   all_vars(ret)%sheet = .true.
+   all_vars(ret)%extern = .true.
+END FUNCTION aed_locate_sheet_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

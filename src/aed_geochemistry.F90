@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2020 -  The University of Western Australia               #
+!#  Copyright 2012 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -126,31 +126,37 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
 !
 !LOCALS
    INTEGER           :: status, i
+
+!  %% NAMELIST   %%  /aed_geochemistry/
+!  %% Last Checked 20/08/2021
    INTEGER           :: speciation_dt
    INTEGER           :: num_components,num_minerals
    INTEGER           :: nDissTransportables, nPartTransportables
    LOGICAL           :: simEq = .TRUE.
    AED_REAL          :: min
-   AED_REAL          :: dis_initial(MAX_GC_COMPONENTS)
+   AED_REAL          :: dis_initial(MAX_GC_COMPONENTS) = 0.0
    AED_REAL          :: Fsed_gch(MAX_GC_COMPONENTS)
    AED_REAL          :: Ksed_gch_o2(MAX_GC_COMPONENTS)
    AED_REAL          :: Ksed_gch_pH(MAX_GC_COMPONENTS)
-   AED_REAL          :: min_initial(MAX_GC_MINERALS)
+   AED_REAL          :: min_initial(MAX_GC_MINERALS) = 0.0
    AED_REAL          :: w_gch(MAX_GC_MINERALS)
-   AED_REAL          :: pH_initial, pe_initial
+   AED_REAL          :: pH_initial = 7.5
+   AED_REAL          :: pe_initial = 8.0
    AED_REAL          :: Riron_red, theta_iron_red, Kiron_red
    AED_REAL          :: Riron_aox, Riron_box, theta_iron_ox
    AED_REAL          :: Rsulf_red, theta_sulf_red, Ksulf_red
    AED_REAL          :: Rsulf_ox, theta_sulf_ox, Ksulf_ox
-   CHARACTER(len=64) :: geochem_file
-   CHARACTER(len=64) :: dis_components(MAX_GC_COMPONENTS)
-   CHARACTER(len=64) :: component_link(MAX_GC_COMPONENTS)
-   CHARACTER(len=64) :: speciesOutput(10)
-   CHARACTER(len=64) :: the_minerals(MAX_GC_MINERALS)
-   CHARACTER(len=64) :: mineral_link(MAX_GC_MINERALS)
+   CHARACTER(len=64) :: geochem_file = ''
+   CHARACTER(len=64) :: dis_components(MAX_GC_COMPONENTS) = ''
+   CHARACTER(len=64) :: component_link(MAX_GC_COMPONENTS) = ''
+   CHARACTER(len=64) :: speciesOutput(10) = ''
+   CHARACTER(len=64) :: the_minerals(MAX_GC_MINERALS) = ''
+   CHARACTER(len=64) :: mineral_link(MAX_GC_MINERALS) = ''
    CHARACTER(len=64) :: ph_link = 'CAR_pH'
    CHARACTER(len=64) :: pco2_link = 'CAR_pCO2'
    CHARACTER(len=64) :: oxy_link = 'OXY_oxy'
+!  %% END NAMELIST   %%  /aed_geochemistry/
+
    CHARACTER(len=64), DIMENSION(:), ALLOCATABLE :: diagnosticList
 
    NAMELIST /aed_geochemistry/ speciation_dt, geochem_file,                   &
@@ -177,13 +183,14 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%component_linked(:) = .FALSE.
    data%mineral_linked(:) = .FALSE.
 
-   dis_initial = 0.0  ! default, overwritten by namelist
-   min_initial = 0.0  ! default, overwritten by namelist
-   pH_initial  = 7.5  ! default, overwritten by namelist
-   pe_initial  = 8.0  ! default, not used
+! Initialisation now done in declaration
+!  dis_initial = 0.0  ! default, overwritten by namelist
+!  min_initial = 0.0  ! default, overwritten by namelist
+!  pH_initial  = 7.5  ! default, overwritten by namelist
+!  pe_initial  = 8.0  ! default, not used
 
-   ph_link     = 'CAR_pH'
-   pco2_link   = 'CAR_pCO2'
+!  ph_link     = 'CAR_pH'
+!  pco2_link   = 'CAR_pCO2'
 
    !----------------------------------------------------------------------------
    ! Read the namelist

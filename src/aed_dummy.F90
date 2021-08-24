@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -105,18 +105,19 @@ SUBROUTINE aed_define_dummy(data, namlst)
 
    CHARACTER(len=4),POINTER :: prefix => null()
 
-!  %% NAMELIST
-   CHARACTER(len=40) :: dm_vars(100)
-   AED_REAL          :: dm_max(100)
-   AED_REAL          :: dm_min(100)
-   AED_REAL          :: dm_init(100)
-   CHARACTER(len=40) :: dm_dvars(100)
-   CHARACTER(len=40) :: dm_svars(100)
-   AED_REAL          :: dm_smax(100)
-   AED_REAL          :: dm_smin(100)
-   AED_REAL          :: dm_sinit(100)
-   CHARACTER(len=40) :: dm_dsvars(100)
-!  %% END NAMELIST
+!  %% NAMELIST   %%  /aed_dummy/
+!  %% Last Checked 20/08/2021
+   CHARACTER(len=40) :: dm_vars(100) = ''
+   AED_REAL          :: dm_max(100) = NaN_
+   AED_REAL          :: dm_min(100) = NaN_
+   AED_REAL          :: dm_init(100) = 0.
+   CHARACTER(len=40) :: dm_dvars(100) = ''
+   CHARACTER(len=40) :: dm_svars(100) = ''
+   AED_REAL          :: dm_smax(100) = NaN_
+   AED_REAL          :: dm_smin(100) = NaN_
+   AED_REAL          :: dm_sinit(100) = 0.
+   CHARACTER(len=40) :: dm_dsvars(100) = ''
+!  %% END NAMELIST   %%  /aed_dummy/
 
    NAMELIST /aed_dummy/ dm_vars, dm_max, dm_min, dm_init,             &
                         dm_dvars,                                     &

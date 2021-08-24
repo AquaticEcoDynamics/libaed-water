@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2020 -  The University of Western Australia               #
+!#  Copyright 2012 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -31,7 +31,7 @@
 !#                                                                             #
 !###############################################################################
 
-#include "aed+.h"
+#include "aed.h"
 
 
 MODULE aed_gctypes
@@ -142,6 +142,7 @@ MODULE aed_gctypes
     REAL,  DIMENSION(:), POINTER :: Stoich => NULL()    !stoichiometric coeffs
   END TYPE PurePhaseInfo
 
+#if 0
 !#----------------- sed_candi types ----------------------------------
 !#----------------- sed_candi types ----------------------------------
 !#----------------- sed_candi types ----------------------------------
@@ -1028,6 +1029,7 @@ MODULE aed_gctypes
      REAL                      :: Xmk, Xfl, Xfm
   END TYPE AEDConstDiagenesisType
 !-------------------------------------------------------------------------------
+#endif
 
 END MODULE aed_gctypes
 !------------------------------------------------------------------------------!

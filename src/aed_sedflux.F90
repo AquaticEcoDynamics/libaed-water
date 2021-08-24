@@ -113,7 +113,8 @@ SUBROUTINE load_sed_zone_data(data,namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_sed_const2d/
+!  %% Last Checked 20/08/2021
    INTEGER  :: n_zones=0                       !% number of sediment zones active in the domain
                                                !% -
                                                !% integer
@@ -216,7 +217,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_sed_const2d/
 
    NAMELIST /aed_sed_const2d/ n_zones, &
                               Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,&
@@ -317,13 +318,13 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_sedflux/
    CHARACTER(len=64) :: sedflux_model=''
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_sedflux/
 
    NAMELIST /aed_sedflux/ sedflux_model
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_sed_constant/
    INTEGER  :: nzones = 1
    AED_REAL :: Fsed_oxy  = MISVAL
    AED_REAL :: Fsed_rsi  = MISVAL
@@ -341,7 +342,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Fsed_ch4_ebb  = MISVAL
    AED_REAL :: Fsed_feii = MISVAL
    AED_REAL :: Fsed_n2o  = MISVAL
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_sed_constant/
 
    NAMELIST /aed_sed_constant/ nzones,                                          &
                             Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,   &
@@ -389,7 +390,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    ELSEIF ( sedflux_model .EQ. "dynamic" ) THEN
       data%sed_modl = SED_DYNAMIC
 
-!     data%id_zones = aed_locate_global_sheet('sed_zone')
+!     data%id_zones = aed_locate_sheet_global('sed_zone')
       data%Fsed_oxy = 10. / secs_per_day
    ELSEIF ( sedflux_model .EQ. "constant2d" .OR. sedflux_model .EQ. "dynamic2d" ) THEN
       IF ( sedflux_model .EQ. "constant2d" ) THEN
@@ -398,7 +399,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
          data%sed_modl = SED_DYNAMIC_2D
       ENDIF
 
-      data%id_zones = aed_locate_global_sheet('sed_zone')
+      data%id_zones = aed_locate_sheet_global('sed_zone')
 
       CALL load_sed_zone_data(data,namlst)
       IF (ALLOCATED(data%Fsed_oxy_P))  Fsed_oxy  = data%Fsed_oxy_P(1)

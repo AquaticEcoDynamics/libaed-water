@@ -126,6 +126,7 @@ OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_organic_matter.o \
      ${objdir}/aed_oxygen.o \
      ${objdir}/aed_pathogens.o \
+     ${objdir}/aed_pesticides.o \
      ${objdir}/aed_phosphorus.o \
      ${objdir}/aed_phytoplankton.o \
      ${objdir}/aed_sedflux.o \

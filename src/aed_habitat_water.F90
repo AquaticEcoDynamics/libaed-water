@@ -30,7 +30,7 @@
 !#                                                                             #
 !###############################################################################
 
-#include "aed+.h"
+#include "aed.h"
 
 !
 MODULE aed_habitat_water
@@ -107,13 +107,33 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
    CLASS (aed_habitat_water_data_t),INTENT(inout) :: data
 !
 !LOCALS
-   INTEGER :: i, f, z, status, num_mtox, num_fish
-   LOGICAL :: simFishTolerance,simCyanoRisk,simMosquitoRisk,simClearWater,simMetalTox
+   INTEGER :: i, f, z, status
+
+!  %% NAMELIST   %%  /aed_habitat_water/
+!  %% Last Checked 20/08/2021
+   LOGICAL           :: simFishTolerance
+   INTEGER           :: num_mtox
+   INTEGER           :: num_fish
+   LOGICAL           :: simCyanoRisk
+   LOGICAL           :: simClearWater
+   LOGICAL           :: simMetalTox
    AED_REAL          :: mtox_lims(10)
-   AED_REAL          :: fish_alpha(20),fish_Tmax(20),fish_Taccl(20),fish_Ocrit(20),fish_KO(20)
-   CHARACTER(len=40) :: mtox_acid_link, mtox_aass_link, fish_oxy_link
+   AED_REAL          :: fish_alpha(20)
+   AED_REAL          :: fish_Tmax(20)
+   AED_REAL          :: fish_Taccl(20)
+   AED_REAL          :: fish_Ocrit(20)
+   AED_REAL          :: fish_KO(20)
    CHARACTER(len=40) :: mtox_vars(10)
-   CHARACTER(6) :: fish_name
+   CHARACTER(6)      :: fish_name
+
+! From Module Globals
+!  INTEGER :: diag_level = 10
+!  %% END NAMELIST   %%  /aed_habitat_water/
+
+   CHARACTER(len=40) :: mtox_acid_link
+   CHARACTER(len=40) :: mtox_aass_link
+   CHARACTER(len=40) :: fish_oxy_link
+   LOGICAL           :: simMosquitoRisk
 
    NAMELIST /aed_habitat_water/                                                   &
                                simFishTolerance, num_fish,                        &

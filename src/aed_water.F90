@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -53,6 +53,7 @@ MODULE aed_water
    USE aed_bio_particles
    USE aed_geochemistry
    USE aed_pathogens
+   USE aed_pesticides
    USE aed_habitat_water
 
    USE aed_benthic
@@ -103,6 +104,7 @@ FUNCTION aed_new_model(modelname) RESULT(model)
       CASE ('aed_noncohesive');    prefix = 'NCS'; ALLOCATE(aed_noncohesive_data_t::model)
       CASE ('aed_geochemistry');   prefix = 'GEO'; ALLOCATE(aed_geochemistry_data_t::model)
       CASE ('aed_pathogens');      prefix = 'PAT'; ALLOCATE(aed_pathogens_data_t::model)
+      CASE ('aed_pesticides');     prefix = 'PST'; ALLOCATE(aed_pesticides_data_t::model)
       CASE ('aed_totals');         prefix = 'TOT'; ALLOCATE(aed_totals_data_t::model)
       CASE ('aed_dummy');          prefix = 'DUM'; ALLOCATE(aed_dummy_data_t::model)
       CASE ('aed_habitat_water');  prefix = 'HAB'; ALLOCATE(aed_habitat_water_data_t::model)

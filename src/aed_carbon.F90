@@ -126,7 +126,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
 !LOCALS
    INTEGER           :: status
 
-!  %% NAMELIST VARS
+!  %% NAMELIST   %%  /aed_carbon/
+!  %% Last Checked 20/08/2021
    AED_REAL          :: dic_initial      = 1000.0
    AED_REAL          :: pH_initial       = 7.5
    AED_REAL          :: ch4_initial      = 4.5
@@ -169,7 +170,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: ch4_bub_ws       = zero_
 
 
-!  %% END NAMELIST VARS
+!  %% END NAMELIST   %%  /aed_carbon/
 
    NAMELIST /aed_carbon/ dic_initial,pH_initial,ch4_initial,ionic,         &
                          Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable, &
@@ -262,15 +263,15 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    data%use_sed_model_dic = Fsed_dic_variable .NE. ''
    IF (data%use_sed_model_dic) &
-      data%id_Fsed_dic = aed_locate_global_sheet(Fsed_dic_variable)
+      data%id_Fsed_dic = aed_locate_sheet_variable(Fsed_dic_variable)
 
    data%use_sed_model_ch4 = Fsed_ch4_variable .NE. ''
    IF (data%use_sed_model_ch4) &
-      data%id_Fsed_ch4 = aed_locate_global_sheet(Fsed_ch4_variable)
+      data%id_Fsed_ch4 = aed_locate_sheet_variable(Fsed_ch4_variable)
 
    data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''
    IF (data%use_sed_model_ebb) &
-      data%id_Fsed_ch4_ebb = aed_locate_global_sheet(Fsed_ebb_variable)
+      data%id_Fsed_ch4_ebb = aed_locate_sheet_variable(Fsed_ebb_variable)
 
    !# Register diagnostic variables
    data%id_pco2 = aed_define_diag_variable('pCO2','atm', 'pCO2')
@@ -308,8 +309,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%id_vel  = aed_locate_global('cell_vel')           ! needed for k600
    data%id_depth= aed_locate_global('depth')
 !  data%id_depth= aed_locate_global('layer_ht')
-   data%id_wind = aed_locate_global_sheet('wind_speed')
-   IF( data%simCH4ebb ) data%id_tau  = aed_locate_global_sheet('taub')
+   data%id_wind = aed_locate_sheet_global('wind_speed')
+   IF( data%simCH4ebb ) data%id_tau  = aed_locate_sheet_global('taub')
 
 END SUBROUTINE aed_define_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -120,7 +120,8 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_oxygen/
+!  %% Last Checked 20/08/2021
    AED_REAL          :: oxy_initial       = 300.  !% initial dissolved oxygen (DO) concentration
                                                   !% $$mmol\,m^{-3}$$
                                                   !% float
@@ -180,7 +181,12 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                                                   !% 1
                                                   !% 1 - X
                                                   !% Choice depends on waterbody type
-!  %% END NAMELIST
+! diag_level is module global
+!  INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
+!                                         ! 1 = basic diagnostic outputs
+!                                         ! 2-10 = most diagnostic outputs
+!                                         ! >10 = debug/checking outputs
+!  %% END NAMELIST   %%  /aed_oxygen/
 
    NAMELIST /aed_oxygen/ oxy_initial, oxy_min, oxy_max,           &
                           Fsed_oxy, Ksed_oxy, theta_sed_oxy,       &
@@ -209,7 +215,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                                     oxy_initial,minimum=oxy_min,maximum=oxy_max)
 
    ! Register the link to external variables
-   IF (data%use_sed_model) data%id_Fsed_oxy = aed_locate_global_sheet(Fsed_oxy_variable)
+   IF (data%use_sed_model) data%id_Fsed_oxy = aed_locate_sheet_variable(Fsed_oxy_variable)
 
    ! Register diagnostic variables
    IF (diag_level>0) THEN
@@ -233,9 +239,9 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    ! Register environmental dependencies
    data%id_temp = aed_locate_global('temperature') ! Temperature (degrees Celsius)
    data%id_salt = aed_locate_global('salinity') ! Salinity (psu)
-!  data%id_pres = aed_locate_global_sheet('pressure') ! Pressure (dbar = 10 kPa)
-   data%id_wind = aed_locate_global_sheet('wind_speed') ! Wind speed at 10 m above surface (m/s)
-   data%id_larea = aed_locate_global_sheet('layer_area')
+!  data%id_pres = aed_locate_sheet_global('pressure') ! Pressure (dbar = 10 kPa)
+   data%id_wind = aed_locate_sheet_global('wind_speed') ! Wind speed at 10 m above surface (m/s)
+   data%id_larea = aed_locate_sheet_global('layer_area')
    data%id_lht = aed_locate_global('layer_ht')
    data%id_cell_vel = -1
    IF( oxy_piston_model>3 )data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600

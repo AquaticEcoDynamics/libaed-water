@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018-2020 -  The University of Western Australia                 #
+!#  Copyright 2018 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -109,9 +109,23 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
-   AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old, &
-               mass_limit, X_cdw, X_nc, X_pc, X_dwww
-   LOGICAL  :: extra_diag
+
+!  %% NAMELIST    %%  /aed_bio_particles/
+!  %% Last Checked 20/08/2021
+   AED_REAL :: vvel_new = 0.
+   AED_REAL :: vvel_old = 0.
+   AED_REAL :: decay_rate_new = 0.
+   AED_REAL :: decay_rate_old = 0.
+   AED_REAL :: mass_limit = 10.
+   AED_REAL :: X_cdw = 0.5
+   AED_REAL :: X_nc = 0.1
+   AED_REAL :: X_pc = 0.01
+   AED_REAL :: X_dwww = 1.0
+   LOGICAL  :: extra_diag = .false.
+
+!  From Module Globals
+!  INTEGER :: diag_level = 10
+!  %% END NAMELIST    %%  /aed_bio_particles/
 
    NAMELIST /aed_bio_particles/ vvel_new, vvel_old, &
                            decay_rate_new, decay_rate_old, &
@@ -122,11 +136,12 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 !BEGIN
 
    ! Initialise
-   mass_limit = 10.
-   X_dwww = 1.0; X_cdw = 0.5;  X_nc = 0.1;  X_pc= 0.01
-   decay_rate_new = 0.; decay_rate_old = 0.
-   vvel_new = 0.; vvel_old = 0.
-   extra_diag = .false.
+! now done in declaration
+!  mass_limit = 10.
+!  X_dwww = 1.0; X_cdw = 0.5;  X_nc = 0.1;  X_pc= 0.01
+!  decay_rate_new = 0.; decay_rate_old = 0.
+!  vvel_new = 0.; vvel_old = 0.
+!  extra_diag = .false.
 
    ! Read the namelist
    read(namlst,nml=aed_bio_particles,iostat=status)
@@ -206,7 +221,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%id_dop = aed_locate_variable('OGM_dop')
 
    ! Environment variables
-   data%id_larea = aed_locate_global_sheet('layer_area')
+   data%id_larea = aed_locate_sheet_global('layer_area')
    data%id_lht = aed_locate_global('layer_ht')
 
 END SUBROUTINE aed_define_bio_particles

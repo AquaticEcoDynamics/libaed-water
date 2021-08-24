@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -115,7 +115,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_phosphorus/
+!  %% Last Checked 20/08/2021
    ! Initial
    AED_REAL          :: frp_initial   = 4.5
    AED_REAL          :: frp_min       = zero_
@@ -142,7 +143,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    LOGICAL           :: simWetDeposition = .false.
    AED_REAL          :: atm_pip_dd   = zero_
    AED_REAL          :: atm_frp_conc = zero_
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_phosphorus/
 
    NAMELIST /aed_phosphorus/ frp_initial,frp_min,frp_max,                     &
                             Fsed_frp,Ksed_frp,theta_sed_frp,Fsed_frp_variable, &
@@ -192,7 +193,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
 
    data%ben_use_aedsed = Fsed_frp_variable .NE. '' !This means aed sediment module switched on
    IF (data%ben_use_aedsed) &
-     data%id_Fsed_frp = aed_locate_global_sheet(Fsed_frp_variable)
+     data%id_Fsed_frp = aed_locate_sheet_variable(Fsed_frp_variable)
 
    data%id_frpads = -1
    data%id_frpads_vvel = -1
@@ -208,7 +209,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
           data%id_tss = aed_locate_variable(po4sorption_target_variable)
           IF(w_po4ads<-999.) THEN
             print *,'          Checking for associated _vvel link array ',TRIM(po4sorption_target_variable)//'_vvel'
-            data%id_frpads_vvel = aed_locate_global(TRIM(po4sorption_target_variable)//'_vvel')
+            data%id_frpads_vvel = aed_locate_variable(TRIM(po4sorption_target_variable)//'_vvel')
             print *,'          ... found'
             data%w_po4ads = zero_
           ELSE
@@ -238,7 +239,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
 
    ! Register environmental dependencies
    data%id_E_temp = aed_locate_global('temperature')
-   IF( simWetDeposition ) data%id_E_rain = aed_locate_global_sheet('rain')
+   IF( simWetDeposition ) data%id_E_rain = aed_locate_sheet_global('rain')
 
 END SUBROUTINE aed_define_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

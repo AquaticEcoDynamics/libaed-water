@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -41,15 +41,18 @@ MODULE aed_zoop_utils
 
 !  PRIVATE   ! By default make everything private
 !
-   TYPE type_zoop_prey
+!  %% NAMELIST   %%  zoop_prey_t
+   TYPE zoop_prey_t
       !State variable name for zooplankton prey
       CHARACTER(64) :: zoop_prey
       !Preference factors for zooplankton predators grazing on prey
       AED_REAL      :: Pzoo_prey
-   END TYPE type_zoop_prey
+   END TYPE zoop_prey_t
+!  %% END NAMELIST   %%  zoop_prey_t
 
 
-   TYPE type_zoop_params
+!  %% NAMELIST   %%  zoop_param_t
+   TYPE zoop_param_t
       ! General Attributes
       CHARACTER(64) :: zoop_name
       AED_REAL :: zoop_initial, min_zoo
@@ -70,13 +73,14 @@ MODULE aed_zoop_utils
       AED_REAL :: Cmin_grz_zoo
       ! Prey information
       INTEGER  :: num_prey
-      TYPE(type_zoop_prey)      :: prey(MAX_ZOOP_PREY)
+      TYPE(zoop_prey_t)      :: prey(MAX_ZOOP_PREY)
       INTEGER  :: simDOlim
       ! Temperature limitation derived terms
       AED_REAL :: kTn, aTn, bTn
-   END TYPE
+   END TYPE zoop_param_t
+!  %% END NAMELIST   %%  zoop_param_t
 
-   TYPE,extends(type_zoop_params) :: type_zoop_data
+   TYPE,extends(zoop_param_t) :: zoop_data_t
       INTEGER  :: id_prey(MAX_ZOOP_PREY)
       INTEGER  :: id_phyIN(MAX_ZOOP_PREY),id_phyIP(MAX_ZOOP_PREY)
    END TYPE
@@ -93,7 +97,7 @@ FUNCTION fPrey_Limitation(zoops,group,C) RESULT(fPlim)
 ! prey is applied.
 !----------------------------------------------------------------------------!
 !ARGUMENTS
-   TYPE(type_zoop_data),DIMENSION(:),INTENT(in) :: zoops
+   TYPE(zoop_data_t),DIMENSION(:),INTENT(in) :: zoops
    INTEGER  :: group
    AED_REAL,INTENT(in)                          :: C !total concentration of available prey
 !
@@ -119,7 +123,7 @@ FUNCTION fSalinity_Limitation(zoops,group,S) RESULT(fSal)
 ! Salinity tolerance of zooplankton                                          !
 !----------------------------------------------------------------------------!
 !ARGUMENTS
-   TYPE(type_zoop_data),DIMENSION(:),INTENT(in) :: zoops
+   TYPE(zoop_data_t),DIMENSION(:),INTENT(in) :: zoops
    INTEGER  :: group
    AED_REAL,INTENT(in)                          :: S
 !

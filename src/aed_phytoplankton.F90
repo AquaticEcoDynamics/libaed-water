@@ -87,7 +87,7 @@ MODULE aed_phytoplankton
 
       !# Model parameters
       INTEGER  :: num_phytos
-      TYPE(phyto_data),DIMENSION(:),ALLOCATABLE :: phytos
+      TYPE(phyto_data_t),DIMENSION(:),ALLOCATABLE :: phytos
       ! LOGICAL  :: do_exc,do_mort,do_upt, do_N2uptake
       LOGICAL  :: do_Puptake, do_Nuptake, do_Cuptake
       LOGICAL  :: do_Siuptake, do_DOuptake, do_N2uptake
@@ -126,7 +126,7 @@ INTEGER FUNCTION load_csv(dbase,pd)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
-   TYPE(phyto_nml_data) :: pd(MAX_PHYTO_TYPES)
+   TYPE(phyto_param_t) :: pd(MAX_PHYTO_TYPES)
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol
@@ -232,8 +232,8 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
    INTEGER  :: i,tfil
    AED_REAL :: minNut
 
-   TYPE(phyto_nml_data) :: pd(MAX_PHYTO_TYPES)
-   NAMELIST /phyto_data/ pd
+   TYPE(phyto_param_t) :: pd(MAX_PHYTO_TYPES)
+   NAMELIST /phyto_data/ pd     ! %% type phyto_param_t - see aed_bio_utils
 !-------------------------------------------------------------------------------
 !BEGIN
     SELECT CASE (param_file_type(dbase))
@@ -423,6 +423,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    INTEGER  :: status,i
 
 !  %% NAMELIST
+!  %% Last Checked 20/08/2021
    ! Default settings
    INTEGER            :: num_phytos = 0
    INTEGER            :: the_phytos(MAX_PHYTO_TYPES) = 0
@@ -460,9 +461,13 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    INTEGER            :: do_mpb = 0
    INTEGER            :: n_zones = 0
    AED_REAL           :: active_zones(1000) = 0
+
+!  From module globals
+!  INTEGER  :: diag_level = 10
+
 !  %% END NAMELIST
 
-   NAMELIST /aed_phytoplankton/ num_phytos, the_phytos, settling,resuspension,&
+   NAMELIST /aed_phytoplankton/ num_phytos, the_phytos, settling, resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
                     n_excretion_target_variable,n_mortality_target_variable,   &
@@ -568,7 +573,8 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    IF (data%do_Puptake) THEN
    ! IF (data%npup>0) THEN ; data%id_Pupttarget(1) = aed_locate_variable(p1_uptake_target_variable); ifrp=1 ; ENDIF
    ! IF (data%npup>1) THEN ; data%id_Pupttarget(2) = aed_locate_variable(p2_uptake_target_variable); idop=2 ; ENDIF
-     IF (data%npup>0) data%id_Pupttarget(ifrp) = aed_locate_variable(p1_uptake_target_variable)  ! CAB ifrp and idop are now constants in bio_utils
+     !# CAB ifrp and idop are now constants in bio_utils
+     IF (data%npup>0) data%id_Pupttarget(ifrp) = aed_locate_variable(p1_uptake_target_variable)
      IF (data%npup>1) data%id_Pupttarget(idop) = aed_locate_variable(p2_uptake_target_variable)
    ENDIF
    data%nnup = 0
@@ -583,7 +589,8 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    ! IF (data%nnup>1) THEN ; data%id_Nupttarget(2) = aed_locate_variable( n2_uptake_target_variable); inh4=2 ; ENDIF
    ! IF (data%nnup>2) THEN ; data%id_Nupttarget(3) = aed_locate_variable( n3_uptake_target_variable); idon=3 ; ENDIF
    ! IF (data%nnup>3) THEN ; data%id_Nupttarget(4) = aed_locate_variable( n4_uptake_target_variable); in2 =4 ; ENDIF
-     IF (data%nnup>0) data%id_Nupttarget(ino3) = aed_locate_variable( n1_uptake_target_variable)  ! CAB ino3, inh4, idon and in2 are now constants in bio_utils
+     !# CAB ino3, inh4, idon and in2 are now constants in bio_utils
+     IF (data%nnup>0) data%id_Nupttarget(ino3) = aed_locate_variable( n1_uptake_target_variable)
      IF (data%nnup>1) data%id_Nupttarget(inh4) = aed_locate_variable( n2_uptake_target_variable)
      IF (data%nnup>2) data%id_Nupttarget(idon) = aed_locate_variable( n3_uptake_target_variable)
      IF (data%nnup>3) data%id_Nupttarget(in2)  = aed_locate_variable( n4_uptake_target_variable)
@@ -606,7 +613,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
 
    !-- resuspension link variable
    IF ( .NOT.resus_link .EQ. '' ) THEN
-      data%id_l_resus  = aed_locate_global_sheet(TRIM(resus_link))
+      data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link))
    ELSE
       data%id_l_resus = 0
       data%resuspension = 0.
@@ -639,11 +646,11 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    data%id_tem = aed_locate_global('temperature')
    data%id_sal = aed_locate_global('salinity')
    data%id_par = aed_locate_global('par')
-   data%id_I_0 = aed_locate_global_sheet('par_sf')
+   data%id_I_0 = aed_locate_sheet_global('par_sf')
    data%id_dz = aed_locate_global('layer_ht')
    data%id_extc = aed_locate_global('extc_coef')
    data%id_dens = aed_locate_global('density')
-   data%id_sedzone = aed_locate_global_sheet('sed_zone')
+   data%id_sedzone = aed_locate_sheet_global('sed_zone')
 
 END SUBROUTINE aed_define_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

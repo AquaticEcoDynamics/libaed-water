@@ -157,7 +157,8 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    INTEGER                   :: status
    AED_REAL                  :: initial_sedom
 
-!  %% NAMELIST
+!  %% NAMELIST    %%  /aed_organic_matter/
+!  %% Last Checked 20/08/2021
    !-- Default initial values and limits
    AED_REAL                  :: om_min         = zero_
    AED_REAL                  :: om_max         =   1e8
@@ -264,7 +265,10 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
 
    !-- Misc options
    LOGICAL                   :: extra_diag = .FALSE.
-!  %% END NAMELIST
+
+   !-- From Module Globals
+!  INTEGER                   :: diag_level
+!  %% END NAMELIST    %%  /aed_organic_matter/
 
    !-- Parameters to read in
    NAMELIST /aed_organic_matter/   om_min, om_max,                             &
@@ -531,24 +535,24 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_Fsed_don = -1 ; data%id_Fsed_dop = -1 ; data%id_Fsed_doc = -1
 
    data%use_Fsed_link_doc = Fsed_doc_variable .NE. ''
-   IF (data%use_Fsed_link_doc) data%id_Fsed_doc = aed_locate_global_sheet(Fsed_doc_variable)
+   IF (data%use_Fsed_link_doc) data%id_Fsed_doc = aed_locate_sheet_variable(Fsed_doc_variable)
    data%use_Fsed_link_don = Fsed_don_variable .NE. ''
-   IF (data%use_Fsed_link_don) data%id_Fsed_don = aed_locate_global_sheet(Fsed_don_variable)
+   IF (data%use_Fsed_link_don) data%id_Fsed_don = aed_locate_sheet_variable(Fsed_don_variable)
    data%use_Fsed_link_dop = Fsed_dop_variable .NE. ''
-   IF (data%use_Fsed_link_dop) data%id_Fsed_dop = aed_locate_global_sheet(Fsed_dop_variable)
+   IF (data%use_Fsed_link_dop) data%id_Fsed_dop = aed_locate_sheet_variable(Fsed_dop_variable)
    data%use_Fsed_link_poc = Fsed_poc_variable .NE. ''
-   IF (data%use_Fsed_link_poc) data%id_Fsed_poc = aed_locate_global_sheet(Fsed_poc_variable)
+   IF (data%use_Fsed_link_poc) data%id_Fsed_poc = aed_locate_sheet_variable(Fsed_poc_variable)
    data%use_Fsed_link_pon = Fsed_pon_variable .NE. ''
-   IF (data%use_Fsed_link_pon) data%id_Fsed_pon = aed_locate_global_sheet(Fsed_pon_variable)
+   IF (data%use_Fsed_link_pon) data%id_Fsed_pon = aed_locate_sheet_variable(Fsed_pon_variable)
    data%use_Fsed_link_pop = Fsed_pop_variable .NE. ''
-   IF (data%use_Fsed_link_pop) data%id_Fsed_pop = aed_locate_global_sheet(Fsed_pop_variable)
+   IF (data%use_Fsed_link_pop) data%id_Fsed_pop = aed_locate_sheet_variable(Fsed_pop_variable)
 
    !-- sedimentation link variables
    data%id_Psed_poc = -1 ; data%id_Psed_pon = -1 ; data%id_Psed_pop = -1
 
    data%use_Psed_link_poc = Psed_poc_variable .NE. ''
    IF (data%use_Psed_link_poc) THEN
-     data%id_Psed_poc = aed_locate_global_sheet(Psed_poc_variable)
+     data%id_Psed_poc = aed_locate_sheet_variable(Psed_poc_variable)
    ELSE
      data%id_Psed_poc = aed_define_diag_variable('Psed_poc','mmol/m**2/s',  'POC sedimentation')
      IF (simRPools) &
@@ -556,12 +560,12 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    ENDIF
    data%use_Psed_link_pon = Psed_pon_variable .NE. ''
    IF (data%use_Psed_link_pon) THEN
-     data%id_Psed_pon = aed_locate_global_sheet(Psed_pon_variable)
+     data%id_Psed_pon = aed_locate_sheet_variable(Psed_pon_variable)
    ELSE
      data%id_Psed_pon = aed_define_diag_variable('Psed_pon','mmol/m**2/s',  'PON sedimentation')
    ENDIF
    IF (data%use_Psed_link_pop) THEN
-     data%id_Psed_pop = aed_locate_global_sheet(Psed_pop_variable)
+     data%id_Psed_pop = aed_locate_sheet_variable(Psed_pop_variable)
    ELSE
      data%id_Psed_pop = aed_define_diag_variable('Psed_pop','mmol/m**2/s',  'POP sedimentation')
    ENDIF
@@ -569,7 +573,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
 
    !-- resuspension link variable
    IF ( resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
-      data%id_l_resus  = aed_locate_global_sheet(TRIM(resus_link)) ! ('TRC_resus')
+      data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link)) ! ('TRC_resus')
    ELSE
       data%id_l_resus = 0
       data%resuspension = 0

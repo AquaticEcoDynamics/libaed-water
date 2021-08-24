@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018 - 2020 - The University of Western Australia                #
+!#  Copyright 2018 - 2021 - The University of Western Australia                #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -124,7 +124,8 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    INTEGER  :: status,i
    CHARACTER(4) :: ncs_name
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_noncohesive/
+!  %% Last Checked 20/08/2021
    ! Set default parameter values
    INTEGER           :: num_ss          = 0
    INTEGER           :: resuspension    = 0
@@ -145,13 +146,13 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    AED_REAL          :: sed_porosity    = 0.3
    AED_REAL          :: sed_initial     = zero_
    CHARACTER(len=64) :: macrophyte_link_var = ''
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_noncohesive/
 
-   NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss, &
-                               settling, w_ss, rho_ss, d_ss, &
-                               resuspension, epsilon, tau_0, tau_r, Ktau_0, &
-                               macrophyte_link_var, Fsed, fs, &
-                               simSedimentMass, ss_initial, sed_porosity
+   NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss,                         &
+                              settling, w_ss, rho_ss, d_ss,                 &
+                              resuspension, epsilon, tau_0, tau_r, Ktau_0,  &
+                              macrophyte_link_var, Fsed, fs,                &
+                              simSedimentMass, ss_initial, sed_porosity
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -244,8 +245,8 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    IF ( resuspension > 0 ) THEN
       data%id_resus = aed_define_sheet_diag_variable('resus','g/m**2/s','resuspension rate')
       data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m**2','taub diagnostic')
-      data%id_e_taub = aed_locate_global_sheet('taub')
-      data%id_e_sedzone = aed_locate_global_sheet('sed_zone')
+      data%id_e_taub = aed_locate_sheet_global('taub')
+      data%id_e_sedzone = aed_locate_sheet_global('sed_zone')
    ENDIF
 
 END SUBROUTINE aed_define_noncohesive
