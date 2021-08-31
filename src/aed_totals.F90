@@ -90,7 +90,11 @@ MODULE aed_totals
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -133,6 +137,12 @@ SUBROUTINE aed_define_totals(data, namlst)
    CHARACTER(len=40) :: tal_vars(10)       = ''
    AED_REAL          :: tal_varscale(10)   = 1.0
    LOGICAL           :: outputLight        = .FALSE.
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_totals/
 
    NAMELIST /aed_totals/ tn_vars,  tn_varscale,  tkn_vars,  tkn_varscale,  &

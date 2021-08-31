@@ -99,8 +99,12 @@ MODULE aed_noncohesive
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
    AED_REAL :: sed_depth = 1.0
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 
 !===============================================================================
@@ -146,13 +150,19 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    AED_REAL          :: sed_porosity    = 0.3
    AED_REAL          :: sed_initial     = zero_
    CHARACTER(len=64) :: macrophyte_link_var = ''
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_noncohesive/
 
    NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss,                         &
                               settling, w_ss, rho_ss, d_ss,                 &
                               resuspension, epsilon, tau_0, tau_r, Ktau_0,  &
                               macrophyte_link_var, Fsed, fs,                &
-                              simSedimentMass, ss_initial, sed_porosity
+                              simSedimentMass, ss_initial, sed_porosity, diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN

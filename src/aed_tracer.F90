@@ -95,7 +95,11 @@ MODULE aed_tracer
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -137,6 +141,12 @@ SUBROUTINE aed_define_tracer(data, namlst)
    AED_REAL          :: tau_0(100)     = 0.04
    AED_REAL          :: fs(100)        = 1.0
    CHARACTER(len=64) :: macrophyte_link_var = ''
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_tracer/
 
    NAMELIST /aed_tracer/ num_tracers, decay, Fsed, Ke_ss, &
@@ -148,19 +158,6 @@ SUBROUTINE aed_define_tracer(data, namlst)
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_tracer initialization"
-
-   ! set default parameter values
-   decay = zero_
-   Fsed = zero_
-   Ke_ss = 0.02
-   w_ss = zero_
-   d_ss = 1e-6
-   rho_ss = 1.6e3
-   epsilon = 0.02
-   tau_r = 1.0
-   tau_0 = 0.04
-   kTau_0 = 1.0
-   fs = 1.0
 
    ! Read the namelist
    read(namlst,nml=aed_tracer,iostat=status)

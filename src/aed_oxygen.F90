@@ -181,7 +181,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                                                   !% 1
                                                   !% 1 - X
                                                   !% Choice depends on waterbody type
-! diag_level is module global
+! %% From Module Globals
 !  INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
 !                                         ! 1 = basic diagnostic outputs
 !                                         ! 2-10 = most diagnostic outputs

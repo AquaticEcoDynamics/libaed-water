@@ -78,8 +78,12 @@ MODULE aed_dummy
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
    AED_REAL :: today = 1.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -117,21 +121,22 @@ SUBROUTINE aed_define_dummy(data, namlst)
    AED_REAL          :: dm_smin(100) = NaN_
    AED_REAL          :: dm_sinit(100) = 0.
    CHARACTER(len=40) :: dm_dsvars(100) = ''
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_dummy/
 
    NAMELIST /aed_dummy/ dm_vars, dm_max, dm_min, dm_init,             &
                         dm_dvars,                                     &
                         dm_svars, dm_smax, dm_smin, dm_sinit,         &
-                        dm_dsvars
+                        dm_dsvars, diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_dummy initialization"
-
-   dm_vars = ''    ; dm_dvars = ''
-   dm_max = NaN_   ; dm_min = NaN_   ; dm_init = 0
-   dm_svars = ''   ; dm_dsvars = ''
-   dm_smax = NaN_  ; dm_smin = NaN_  ; dm_sinit = 0
 
    num_v = 0 ; num_dv = 0 ; num_sv = 0 ; num_dsv = 0
 

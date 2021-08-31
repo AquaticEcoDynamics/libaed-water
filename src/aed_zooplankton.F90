@@ -93,8 +93,11 @@ MODULE aed_zooplankton
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
-   LOGICAL :: debug = .TRUE.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -301,12 +304,18 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    CHARACTER(len=128) :: dbase='aed_zoop_pars.nml'
 
    LOGICAL  :: simZoopFeedback = .TRUE.
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_zooplankton/
 
    NAMELIST /aed_zooplankton/ num_zoops, the_zoops, &
                     dn_target_variable, pn_target_variable, dp_target_variable, &
                     pp_target_variable, dc_target_variable, pc_target_variable, &
-                    dbase, simZoopFeedback
+                    dbase, simZoopFeedback, diag_level
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_zooplankton initialization"

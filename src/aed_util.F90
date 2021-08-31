@@ -45,7 +45,7 @@ MODULE aed_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, aed_real2str, qsort, exp_integral
+   PUBLIC find_free_lun, aed_real2str, aed_int2str, qsort, exp_integral
    PUBLIC water_viscosity
    PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
@@ -86,7 +86,6 @@ END FUNCTION find_free_lun
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
 !###############################################################################
 SUBROUTINE aed_real2str(num, str)
 !-------------------------------------------------------------------------------
@@ -101,6 +100,20 @@ SUBROUTINE aed_real2str(num, str)
 END SUBROUTINE aed_real2str
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+!###############################################################################
+SUBROUTINE aed_int2str(num, str)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER, INTENT(in) :: num
+   CHARACTER(*), INTENT(out) :: str
+!
+!BEGIN
+!-------------------------------------------------------------------------------
+   WRITE(str, "(d)") num
+   str = TRIM(ADJUSTL(str))
+END SUBROUTINE aed_int2str
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################

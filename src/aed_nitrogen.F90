@@ -97,7 +97,11 @@ MODULE aed_nitrogen
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -177,6 +181,12 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    CHARACTER(len=64) :: Fsed_nit_variable=''
    CHARACTER(len=64) :: Fsed_n2o_variable=''
    CHARACTER(len=64) :: Fsed_no2_variable=''
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST    %%  /aed_nitrogen/
 
    NAMELIST /aed_nitrogen/     n_min, n_max,                                  &
@@ -190,7 +200,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
                 Ranammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
                 simNitrfpH, simNitrfLight, simDryDeposition, simWetDeposition, &
-                atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model
+                atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model, &
+                diag_level
 !
 !------------------------------------------------------------------------------+
 !BEGIN

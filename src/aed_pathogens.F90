@@ -113,7 +113,7 @@ MODULE aed_pathogens
       AED_REAL,ALLOCATABLE :: epsilon(:), tau_0(:), tau_r(:), Ke_ss(:)
       AED_REAL,ALLOCATABLE :: epsilonP(:), tauP_0(:)
       AED_REAL,DIMENSION(:),ALLOCATABLE :: ss_set, ss_tau, ss_ke
-      LOGICAL :: sim_sedorgs, extra_diag
+      LOGICAL :: sim_sedorgs
       AED_REAL :: att_ts
 
      CONTAINS
@@ -126,7 +126,12 @@ MODULE aed_pathogens
    END TYPE
 
 !MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   LOGICAL  :: extra_diag = .false.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -167,13 +172,17 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    AED_REAL :: att_ts = (1./(secs_per_day*7.)) ! attachment fraction re-equilibrates over a week
    INTEGER  :: resuspension
    LOGICAL  :: sim_sedorgs = .FALSE.
-   LOGICAL  :: extra_diag = .FALSE.
    CHARACTER(len=64)  :: oxy_variable = ''
    CHARACTER(4) :: trac_name
    CHARACTER(len=128) :: dbase='aed_pathogen_pars.nml'
 
 ! From Module Globals
-!  INTEGER :: diag_level = 10
+!  LOGICAL  :: extra_diag = .false.      !## Obsolete Use diag_level = 10
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_pathogens/
 
    NAMELIST /aed_pathogens/ num_pathogens, the_pathogens, resuspension, &
@@ -188,7 +197,8 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    read(namlst,nml=aed_pathogens,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed_pathogens'
 
-   data%extra_diag = extra_diag
+   IF ( extra_diag ) diag_level = 10
+
    data%tau_0_min = tau_0_min
    data%Ktau_0 = Ktau_0
    data%att_ts = att_ts
@@ -374,7 +384,7 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
        ALLOCATE(data%id_ps(count))
     ENDIF
     ALLOCATE(data%id_total(count))
-    IF (data%extra_diag) THEN
+    IF ( diag_level >= 10 ) THEN
        ALLOCATE(data%id_growth(count))
        ALLOCATE(data%id_sunlight(count))
        ALLOCATE(data%id_mortality(count))
@@ -427,7 +437,7 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
        ENDIF
 
        data%id_total(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_t', 'orgs/m3', 'total')
-       IF (data%extra_diag) THEN
+       IF ( diag_level >= 10 ) THEN
           data%id_growth(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_g', 'orgs/m3/day', 'growth')
           data%id_sunlight(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_l', 'orgs/m3/day', 'sunlight')
           data%id_mortality(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
@@ -572,7 +582,7 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       !-----------------------------------------------------------------
       ! SET DIAGNOSTICS
       _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d  ! orgs/m3/s
-      IF (data%extra_diag) THEN
+      IF ( diag_level >= 10 ) THEN
          _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a)  ! orgs/m3/s
          _DIAG_VAR_(data%id_sunlight(pth_i)) =  light*pth_f + (light/2.)*pth_a  ! orgs/m3/s
          _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a)  ! orgs/m3/s

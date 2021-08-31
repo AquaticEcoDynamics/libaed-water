@@ -101,7 +101,11 @@ MODULE aed_geochemistry
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -155,6 +159,12 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    CHARACTER(len=64) :: ph_link = 'CAR_pH'
    CHARACTER(len=64) :: pco2_link = 'CAR_pCO2'
    CHARACTER(len=64) :: oxy_link = 'OXY_oxy'
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_geochemistry/
 
    CHARACTER(len=64), DIMENSION(:), ALLOCATABLE :: diagnosticList
@@ -167,7 +177,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                     Riron_aox, Riron_box, theta_iron_ox, &
                     Rsulf_red, theta_sulf_red, Ksulf_red, &
                     Rsulf_ox, theta_sulf_ox, Ksulf_ox, &
-                    ph_link, pco2_link
+                    ph_link, pco2_link, diag_level
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_geochemistry initialization"

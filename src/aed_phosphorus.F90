@@ -92,7 +92,11 @@ MODULE aed_phosphorus
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -143,6 +147,12 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    LOGICAL           :: simWetDeposition = .false.
    AED_REAL          :: atm_pip_dd   = zero_
    AED_REAL          :: atm_frp_conc = zero_
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_phosphorus/
 
    NAMELIST /aed_phosphorus/ frp_initial,frp_min,frp_max,                     &
@@ -152,7 +162,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
                             po4sorption_target_variable, PO4AdsorptionModel,   &
                             ads_use_pH,Kpo4p,Kadsratio,Qmax,w_po4ads,pH_variable, &
                             simDryDeposition, simWetDeposition,                &
-                            atm_pip_dd, atm_frp_conc
+                            atm_pip_dd, atm_frp_conc, diag_level
 !
 !------------------------------------------------------------------------------+
 !BEGIN

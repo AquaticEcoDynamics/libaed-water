@@ -104,7 +104,11 @@ MODULE aed_carbon
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -169,6 +173,12 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: ch4_bub_disdp    = 20.0
    AED_REAL          :: ch4_bub_ws       = zero_
 
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 
 !  %% END NAMELIST   %%  /aed_carbon/
 

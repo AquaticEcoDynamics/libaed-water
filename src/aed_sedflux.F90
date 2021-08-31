@@ -97,7 +97,11 @@ MODULE aed_sedflux
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -342,6 +346,12 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Fsed_ch4_ebb  = MISVAL
    AED_REAL :: Fsed_feii = MISVAL
    AED_REAL :: Fsed_n2o  = MISVAL
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_sed_constant/
 
    NAMELIST /aed_sed_constant/ nzones,                                          &

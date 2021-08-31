@@ -87,7 +87,11 @@ MODULE aed_habitat_water
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    AED_REAL, PARAMETER :: DDT = 0.25/24.    ! Currently assuming 15 min timestep
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -127,7 +131,11 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
    CHARACTER(6)      :: fish_name
 
 ! From Module Globals
-!  INTEGER :: diag_level = 10
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_habitat_water/
 
    CHARACTER(len=40) :: mtox_acid_link

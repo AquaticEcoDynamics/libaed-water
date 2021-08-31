@@ -110,7 +110,6 @@ MODULE aed_organic_matter
       LOGICAL  :: use_Fsed_link_don, use_Fsed_link_dop, use_Fsed_link_doc
       LOGICAL  :: use_Fsed_link_pon, use_Fsed_link_pop, use_Fsed_link_poc
       LOGICAL  :: use_Psed_link_pon, use_Psed_link_pop, use_Psed_link_poc
-      LOGICAL  :: extra_diag
 
       !# Model parameters
       AED_REAL :: Rpoc_hydrol,  Rpon_hydrol,  Rpop_hydrol,                     &
@@ -134,7 +133,13 @@ MODULE aed_organic_matter
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER  :: diag_level = 10
+   LOGICAL  :: extra_diag = .false.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
+
    AED_REAL :: c
 
 !===============================================================================
@@ -263,11 +268,13 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    CHARACTER(len=64)         :: Fsed_pop_variable=''
    CHARACTER(len=64)         :: Fsed_dop_variable=''
 
-   !-- Misc options
-   LOGICAL                   :: extra_diag = .FALSE.
-
    !-- From Module Globals
-!  INTEGER                   :: diag_level
+!  LOGICAL  :: extra_diag = .FALSE.      !## Obsolete Use diag_level = 10
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST    %%  /aed_organic_matter/
 
    !-- Parameters to read in
@@ -380,9 +387,6 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%Fsed_dop            = Fsed_dop/secs_per_day
    data%Ksed_dom            = Ksed_dom
    data%theta_sed_dom       = theta_sed_dom
-   !-- Misc options
-   data%extra_diag          = extra_diag
-
 
    ! Register state variables
 

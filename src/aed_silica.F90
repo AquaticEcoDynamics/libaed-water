@@ -78,7 +78,11 @@ MODULE aed_silica
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -110,10 +114,16 @@ SUBROUTINE aed_define_silica(data, namlst)
    AED_REAL          :: theta_sed_rsi = 1.0
    CHARACTER(len=64) :: silica_reactant_variable=''
    CHARACTER(len=64) :: Fsed_rsi_variable=''
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_silica/
 
    NAMELIST /aed_silica/ rsi_initial,rsi_min,rsi_max,Fsed_rsi,Ksed_rsi,theta_sed_rsi, &
-                         silica_reactant_variable,Fsed_rsi_variable
+                         silica_reactant_variable,Fsed_rsi_variable, diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN
