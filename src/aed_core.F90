@@ -426,7 +426,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       ret = n_aed_vars
 
       all_vars(ret)%name = tname
-print*,"CREATE Variable '",trim(tname),"' long name '",trim(longname),"' with units '",trim(units),"'"
+!print*,"CREATE Variable '",trim(tname),"' long name '",trim(longname),"' with units '",trim(units),"' at ", ret
 
       all_vars(ret)%model_name = cur_model_name
       all_vars(ret)%longname = longname
@@ -627,7 +627,14 @@ FUNCTION aed_locate_variable(name) RESULT(ret)
 !BEGIN
    ret = aed_create_variable(name, '', '', .true.)
 
-   IF ( all_vars(ret)%extern .OR. all_vars(ret)%sheet ) ret = 0
+   IF ( ret /= 0 ) THEN
+     IF ( all_vars(ret)%extern .OR. all_vars(ret)%sheet ) ret = 0
+   ENDIF
+!  IF ( ret /= 0 ) THEN
+!    print*,"VARIABLE ",TRIM(name)," LOCATED at ",ret
+!  ELSE
+!    print*,"VARIABLE ",TRIM(name)," NOT FOUND"
+!  ENDIF
 END FUNCTION aed_locate_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -645,7 +652,14 @@ FUNCTION aed_locate_sheet_variable(name) RESULT(ret)
 !BEGIN
    ret = aed_create_variable(name, '', '', .true.)
 
-   IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
+   IF ( ret /= 0 ) THEN
+     IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
+   ENDIF
+!  IF ( ret /= 0 ) THEN
+!    print*,"SHEET_VAR ",TRIM(name)," LOCATED at ",ret
+!  ELSE
+!    print*,"SHEET_VAR ",TRIM(name)," NOT FOUND"
+!  ENDIF
 END FUNCTION aed_locate_sheet_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
