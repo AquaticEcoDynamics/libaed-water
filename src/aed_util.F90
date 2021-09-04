@@ -110,7 +110,7 @@ SUBROUTINE aed_int2str(num, str)
 !
 !BEGIN
 !-------------------------------------------------------------------------------
-   WRITE(str, "(d)") num
+   WRITE(str, *) num
    str = TRIM(ADJUSTL(str))
 END SUBROUTINE aed_int2str
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

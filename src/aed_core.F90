@@ -194,27 +194,27 @@ SUBROUTINE display_var(var)
 
    line = TRIM(var%name) // '             '
    IF ( var%found ) THEN
-       line = line // var%model_name // '             '
+      line = TRIM(line) // var%model_name // '             '
    ELSE
-      line = line // '???             '
+      line = TRIM(line) // '???             '
 !     print*,'Requested variable ', TRIM(var%name), ' not defined.'
    ENDIF
 
    IF ( var%sheet ) THEN
-       line = line // '2D       '
+      line = TRIM(line) // '2D       '
    ELSE
-       line = line // '3D       '
+      line = TRIM(line) // '3D       '
    ENDIF
 
    req => var%req
 
    IF ( ASSOCIATED(req) ) THEN
-      line = line // req%aed_model_prefix
+      line = TRIM(line) // req%aed_model_prefix
    ENDIF
 
    DO WHILE ( ASSOCIATED(req%next) )
       req => req%next
-      line = line // ", " // req%aed_model_prefix
+      line = TRIM(line) // ", " // req%aed_model_prefix
    ENDDO
 
    print *, line
