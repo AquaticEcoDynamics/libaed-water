@@ -80,16 +80,13 @@ MODULE aed_oxygen
       AED_REAL :: Fsed_oxy,Ksed_oxy,theta_sed_oxy
       INTEGER  :: oxy_piston_model
       LOGICAL  :: use_sed_model
+      AED_REAL :: altitude
 
      CONTAINS
          PROCEDURE :: define            => aed_define_oxygen
          PROCEDURE :: calculate_surface => aed_calculate_surface_oxygen
          PROCEDURE :: calculate         => aed_calculate_oxygen
          PROCEDURE :: calculate_benthic => aed_calculate_benthic_oxygen
-!        PROCEDURE :: mobility          => aed_mobility_oxygen
-!        PROCEDURE :: light_extinction  => aed_light_extinction_oxygen
-!        PROCEDURE :: particle_bgc      => aed_particle_bgc_oxygen
-!        PROCEDURE :: delete            => aed_delete_oxygen
 
    END TYPE
 
@@ -166,7 +163,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                                                   !% Changes the sensitivity of the oxygen flux to
                                                   !-     the overlying temperature
 
-   CHARACTER(len=64) :: Fsed_oxy_variable =''     !% oxygen sediment flux variable link
+   CHARACTER(len=64) :: Fsed_oxy_variable = ''    !% oxygen sediment flux variable link
                                                   !% -
                                                   !% string
                                                   !% '
@@ -181,6 +178,15 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                                                   !% 1
                                                   !% 1 - X
                                                   !% Choice depends on waterbody type
+
+
+   AED_REAL          :: altitude     = 0.0        !% Altitude of site above sea level
+                                                  !% -
+                                                  !% float
+                                                  !% 1e+00
+                                                  !% 0 - 4000
+                                                  !% Changes oxygen solubility
+
 ! %% From Module Globals
 !  INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
 !                                         ! 1 = basic diagnostic outputs
@@ -188,9 +194,10 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 !                                         ! >10 = debug/checking outputs
 !  %% END NAMELIST   %%  /aed_oxygen/
 
-   NAMELIST /aed_oxygen/ oxy_initial, oxy_min, oxy_max,           &
+   NAMELIST /aed_oxygen/ oxy_initial, oxy_min, oxy_max,            &
                           Fsed_oxy, Ksed_oxy, theta_sed_oxy,       &
                           Fsed_oxy_variable, oxy_piston_model,     &
+                          altitude,                                &
                           diag_level
 !
 !-------------------------------------------------------------------------------
@@ -209,6 +216,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%theta_sed_oxy = theta_sed_oxy
    data%use_sed_model = Fsed_oxy_variable .NE. ''
    data%oxy_piston_model = oxy_piston_model
+   data%altitude = altitude
 
    ! Register state variables
    data%id_oxy = aed_define_variable('oxy','mmol/m**3','oxygen',   &
@@ -302,6 +310,7 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    ! First get the oxygen concentration in the air phase at the interface
    ! (taken from Riley and Skirrow, 1974)
    f_pres = 1.0    ! set pressure function here using data%id_pres
+   IF(data%altitude>1) f_pres = aed_oxygen_fp(data%altitude,air_temp=10.)
    Coxy_air = f_pres * aed_oxygen_sat(salt,temp)
 
    ! Get the oxygen flux
@@ -349,6 +358,7 @@ SUBROUTINE aed_calculate_oxygen(data,column,layer_idx)
 
    ! Compute the oxygen saturation for diagnostic output
    f_pres = 1.0 ! set pressure function here using data%id_pres
+   IF(data%altitude>1) f_pres = aed_oxygen_fp(data%altitude,air_temp=10.)
    coxy_sat = f_pres * aed_oxygen_sat(salt,temp)
 
    ! Export diagnostic variables
@@ -411,6 +421,39 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
 
 END SUBROUTINE aed_calculate_benthic_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION aed_oxygen_fp(altitude,air_temp)
+!-------------------------------------------------------------------------------
+! An extra function is included to account for the effect of a
+! non-standard atmosphere (i.e. high altitudes)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: altitude,air_temp
+!LOCAL
+   AED_REAL, PARAMETER  :: p_SL = 101.325      ! MSL Pressure
+   AED_REAL             :: p_vap, p_H
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+  ! Pressure at altitude
+  p_H = p_SL * exp((9.81/(287.0*0.0065)) * log((288.0-0.0065*altitude)/288.0))
+
+  p_vap = zero_
+  IF( air_temp > zero_ ) THEN
+     IF (((-216961.*(1./(air_temp))-3840.7)*(1./(air_temp))+16.4754) > &
+                                              1+MINEXPONENT(air_temp)/2) THEN
+       p_vap = exp((-216961.*(1./(air_temp))-3840.7) * (1./(air_temp))+16.4754)
+     END IF
+  END IF
+
+  aed_oxygen_fp = (p_H/p_SL) * ( (1.0-(p_vap/p_H)) / (1.0-(p_vap/p_SL)) )
+
+END FUNCTION aed_oxygen_fp
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 END MODULE aed_oxygen
