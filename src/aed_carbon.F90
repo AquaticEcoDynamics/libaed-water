@@ -780,12 +780,14 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
 
 
     IF ( data%co2_model == 1 ) THEN
+
+      S=salt; T=temp
+
       !# Use the CO2SYS code for computing pCO2 & pH
       a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
       b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
       c    =  4.8314d-4
 
-      S=salt; T=temp
       dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
                - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
       TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
