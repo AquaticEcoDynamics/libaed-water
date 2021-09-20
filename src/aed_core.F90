@@ -175,15 +175,16 @@ END FUNCTION aed_init_core
 
 
 !###############################################################################
-SUBROUTINE display_var(var)
+SUBROUTINE display_var(var, idx)
 !-------------------------------------------------------------------------------
 ! Status of the aed model library core routines
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    TYPE(aed_variable_t),INTENT(in) :: var
+   INTEGER :: idx
 !
 !LOCALS
-   CHARACTER(256) :: line
+   CHARACTER(80) :: line
    CLASS(aed_prefix_list_t),POINTER :: req => null()
 !
 !-------------------------------------------------------------------------------
@@ -192,32 +193,50 @@ SUBROUTINE display_var(var)
 ! Wind                  FV                    2D                        -                           OGM, PHY, MAG
 ! Temp                  FV                    3D                        -                           OXY,CAR,NIT,OGM, PHY, MAG
 
-   line = TRIM(var%name) // '             '
+!  WRITE(line, *) idx
+!  line = TRIM(ADJUSTL(line))
+!  line(1:4) = ADJUSTR(line(1:4))
+
+!  line = line(1:4) // "  " // TRIM(var%name) // '                    '
+   line = TRIM(var%name) // '                    '
    IF ( var%found ) THEN
-      line = TRIM(line) // var%model_name // '             '
+      line = line(1:20) // ' ' // var%model_name
    ELSE
-      line = TRIM(line) // '???             '
+      line = line(1:20) // ' ???'
 !     print*,'Requested variable ', TRIM(var%name), ' not defined.'
    ENDIF
+   line = TRIM(line) // '             '
 
    IF ( var%sheet ) THEN
-      line = TRIM(line) // '2D       '
+      line = line(1:40) // ' 2D'
    ELSE
-      line = TRIM(line) // '3D       '
+      line = line(1:40) // ' 3D'
    ENDIF
 
    req => var%req
 
+   IF ( var%extern ) THEN
+      line = TRIM(line) // '  ---'
+   ELSE IF ( ASSOCIATED(req) ) THEN
+      line = TRIM(line) // '  ' // req%aed_model_prefix
+      req => req%next
+   ENDIF
    IF ( ASSOCIATED(req) ) THEN
-      line = TRIM(line) // req%aed_model_prefix
+      line = TRIM(line) // "  " // req%aed_model_prefix
+
+      DO WHILE ( ASSOCIATED(req%next) )
+         req => req%next
+         IF (LEN_TRIM(line) >= 75 .AND. ASSOCIATED(req%next)) THEN
+             print*, TRIM(line),","
+             line(1:51)=' '
+             line = line(1:51) // req%aed_model_prefix
+         ELSE
+             line = TRIM(line) // ", " // req%aed_model_prefix
+         ENDIF
+      ENDDO
    ENDIF
 
-   DO WHILE ( ASSOCIATED(req%next) )
-      req => req%next
-      line = TRIM(line) // ", " // req%aed_model_prefix
-   ENDDO
-
-   print *, line
+   print *, TRIM(line)
 END SUBROUTINE display_var
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -236,12 +255,13 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print*,'Var name    |       Module.      |.          Type          !' // &
-       '           ID              |             Usage   (ie who linked to me)'
+   print*
+   print*,' ---------------------- AED Variables Summary ----------------------'
+   print*,'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
    print*
    print*,'ENVIRONMENT:'
    DO i=1,n_aed_vars
-      IF ( all_vars(i)%extern ) CALL display_var(all_vars(i))
+      IF ( all_vars(i)%extern ) CALL display_var(all_vars(i), i)
    ENDDO
 
    print*
@@ -249,7 +269,7 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
    n_vars = 0 ; n_sheet_vars = 0
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. .NOT. all_vars(i)%diag ) THEN
-         CALL display_var(all_vars(i))
+         CALL display_var(all_vars(i), i)
          IF ( all_vars(i)%sheet ) THEN ; n_sheet_vars = n_sheet_vars + 1
          ELSE ; n_vars = n_vars + 1 ; ENDIF
       ENDIF
@@ -260,11 +280,14 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
    n_diags = 0 ; n_sheet_diags = 0;
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. all_vars(i)%diag ) THEN
-         CALL display_var(all_vars(i))
+         CALL display_var(all_vars(i), i)
          IF ( all_vars(i)%sheet ) THEN ; n_sheet_diags = n_sheet_diags + 1
          ELSE ; n_diags = n_diags + 1 ; ENDIF
       ENDIF
    ENDDO
+   print*
+   print*,' -------------------------------------------------------------------'
+   print*
 
    n_v = n_vars;  n_sv = n_sheet_vars
    n_d = n_diags; n_sd = n_sheet_diags

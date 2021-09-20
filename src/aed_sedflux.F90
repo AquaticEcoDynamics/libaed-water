@@ -400,7 +400,6 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    ELSEIF ( sedflux_model .EQ. "dynamic" ) THEN
       data%sed_modl = SED_DYNAMIC
 
-!     data%id_zones = aed_locate_sheet_global('sed_zone')
       data%Fsed_oxy = 10. / secs_per_day
    ELSEIF ( sedflux_model .EQ. "constant2d" .OR. sedflux_model .EQ. "dynamic2d" ) THEN
       IF ( sedflux_model .EQ. "constant2d" ) THEN
@@ -520,7 +519,6 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL :: Rzone
    INTEGER  :: zone
    ! Temporary variables
    AED_REAL :: Fsed_oxy = 0., Fsed_rsi = 0.
@@ -560,8 +558,7 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
        !# select the material zone for this cell
        !# set sediment values accordingly
        !# This sets the value to the values in &aed_sed_const2d
-       Rzone = _STATE_VAR_S_(data%id_zones)
-       zone = INT(Rzone)
+       zone = INT(_STATE_VAR_S_(data%id_zones))
 
        IF ( zone .LE. 0 .OR. zone .GT. data%n_zones ) zone = 1
 

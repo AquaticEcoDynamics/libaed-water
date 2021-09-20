@@ -236,7 +236,7 @@ SUBROUTINE aed_define_tracer(data, namlst)
    ENDIF
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed_locate_sheet_global('taub')
-      data%id_E_sedzone = aed_locate_sheet_global('sed_zone')
+      data%id_E_sedzone = aed_locate_sheet_global('material')
       data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
       data%id_resus =  aed_define_sheet_diag_variable('resus','g/m**2/s', 'resuspension rate')
    ENDIF
