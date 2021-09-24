@@ -88,12 +88,12 @@ MODULE aed_sedflux
                   Fsed_ch4_ebb_P
 
      CONTAINS
-         PROCEDURE :: define            => aed_define_sedflux
-         PROCEDURE :: initialize        => aed_initialize_sedflux
-         PROCEDURE :: calculate_benthic => aed_calculate_benthic_sedflux
-!        PROCEDURE :: mobility          => aed_mobility_sedflux
-!        PROCEDURE :: light_extinction  => aed_light_extinction_sedflux
-!        PROCEDURE :: delete            => aed_delete_sedflux
+         PROCEDURE :: define             => aed_define_sedflux
+         PROCEDURE :: initialize_benthic => aed_initialize_benthic_sedflux
+         PROCEDURE :: calculate_benthic  => aed_calculate_benthic_sedflux
+!        PROCEDURE :: mobility           => aed_mobility_sedflux
+!        PROCEDURE :: light_extinction   => aed_light_extinction_sedflux
+!        PROCEDURE :: delete             => aed_delete_sedflux
    END TYPE
 
 ! MODULE GLOBALS
@@ -509,7 +509,7 @@ END SUBROUTINE aed_define_sedflux
 
 
 !###############################################################################
-SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
+SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 ! Routine to set initial state of SEDFLUX variables                            !
 !-------------------------------------------------------------------------------
@@ -597,7 +597,7 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
    IF ( data%id_Fsed_ch4  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4)  = Fsed_ch4
    IF ( data%id_Fsed_feii > 0 ) _DIAG_VAR_S_(data%id_Fsed_feii) = Fsed_feii
    IF ( data%id_Fsed_ch4_ebb  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_ebb)  = Fsed_ch4_ebb
-END SUBROUTINE aed_initialize_sedflux
+END SUBROUTINE aed_initialize_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -614,7 +614,7 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !
    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
-      CALL aed_initialize_sedflux(data, column, layer_idx)
+      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 
    !_DIAG_VAR_(data%id_Fsed_oxy_pel) =   _DIAG_VAR_S_(data%id_Fsed_oxy)* secs_per_day
 END SUBROUTINE aed_calculate_benthic_sedflux

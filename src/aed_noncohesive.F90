@@ -88,13 +88,13 @@ MODULE aed_noncohesive
       AED_REAL             :: sed_porosity
 
      CONTAINS
-         PROCEDURE :: define            => aed_define_noncohesive
-         PROCEDURE :: initialize        => aed_initialize_noncohesive
-         PROCEDURE :: calculate         => aed_calculate_noncohesive
-         PROCEDURE :: calculate_benthic => aed_calculate_benthic_noncohesive
-         PROCEDURE :: mobility          => aed_mobility_noncohesive
-         PROCEDURE :: light_extinction  => aed_light_extinction_noncohesive
-        !PROCEDURE :: delete            => aed_delete_noncohesive
+         PROCEDURE :: define             => aed_define_noncohesive
+         PROCEDURE :: initialize_benthic => aed_initialize_benthic_noncohesive
+         PROCEDURE :: calculate          => aed_calculate_noncohesive
+         PROCEDURE :: calculate_benthic  => aed_calculate_benthic_noncohesive
+         PROCEDURE :: mobility           => aed_mobility_noncohesive
+         PROCEDURE :: light_extinction   => aed_light_extinction_noncohesive
+        !PROCEDURE :: delete             => aed_delete_noncohesive
 
    END TYPE
 
@@ -264,7 +264,7 @@ END SUBROUTINE aed_define_noncohesive
 
 
 !###############################################################################
-SUBROUTINE aed_initialize_noncohesive(data, column, layer_idx)
+SUBROUTINE aed_initialize_benthic_noncohesive(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 ! Routine to set initial state of NCS variables (in the sediment)
 !-------------------------------------------------------------------------------
@@ -288,7 +288,7 @@ SUBROUTINE aed_initialize_noncohesive(data, column, layer_idx)
     ENDDO
    ENDIF
    !---------------------------------------------------------------------------+
-END SUBROUTINE aed_initialize_noncohesive
+END SUBROUTINE aed_initialize_benthic_noncohesive
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

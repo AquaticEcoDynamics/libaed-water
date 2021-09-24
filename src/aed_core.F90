@@ -87,6 +87,7 @@ MODULE aed_core
       CONTAINS
          procedure :: define             => aed_define
          procedure :: initialize         => aed_initialize
+         procedure :: initialize_benthic => aed_initialize_benthic
          procedure :: calculate_surface  => aed_calculate_surface
          procedure :: calculate          => aed_calculate
          procedure :: calculate_benthic  => aed_calculate_benthic
@@ -773,6 +774,18 @@ SUBROUTINE aed_initialize(data,column, layer_idx)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_initialize ", trim(data%aed_model_name)
 END SUBROUTINE aed_initialize
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_initialize_benthic(data,column, layer_idx)
+!-------------------------------------------------------------------------------
+   CLASS (aed_model_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+!-------------------------------------------------------------------------------
+!print*,"Default aed_initialize_benthic ", trim(data%aed_model_name)
+END SUBROUTINE aed_initialize_benthic
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

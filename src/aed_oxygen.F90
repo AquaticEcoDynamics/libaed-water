@@ -406,6 +406,7 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
 
    ! Compute the sediment flux dependent on overlying oxygen & temperature
    oxy_flux = Fsed_oxy * MIN(3.,oxy/(data%Ksed_oxy+oxy) * (data%theta_sed_oxy**(temp-20.0)))
+!print*, "Oxy oxy ben = ", oxy, "oxy_flux ", oxy_flux
 
    ! Set bottom fluxes for the pelagic (change per surface area per second)
    ! Transfer sediment flux value to AED2
