@@ -615,8 +615,7 @@ LOGICAL FUNCTION aed_csv_close(unit)
 !-------------------------------------------------------------------------------
 !BEGIN
    aedr => units(unit)%p
-   aed_csv_close = end_parse(aedr)
-   IF (ASSOCIATED(aedr)) DEALLOCATE(aedr)
+   IF (ASSOCIATED(aedr)) aed_csv_close = end_parse(aedr)
    NULLIFY(aedr)
    units(unit)%p => aedr
 END FUNCTION aed_csv_close
