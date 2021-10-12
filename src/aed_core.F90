@@ -71,7 +71,7 @@ MODULE aed_core
       AED_REAL          :: mobility
       AED_REAL          :: light_extinction
       LOGICAL           :: sheet, diag, extern, found
-      LOGICAL           :: top, bot
+      LOGICAL           :: top, bot, zavg
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -350,6 +350,7 @@ SUBROUTINE extend_allocated_variables(pcount)
 
    all_vars(a_vars+1:a_vars+count)%top = .false.
    all_vars(a_vars+1:a_vars+count)%bot = .false.
+   all_vars(a_vars+1:a_vars+count)%zavg = .false.
 
 !  IF ( ALLOCATED(column) ) THEN
 !     ALLOCATE(tmpc(1:a_vars))
@@ -460,6 +461,9 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%diag = .false.
       all_vars(ret)%extern = .false.
       all_vars(ret)%found = .false.
+      all_vars(ret)%zavg = .false.
+      all_vars(ret)%top = .false.
+      all_vars(ret)%bot = .false.
    ENDIF
    IF ( ASSOCIATED(aed_cur_prefix) ) THEN
       CALL extend_requested(all_vars(ret), aed_cur_prefix)
@@ -499,12 +503,13 @@ END FUNCTION aed_define_variable
 
 
 !###############################################################################
-FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maximum, surf) RESULT(ret)
+FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maximum, surf, zavg) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    AED_REAL,INTENT(in),OPTIONAL :: initial, minimum, maximum
    LOGICAL,INTENT(in),OPTIONAL :: surf
+   LOGICAL,INTENT(in),OPTIONAL :: zavg
 !
 !LOCALS
    INTEGER :: ret
@@ -527,6 +532,12 @@ FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maxi
       all_vars(ret)%top = surf
    ELSE
       all_vars(ret)%bot = .TRUE.
+   ENDIF
+
+   IF ( PRESENT(zavg) ) THEN
+      all_vars(ret)%zavg = zavg
+   ELSE
+      all_vars(ret)%zavg = .FALSE.
    ENDIF
 END FUNCTION aed_define_sheet_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -555,11 +566,12 @@ END FUNCTION aed_define_diag_variable
 
 
 !###############################################################################
-FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf) RESULT(ret)
+FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: surf
+   LOGICAL,INTENT(in),OPTIONAL :: zavg
 !
 !LOCALS
    INTEGER :: ret
@@ -579,6 +591,12 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf) RESULT(ret)
       all_vars(ret)%top = surf
    ELSE
       all_vars(ret)%bot = .TRUE.
+   ENDIF
+
+   IF ( PRESENT(zavg) ) THEN
+      all_vars(ret)%zavg = zavg
+   ELSE
+      all_vars(ret)%zavg = .FALSE.
    ENDIF
 
    ret = n_aed_vars
