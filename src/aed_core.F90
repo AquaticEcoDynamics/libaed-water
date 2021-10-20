@@ -82,6 +82,7 @@ MODULE aed_core
       INTEGER           :: aed_model_id
       CHARACTER(len=64) :: aed_model_name
       CHARACTER(len=4)  :: aed_model_prefix
+      LOGICAL           :: aed_model_no_zones
       CLASS(aed_model_data_t),POINTER :: next => null()
       !# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       CONTAINS

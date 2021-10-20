@@ -59,6 +59,7 @@ MODULE aed_common
    !# Re-export these from aed_core.
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
    PUBLIC aed_init_core, aed_get_var, aed_core_status
+   PUBLIC aed_provide_global, aed_provide_sheet_global
 
    PUBLIC zero_, one_, nan_, secs_per_day, misval_
 
@@ -194,19 +195,30 @@ END SUBROUTINE aed_calculate_surface
 
 
 !###############################################################################
-SUBROUTINE aed_calculate_benthic(column, layer_idx)
+SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
 !-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
+   LOGICAL,OPTIONAL,INTENT(in) :: do_zones
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
+   LOGICAL :: za = .FALSE.
 !-------------------------------------------------------------------------------
+   IF ( PRESENT(do_zones) ) za = do_zones
    model => model_list
-   DO WHILE (ASSOCIATED(model))
-      CALL model%calculate_benthic(column, layer_idx)
-      model => model%next
-   ENDDO
+   IF ( za ) THEN
+      DO WHILE (ASSOCIATED(model))
+         IF ( model%aed_model_no_zones ) &
+            CALL model%calculate_benthic(column, layer_idx)
+         model => model%next
+      ENDDO
+   ELSE
+      DO WHILE (ASSOCIATED(model))
+         CALL model%calculate_benthic(column, layer_idx)
+         model => model%next
+      ENDDO
+   ENDIF
 END SUBROUTINE aed_calculate_benthic
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

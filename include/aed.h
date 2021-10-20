@@ -32,23 +32,23 @@
 
 #define MAX_MODELS 40
 
-!# aed2_phytoplankton constants
+!# aed_phytoplankton constants
 #define MAX_PHYTO_TYPES 256
 #define MAX_ZOOP_TYPES  256
 #define MAX_ZOOP_PREY    10
 #define MAX_PATHO_TYPES 256
 
-!# for aed2_geochemistry
+!# for aed_geochemistry
 #define MAX_GC_COMPONENTS 20
 #define MAX_GC_MINERALS   20
 
-!# for aed2_vegetation
+!# for aed_vegetation
 #define MAX_VEG_TYPES   256
 
-!# for aed2_macrophytes
+!# for aed_macrophytes
 #define MAX_ZONES       256
 
-!# for aed2_ass
+!# for aed_ass
 #define MAX_ASS_PARAMS  20
 
 

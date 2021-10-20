@@ -70,24 +70,64 @@ MODULE aed_water
 
    PUBLIC aed_new_model, aed_print_version
 
+   INTEGER,PARAMETER :: NO_ZONES = 1
 
 CONTAINS
 !===============================================================================
 
 
 !###############################################################################
-FUNCTION aed_new_model(modelname) RESULT(model)
+FUNCTION scan_name(modeldef, flags) RESULT(modelname)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CHARACTER(*),INTENT(in) :: modelname
+   CHARACTER(*),INTENT(in)  :: modeldef
+   INTEGER(4), INTENT(out)  :: flags
+!
+!LOCALS
+   INTEGER :: len, i
+   CHARACTER(len=64) :: modelname
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   flags = 0
+   modelname = ''
+   len = LEN_TRIM(modeldef)
+
+   DO i=1,len
+      IF (modeldef(i:i) == ':') EXIT
+      modelname(i:i) = modeldef(i:i)
+   ENDDO
+
+   IF ( i >= len ) RETURN
+
+   DO WHILE ( i <= len )
+      IF ( modeldef(i:i+1) == 'nz' ) flags = OR(flags, NO_ZONES)
+
+      DO WHILE ( i <= len .and. modeldef(i:i) /= ':' ) ; i = i + 1 ; ENDDO
+      IF ( i <= len .and. modeldef(i:i) == ':' ) i = i + 1
+   ENDDO
+
+   modelname = TRIM(modelname)
+END FUNCTION scan_name
+!===============================================================================
+
+
+!###############################################################################
+FUNCTION aed_new_model(modeldef) RESULT(model)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: modeldef
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
    CHARACTER(len=4) :: prefix
+   CHARACTER(len=64) :: modelname
+   INTEGER(4) :: flags = 0
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    NULLIFY(model)
+   modelname = scan_name(modeldef, flags)
 
    SELECT CASE (modelname)
       CASE ('aed_bio_particles');  prefix = 'PTM'; ALLOCATE(aed_bio_particles_data_t::model)
@@ -122,6 +162,8 @@ FUNCTION aed_new_model(modelname) RESULT(model)
    ENDIF
 
    IF (ASSOCIATED(model)) THEN
+      model%aed_model_no_zones = ( AND(flags, NO_ZONES) /= 0 )
+
       IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
       IF ( ASSOCIATED(last_model) ) last_model%next => model
       last_model => model
