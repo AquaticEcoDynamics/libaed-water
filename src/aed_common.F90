@@ -203,13 +203,11 @@ SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
-   LOGICAL :: za = .FALSE.
 !-------------------------------------------------------------------------------
-   IF ( PRESENT(do_zones) ) za = do_zones
    model => model_list
-   IF ( za ) THEN
+   IF ( PRESENT(do_zones) ) THEN
       DO WHILE (ASSOCIATED(model))
-         IF ( model%aed_model_no_zones ) &
+         IF ( (.NOT. model%aed_model_no_zones) .EQV. do_zones ) &
             CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
