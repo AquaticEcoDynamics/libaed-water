@@ -610,13 +610,18 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
    CLASS (aed_sedflux_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
+!LOCALS
+   INTEGER :: zone
 !
 !-------------------------------------------------------------------------------
 !
    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
       CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 
+zone = INT(_STATE_VAR_S_(data%id_zones))
+
    !_DIAG_VAR_(data%id_Fsed_oxy_pel) =   _DIAG_VAR_S_(data%id_Fsed_oxy)* secs_per_day
+print*,"sedflux oxy in zone ",zone," := ", _DIAG_VAR_S_(data%id_Fsed_oxy)
 END SUBROUTINE aed_calculate_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
