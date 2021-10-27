@@ -351,7 +351,7 @@ SUBROUTINE extend_allocated_variables(pcount)
 
    all_vars(a_vars+1:a_vars+count)%top = .false.
    all_vars(a_vars+1:a_vars+count)%bot = .false.
-   all_vars(a_vars+1:a_vars+count)%zavg = .false.
+   all_vars(a_vars+1:a_vars+count)%zavg = .true.
 
 !  IF ( ALLOCATED(column) ) THEN
 !     ALLOCATE(tmpc(1:a_vars))
@@ -462,7 +462,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%diag = .false.
       all_vars(ret)%extern = .false.
       all_vars(ret)%found = .false.
-      all_vars(ret)%zavg = .false.
+      all_vars(ret)%zavg = .true.
       all_vars(ret)%top = .false.
       all_vars(ret)%bot = .false.
    ENDIF
@@ -538,7 +538,7 @@ FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maxi
    IF ( PRESENT(zavg) ) THEN
       all_vars(ret)%zavg = zavg
    ELSE
-      all_vars(ret)%zavg = .FALSE.
+      all_vars(ret)%zavg = .TRUE.
    ENDIF
 END FUNCTION aed_define_sheet_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -597,7 +597,7 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
    IF ( PRESENT(zavg) ) THEN
       all_vars(ret)%zavg = zavg
    ELSE
-      all_vars(ret)%zavg = .FALSE.
+      all_vars(ret)%zavg = .TRUE.
    ENDIF
 
    ret = n_aed_vars
