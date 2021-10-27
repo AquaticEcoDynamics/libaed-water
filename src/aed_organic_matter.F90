@@ -568,6 +568,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    ELSE
      data%id_Psed_pon = aed_define_diag_variable('Psed_pon','mmol/m**2/s',  'PON sedimentation')
    ENDIF
+   data%use_Psed_link_pop = Psed_pop_variable .NE. ''
    IF (data%use_Psed_link_pop) THEN
      data%id_Psed_pop = aed_locate_sheet_variable(Psed_pop_variable)
    ELSE

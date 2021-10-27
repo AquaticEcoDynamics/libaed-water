@@ -313,18 +313,18 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    !----------------------------------------------------------------------------
    ! Register links to other modules
 
-   data%id_o_oxy = aed_locate_global(oxy_link)
+   data%id_o_oxy = aed_locate_variable(oxy_link)
 
    IF ( ph_link .EQ. '' ) THEN
      ! Register as a diagnostic variable
      data%id_pH = aed_define_diag_variable( 'pH', 'pH', 'pH')
    ELSE
      ! Link to module
-     data%id_pH = aed_locate_global(ph_link)
+     data%id_pH = aed_locate_variable(ph_link)
    ENDIF
 
    ! solution to get aed_carbon's pCO2 updated for atm exchange ...
-   data%id_c_pco2 = aed_locate_global(pco2_link)
+   data%id_c_pco2 = aed_locate_variable(pco2_link)
 
    !----------------------------------------------------------------------------
    ! Register diagnostic variables

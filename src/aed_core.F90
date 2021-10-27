@@ -668,6 +668,8 @@ FUNCTION aed_locate_variable(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
+
    ret = aed_create_variable(name, '', '', .true.)
 
    IF ( ret /= 0 ) THEN
@@ -693,6 +695,8 @@ FUNCTION aed_locate_sheet_variable(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
+
    ret = aed_create_variable(name, '', '', .true.)
 
    IF ( ret /= 0 ) THEN
@@ -718,6 +722,8 @@ FUNCTION aed_locate_global(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
+
    IF ( TRIM(name) == "cell_vel" ) THEN
        ret = -1
        IF ( .NOT. host_has_cell_vel ) RETURN
@@ -740,6 +746,8 @@ FUNCTION aed_locate_sheet_global(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
+
    ret = aed_create_variable(name, '', '', .true.)
 
    all_vars(ret)%sheet = .true.
