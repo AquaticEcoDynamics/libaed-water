@@ -65,7 +65,7 @@ MODULE aed_dummy
    TYPE,extends(aed_model_data_t) :: aed_dummy_data_t
       !# Variable identifiers
       INTEGER :: num_v, num_dv, num_sv, num_dsv
-      INTEGER :: id_sine, id_vsine, id_za_d, id_coln
+      INTEGER :: id_sine, id_vsine
       INTEGER,ALLOCATABLE :: id_dummy_v(:), id_dummy_dv(:),           &
                              id_dummy_sv(:), id_dummy_dsv(:)
       AED_REAL,ALLOCATABLE :: dm_max(:), dm_min(:)
@@ -187,10 +187,6 @@ SUBROUTINE aed_define_dummy(data, namlst)
 
    data%id_vsine = aed_define_diag_variable('DUM_vol_sine', 'no units', 'DBG volume sine between 0.0 and 1.0')
    data%id_sine = aed_define_sheet_diag_variable('DUM_sine', 'no units', 'DBG sine wave between 0.0 and 1.0', .FALSE.)
-   data%id_za_d = aed_define_sheet_diag_variable('DUM_za_d', 'no units', 'DBG averaged zone', .FALSE.)
-
-   data%id_coln = aed_locate_global('col_num')
-
 END SUBROUTINE aed_define_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -220,8 +216,6 @@ SUBROUTINE aed_calculate_dummy(data,column,layer_idx)
       _STATE_VAR_(data%id_dummy_v(i)) = &
         (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * scale) + offs
    ENDDO
-
-   _DIAG_VAR_S_(data%id_za_d) = _STATE_VAR_S_(data%id_coln)
 END SUBROUTINE aed_calculate_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -251,8 +245,6 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
       _STATE_VAR_S_(data%id_dummy_sv(i)) = &
         (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * scale) + offs
    ENDDO
-
-   _DIAG_VAR_S_(data%id_za_d) = _STATE_VAR_S_(data%id_coln)
 END SUBROUTINE aed_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
