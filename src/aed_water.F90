@@ -101,7 +101,7 @@ FUNCTION scan_name(modeldef, flags) RESULT(modelname)
    IF ( i >= len ) RETURN
 
    DO WHILE ( i <= len )
-      IF ( modeldef(i:i+1) == 'nz' ) flags = OR(flags, NO_ZONES)
+      IF ( modeldef(i:i+1) == 'nz' ) flags = IOR(flags, NO_ZONES)
 
       DO WHILE ( i <= len .and. modeldef(i:i) /= ':' ) ; i = i + 1 ; ENDDO
       IF ( i <= len .and. modeldef(i:i) == ':' ) i = i + 1
@@ -162,7 +162,7 @@ FUNCTION aed_new_model(modeldef) RESULT(model)
    ENDIF
 
    IF (ASSOCIATED(model)) THEN
-      model%aed_model_no_zones = ( AND(flags, NO_ZONES) /= 0 )
+      model%aed_model_no_zones = ( IAND(flags, NO_ZONES) /= 0 )
 
       IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
       IF ( ASSOCIATED(last_model) ) last_model%next => model
