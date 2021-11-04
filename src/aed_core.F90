@@ -504,13 +504,12 @@ END FUNCTION aed_define_variable
 
 
 !###############################################################################
-FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maximum, surf, zavg) RESULT(ret)
+FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maximum, surf) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    AED_REAL,INTENT(in),OPTIONAL :: initial, minimum, maximum
    LOGICAL,INTENT(in),OPTIONAL :: surf
-   LOGICAL,INTENT(in),OPTIONAL :: zavg
 !
 !LOCALS
    INTEGER :: ret
@@ -533,12 +532,6 @@ FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maxi
       all_vars(ret)%top = surf
    ELSE
       all_vars(ret)%bot = .TRUE.
-   ENDIF
-
-   IF ( PRESENT(zavg) ) THEN
-      all_vars(ret)%zavg = zavg
-   ELSE
-      all_vars(ret)%zavg = .TRUE.
    ENDIF
 END FUNCTION aed_define_sheet_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

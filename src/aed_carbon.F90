@@ -401,7 +401,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    ! Temporary variables
 
    AED_REAL :: pCO2 = 0.,FCO2,FCH4,henry
-   AED_REAL :: Ko,kCH4,KCO2, CH4solub
+   AED_REAL :: Ko, kCH4, KCO2, CH4solub
    AED_REAL :: Tabs,windHt,atm
    AED_REAL :: A1,A2,A3,A4,B1,B2,B3,logC
    AED_REAL :: a,b,c,dcf
@@ -416,6 +416,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 !BEGIN
 
    IF(.NOT.data%simDIC .AND. .NOT.data%simCH4) RETURN
+
+   Ko = 0.
 
    !----------------------------------------------------------------------------
    !# Get dependent state variables from physical driver
@@ -553,7 +555,6 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
      !# Now compute piston velocity, k
      kCO2 = aed_gas_piston_velocity(windHt,wind,temp,salt,                     &
          vel=vel,depth=depth,schmidt_model=2,piston_model=data%co2_piston_model)
-
 
      !# Now compute the CO2 flux
      !  FCO2 = kCO2 * Ko * (pCO2 - PCO2a)
@@ -778,6 +779,7 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
     temp = _STATE_VAR_(data%id_temp) ! Temperature
     pHin = _STATE_VAR_(data%id_pH)   ! pH (from previous time-step)
 
+    pH = pHin
 
     IF ( data%co2_model == 1 ) THEN
 

@@ -588,17 +588,12 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
 
          values(i) = sym
          NULLIFY(sym%sym)
-!print*,"values(",i,") = '",values(i)%sym,"'"
       ENDIF
    ENDDO
    IF ( i > 0 .AND. i /= ncols ) &
       print *, "data row had ", i, " columns : expecting ", ncols
 
    aed_csv_read_row = (i > 0)
-
-!DO i=1,ncols
-!print*,"values(",i,") = '",values(i)%sym,"'"
-!ENDDO
 END FUNCTION aed_csv_read_row
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -614,6 +609,7 @@ LOGICAL FUNCTION aed_csv_close(unit)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   aed_csv_close = .FALSE.
    aedr => units(unit)%p
    IF (ASSOCIATED(aedr)) aed_csv_close = end_parse(aedr)
    NULLIFY(aedr)

@@ -193,6 +193,7 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
      mtox_aass_link = 'ASS_uzaass'
 
      mtox_vars = '' ;  mtox_lims = 1.0
+     num_mtox = 0
      DO i=1,10 ; IF (mtox_vars(i)  .EQ. '' ) THEN ; num_mtox = i-1 ; EXIT ; ENDIF ; ENDDO
      ALLOCATE(data%id_l_mtox(num_mtox)); ALLOCATE(data%mtox_lims(num_mtox))
      data%num_mtox = num_mtox
