@@ -197,6 +197,15 @@ END SUBROUTINE aed_calculate_surface
 !###############################################################################
 SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
 !-------------------------------------------------------------------------------
+! The benthic routine may be grouped in zones by the global do_zone_averaging
+! flag, however a new model level flag allows us to not average in zones.
+! This routine takes the optional argument "do_zones" which should only be
+! passed if do_zone_averaging is on.
+! If do_zones is not present we can call every models calculate_benthic
+! routine.
+! If it IS present we pass true when called from inside the zone calculations,
+! but false when called from the normal flux calculation section.
+!-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    LOGICAL,OPTIONAL,INTENT(in) :: do_zones
@@ -407,7 +416,6 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, partcl)
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
-   !ppid = 0
    model => model_list
    DO WHILE (ASSOCIATED(model))
       CALL model%particle_bgc(column, layer_idx, ppid, partcl)
