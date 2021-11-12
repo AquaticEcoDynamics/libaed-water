@@ -262,7 +262,8 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
          uptake(1) = zero_
       ELSE
          ! Reduce n-uptake by the amount fixed:
-         uptake(1) = uptake(1) * (ABS(uptake(1))-a_nfix) / ABS(uptake(1))
+         IF ( uptake(1) /= 0. ) &
+            uptake(1) = uptake(1) * (ABS(uptake(1))-a_nfix) / ABS(uptake(1))
       ENDIF
    ENDIF
 
