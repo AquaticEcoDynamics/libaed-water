@@ -451,7 +451,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
-   IF ( data%Fsed_oxy .GT. MISVAL ) &
+   IF ( Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol/m**2',   &
                                           'flux rate of oxygen across the swi')
    IF ( Fsed_rsi .GT. MISVAL ) &
@@ -499,6 +499,25 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Fsed_feii .GT. MISVAL ) &
       data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
                                           'flux rate of feii across the swi')
+
+   IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
+      CALL aed_set_const_var(data%id_Fsed_oxy)
+      CALL aed_set_const_var(data%id_Fsed_rsi)
+      CALL aed_set_const_var(data%id_Fsed_amm)
+      CALL aed_set_const_var(data%id_Fsed_nit)
+      CALL aed_set_const_var(data%id_Fsed_n2o)
+      CALL aed_set_const_var(data%id_Fsed_frp)
+      CALL aed_set_const_var(data%id_Fsed_pon)
+      CALL aed_set_const_var(data%id_Fsed_don)
+      CALL aed_set_const_var(data%id_Fsed_pop)
+      CALL aed_set_const_var(data%id_Fsed_dop)
+      CALL aed_set_const_var(data%id_Fsed_poc)
+      CALL aed_set_const_var(data%id_Fsed_dic)
+      CALL aed_set_const_var(data%id_Fsed_dic)
+      CALL aed_set_const_var(data%id_Fsed_ch4)
+      CALL aed_set_const_var(data%id_Fsed_ch4_ebb)
+      CALL aed_set_const_var(data%id_Fsed_feii)
+   ENDIF
 
    !data%id_Fsed_oxy_pel = aed_define_diag_variable('Fsed_oxy_pel','mmol/m**2',&
    !                                          'sedimentation rate of oxygen')
