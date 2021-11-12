@@ -50,7 +50,7 @@ MODULE aed_benthic
    IMPLICIT NONE
    !#---------------------------------------------------------------------------
    PRIVATE   !# By default make everything private
-   PUBLIC aed_new_ben_model, aed_print_version_ben
+   PUBLIC aed_new_ben_model, aed_print_ben_version
    !#---------------------------------------------------------------------------
 
 CONTAINS
@@ -69,11 +69,11 @@ END FUNCTION aed_new_ben_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################
-SUBROUTINE aed_print_version_ben
+SUBROUTINE aed_print_ben_version
 !-------------------------------------------------------------------------------
 !BEGIN
    print*,"    libaed-ben not included "
-END SUBROUTINE aed_print_version_ben
+END SUBROUTINE aed_print_ben_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !===============================================================================
@@ -88,7 +88,7 @@ MODULE aed_riparian
    IMPLICIT NONE
    !#---------------------------------------------------------------------------
    PRIVATE   !# By default make everything private
-   PUBLIC aed_new_rip_model, aed_print_version_rip
+   PUBLIC aed_new_rip_model, aed_print_rip_version
    !#---------------------------------------------------------------------------
 
 CONTAINS
@@ -107,11 +107,11 @@ END FUNCTION aed_new_rip_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################
-SUBROUTINE aed_print_version_rip
+SUBROUTINE aed_print_rip_version
 !-------------------------------------------------------------------------------
 !BEGIN
    print*,"    libaed-riparian no included "
-END SUBROUTINE aed_print_version_rip
+END SUBROUTINE aed_print_rip_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !===============================================================================
@@ -126,7 +126,7 @@ MODULE aed_demo
    IMPLICIT NONE
    !#---------------------------------------------------------------------------
    PRIVATE   !# By default make everything private
-   PUBLIC aed_new_dmo_model, aed_print_version_dmo
+   PUBLIC aed_new_dmo_model, aed_print_dmo_version
    !#---------------------------------------------------------------------------
 
 CONTAINS
@@ -149,11 +149,11 @@ END FUNCTION aed_new_dmo_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################
-SUBROUTINE aed_print_version_dmo
+SUBROUTINE aed_print_dmo_version
 !-------------------------------------------------------------------------------
 !BEGIN
    print*,"    libaed-demo no included"
-END SUBROUTINE aed_print_version_dmo
+END SUBROUTINE aed_print_dmo_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !===============================================================================
@@ -168,7 +168,7 @@ MODULE aed_dev
    IMPLICIT NONE
    !#---------------------------------------------------------------------------
    PRIVATE   !# By default make everything private
-   PUBLIC aed_new_dev_model, aed_print_version_dev
+   PUBLIC aed_new_dev_model, aed_print_dev_version
    !#---------------------------------------------------------------------------
 CONTAINS
 !===============================================================================
@@ -186,11 +186,11 @@ END FUNCTION aed_new_dev_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################
-SUBROUTINE aed_print_version_dev
+SUBROUTINE aed_print_dev_version
 !-------------------------------------------------------------------------------
 !BEGIN
    print*,"    libaed-dev not included"
-END SUBROUTINE aed_print_version_dev
+END SUBROUTINE aed_print_dev_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !===============================================================================

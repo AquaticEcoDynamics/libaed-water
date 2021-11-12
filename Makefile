@@ -167,4 +167,4 @@ ${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed_core.F90 ${incdir}/aed.h
 
 ${objdir}/aed_external.o: ${srcdir}/aed_external.F90 ${objdir}/aed_core.o ${incdir}/aed.h
 	$(F90) $(FFLAGS) -DLIBDEF -g -c $< -o $@
-${objdir}/aed_water.o: ${srcdir}/aed_water.F90 ${srcdir}/aed_core.F90 ${objdir}/aed_external.o ${incdir}/aed.h
+${objdir}/aed_common.o: ${srcdir}/aed_common.F90 ${srcdir}/aed_core.F90 ${objdir}/aed_external.o ${incdir}/aed.h

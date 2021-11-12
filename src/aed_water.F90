@@ -56,11 +56,6 @@ MODULE aed_water
    USE aed_pesticides
    USE aed_habitat_water
 
-   USE aed_benthic
-   USE aed_riparian
-   USE aed_demo
-   USE aed_dev
-
    IMPLICIT NONE
 
 
@@ -68,66 +63,25 @@ MODULE aed_water
 
    PRIVATE   !# By default make everything private
 
-   PUBLIC aed_new_model, aed_print_version
-
-   INTEGER,PARAMETER :: NO_ZONES = 1
+   PUBLIC aed_new_wat_model, aed_print_wat_version
 
 CONTAINS
 !===============================================================================
 
 
 !###############################################################################
-FUNCTION scan_name(modeldef, flags) RESULT(modelname)
+FUNCTION aed_new_wat_model(modelname) RESULT(model)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CHARACTER(*),INTENT(in)  :: modeldef
-   INTEGER(4), INTENT(out)  :: flags
-!
-!LOCALS
-   INTEGER :: len, i
-   CHARACTER(len=64) :: modelname
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   flags = 0
-   modelname = ''
-   len = LEN_TRIM(modeldef)
-
-   DO i=1,len
-      IF (modeldef(i:i) == ':') EXIT
-      modelname(i:i) = modeldef(i:i)
-   ENDDO
-
-   IF ( i >= len ) RETURN
-
-   DO WHILE ( i <= len )
-      IF ( modeldef(i:i+1) == 'nz' ) flags = IOR(flags, NO_ZONES)
-
-      DO WHILE ( i <= len .and. modeldef(i:i) /= ':' ) ; i = i + 1 ; ENDDO
-      IF ( i <= len .and. modeldef(i:i) == ':' ) i = i + 1
-   ENDDO
-
-   modelname = TRIM(modelname)
-END FUNCTION scan_name
-!===============================================================================
-
-
-!###############################################################################
-FUNCTION aed_new_model(modeldef) RESULT(model)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CHARACTER(*),INTENT(in) :: modeldef
+   CHARACTER(*),INTENT(in) :: modelname
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
    CHARACTER(len=4) :: prefix
-   CHARACTER(len=64) :: modelname
-   INTEGER(4) :: flags = 0
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    NULLIFY(model)
-   modelname = scan_name(modeldef, flags)
 
    SELECT CASE (modelname)
       CASE ('aed_bio_particles');  prefix = 'PTM'; ALLOCATE(aed_bio_particles_data_t::model)
@@ -154,28 +108,13 @@ FUNCTION aed_new_model(modeldef) RESULT(model)
    IF (ASSOCIATED(model)) THEN
       model%aed_model_name = modelname
       model%aed_model_prefix = prefix
-   ELSE
-      model => aed_new_ben_model(modelname)
-      IF (.NOT. ASSOCIATED(model)) model => aed_new_rip_model(modelname)
-      IF (.NOT. ASSOCIATED(model)) model => aed_new_dmo_model(modelname)
-      IF (.NOT. ASSOCIATED(model)) model => aed_new_dev_model(modelname)
    ENDIF
-
-   IF (ASSOCIATED(model)) THEN
-      model%aed_model_no_zones = ( IAND(flags, NO_ZONES) /= 0 )
-
-      IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
-      IF ( ASSOCIATED(last_model) ) last_model%next => model
-      last_model => model
-   ELSE
-       print *,'*** Unknown module ', TRIM(modelname)
-   ENDIF
-END FUNCTION aed_new_model
+END FUNCTION aed_new_wat_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_print_version
+SUBROUTINE aed_print_wat_version
 !-------------------------------------------------------------------------------
 !BEGIN
    print*,"    libaed-water version ", TRIM(AED_VERSION)
@@ -196,12 +135,7 @@ SUBROUTINE aed_print_version
 #  endif
 # endif
 #endif
-
-   CALL aed_print_version_ben
-   CALL aed_print_version_rip
-   CALL aed_print_version_dmo
-   CALL aed_print_version_dev
-END SUBROUTINE aed_print_version
+END SUBROUTINE aed_print_wat_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !===============================================================================

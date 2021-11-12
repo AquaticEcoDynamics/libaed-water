@@ -37,7 +37,12 @@
 MODULE aed_common
 !-------------------------------------------------------------------------------
    USE aed_core
+
    USE aed_water
+   USE aed_benthic
+   USE aed_riparian
+   USE aed_demo
+   USE aed_dev
 
    IMPLICIT NONE
 
@@ -45,24 +50,34 @@ MODULE aed_common
 
    PRIVATE   !# By default make everything private
 
-   PUBLIC aed_new_model, aed_define_model, aed_build_model
+   !#---------------------------------------------------------------------------
+
+   PUBLIC aed_define_model, aed_delete, aed_print_version, aed_requested_zones
 
    !#---------------------------------------------------------------------------
 
    PUBLIC aed_initialize, aed_initialize_benthic
    PUBLIC aed_calculate, aed_calculate_surface, aed_calculate_benthic
    PUBLIC aed_calculate_riparian, aed_calculate_dry
-   PUBLIC aed_light_extinction, aed_delete, aed_equilibrate
-   PUBLIC aed_mobility, aed_rain_loss, aed_light_shading
+   PUBLIC aed_light_extinction, aed_light_shading
+   PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
    PUBLIC aed_bio_drag, aed_particle_bgc
+
+   !#---------------------------------------------------------------------------
 
    !# Re-export these from aed_core.
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
-   PUBLIC aed_init_core, aed_get_var, aed_core_status
+   PUBLIC aed_init_core, aed_core_status, aed_get_var
    PUBLIC aed_provide_global, aed_provide_sheet_global
+
+   !#---------------------------------------------------------------------------
 
    PUBLIC zero_, one_, nan_, secs_per_day, misval_
 
+   !#---------------------------------------------------------------------------
+
+   INTEGER,PARAMETER :: NO_ZONES = 1
+   INTEGER,PARAMETER :: DO_ZONES = 2
 
 CONTAINS
 !===============================================================================
@@ -81,7 +96,7 @@ SUBROUTINE aed_build_model(model, namlst, do_prefix)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   cur_model_name = model%aed_model_name
+   CALL aed_set_current_model(model)
    IF ( do_prefix ) THEN
       prefix_p => model%aed_model_prefix
       CALL aed_set_prefix(prefix_p)
@@ -91,27 +106,135 @@ SUBROUTINE aed_build_model(model, namlst, do_prefix)
       prefix_p => null()
       CALL aed_set_prefix(prefix_p)
    ENDIF
-   cur_model_name = ''
+   CALL aed_set_current_model(null())
 END SUBROUTINE aed_build_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_define_model(modelname, namlst)
+FUNCTION scan_name(modeldef, flags) RESULT(modelname)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CHARACTER(*),INTENT(in) :: modelname
+   CHARACTER(*),INTENT(in)  :: modeldef
+   INTEGER(4), INTENT(out)  :: flags
+!
+!LOCALS
+   INTEGER :: len, i
+   CHARACTER(len=64) :: modelname
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   flags = 0
+   modelname = ''
+   len = LEN_TRIM(modeldef)
+
+   DO i=1,len
+      IF (modeldef(i:i) == ':') EXIT
+      modelname(i:i) = modeldef(i:i)
+   ENDDO
+
+   IF ( i >= len ) RETURN
+
+   DO WHILE ( i <= len )
+      IF ( modeldef(i:i+1) == 'nz' ) flags = IOR(flags, NO_ZONES)
+      IF ( modeldef(i:i+1) == 'za' ) flags = IOR(flags, DO_ZONES)
+
+      DO WHILE ( i <= len .AND. modeldef(i:i) /= ':' ) ; i = i + 1 ; ENDDO
+      IF ( i <= len .AND. modeldef(i:i) == ':' ) i = i + 1
+   ENDDO
+
+   modelname = TRIM(modelname)
+END FUNCTION scan_name
+!===============================================================================
+
+
+!###############################################################################
+SUBROUTINE aed_define_model(modeldef, namlst)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: modeldef
    INTEGER,INTENT(in)      :: namlst
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
+   CHARACTER(len=64) :: modelname
+   INTEGER :: flags = 0
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   modelname = scan_name(modeldef, flags)
    NULLIFY(model)
-   model => aed_new_model(modelname)
-   IF ( ASSOCIATED(model) ) CALL aed_build_model(model, namlst, .TRUE.)
+   model => aed_new_wat_model(modelname)
+   IF (.NOT. ASSOCIATED(model)) model => aed_new_ben_model(modelname)
+   IF (.NOT. ASSOCIATED(model)) model => aed_new_rip_model(modelname)
+   IF (.NOT. ASSOCIATED(model)) model => aed_new_dmo_model(modelname)
+   IF (.NOT. ASSOCIATED(model)) model => aed_new_dev_model(modelname)
+
+   IF ( ASSOCIATED(model) ) THEN
+      IF ( IAND(flags, DO_ZONES) /= 0 ) &
+         model%aed_model_zone_avg = .TRUE.
+      IF ( IAND(flags, NO_ZONES) /= 0 ) &
+         model%aed_model_zone_avg = .FALSE.
+
+      CALL aed_build_model(model, namlst, .TRUE.)
+
+      IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
+      IF ( ASSOCIATED(last_model) ) last_model%next => model
+      last_model => model
+   ELSE
+      print *,'*** Unknown module ', TRIM(modelname)
+   ENDIF
 END SUBROUTINE aed_define_model
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_print_version
+!-------------------------------------------------------------------------------
+   CALL aed_print_wat_version
+   CALL aed_print_ben_version
+   CALL aed_print_rip_version
+   CALL aed_print_dmo_version
+   CALL aed_print_dev_version
+END SUBROUTINE aed_print_version
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+LOGICAL FUNCTION aed_requested_zones(n_aed_vars)
+!-------------------------------------------------------------------------------
+   INTEGER, INTENT(in) :: n_aed_vars
+!
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+   TYPE(aed_variable_t),POINTER :: tvar
+   INTEGER :: i, j
+   LOGICAL :: res = .FALSE., err = .FALSE.
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      IF ( model%aed_model_zone_avg ) THEN
+         res = .TRUE.
+         j = 0
+         DO i=1, n_aed_vars
+            IF ( aed_get_var(i, tvar) ) THEN
+               IF ( tvar%model%aed_model_id .EQ. model%aed_model_id ) THEN
+                  IF ( tvar%diag ) THEN
+                     j = j + 1
+                     IF ( tvar%zavg ) err = .TRUE.
+                  ENDIF
+                  IF ( .NOT. tvar%extern ) THEN
+                     IF ( .NOT. tvar%sheet ) err = .TRUE.
+                  ENDIF
+                  tvar%zavg = .TRUE.
+               ENDIF
+            ENDIF
+         ENDDO
+      ENDIF
+      model => model%next
+   ENDDO
+   aed_requested_zones = res
+END FUNCTION aed_requested_zones
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -216,7 +339,7 @@ SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
    model => model_list
    IF ( PRESENT(do_zones) ) THEN
       DO WHILE (ASSOCIATED(model))
-         IF ( (.NOT. model%aed_model_no_zones) .EQV. do_zones ) &
+         IF ( model%aed_model_zone_avg .EQV. do_zones ) &
             CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
