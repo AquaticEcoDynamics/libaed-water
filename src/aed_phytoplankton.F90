@@ -323,7 +323,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%K_Si         = pd(list(i))%K_Si
        data%phytos(i)%X_sicon      = pd(list(i))%X_sicon
 
-       data%phytos(i)%c1           = 0.0124/60.   ! From Chung et al (2014)
+       data%phytos(i)%c1           = 0.1240/60.   ! From Chung et al (2014)
        data%phytos(i)%c3           = 0.0230/60.   !  "
        data%phytos(i)%f1           = 0.675        ! Ross and Sharples (2007)
        data%phytos(i)%f2           = 0.750        !  "
