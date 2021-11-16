@@ -781,7 +781,7 @@ LOGICAL FUNCTION aed_is_const_var(which)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   aed_get_var = .FALSE.
+   aed_is_const_var = .FALSE.
    IF (which > 0 .AND. which <= n_aed_vars) &
       aed_is_const_var =  all_vars(which)%const
 END FUNCTION aed_is_const_var
