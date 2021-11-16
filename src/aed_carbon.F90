@@ -708,12 +708,14 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    IF( data%simCH4 .and. diag_level>0) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
    ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day)
-   _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
-   IF( data%simCH4) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
+   IF ( diag_level > 0 ) THEN
+      _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
+      IF( data%simCH4) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
+   ENDIF
 
    ! Re-distribute bubbles to the water or atmosphere, or dissolve
    IF( data%simCH4ebb ) THEN
-     ! Add bubbles to layer
+      ! Add bubbles to layer
       !_FLUX_VAR_(data%id_ch4_bub) = _FLUX_VAR_(data%id_ch4_bub) + (ebb_flux)
 
       ! Dissolve bubbles in this bottom layer, depending on depth
@@ -722,16 +724,16 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
       IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*ch4_bub_disf
 
       IF (diag_level>0) THEN
-        _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*ch4_bub_disf * secs_per_day !/ dz. MH Something wrong with dz here?
+         _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*ch4_bub_disf * secs_per_day !/ dz. MH Something wrong with dz here?
 
-       ! Release the remainder to the atmosphere (mmol/m2/day)
-        IF (diag_level>0) _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
+         ! Release the remainder to the atmosphere (mmol/m2/day)
+         _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
 
-       ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
-        IF (diag_level>0) _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+         ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
+         _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
 
-       ! Note the bubble flux, as the water sees it  (mmol/m3/day)
-        IF (diag_level>0) _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
+         ! Note the bubble flux, as the water sees it  (mmol/m3/day)
+         _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
       ENDIF
     ENDIF
 

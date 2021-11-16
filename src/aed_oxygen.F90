@@ -362,7 +362,7 @@ SUBROUTINE aed_calculate_oxygen(data,column,layer_idx)
    coxy_sat = f_pres * aed_oxygen_sat(salt,temp)
 
    ! Export diagnostic variables
-   _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
+   IF (diag_level>0) _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
 
 END SUBROUTINE aed_calculate_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -417,7 +417,7 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_oxy) = _FLUX_VAR_B_(data%id_ben_oxy) + (-oxy_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
+   IF (diag_level>0) _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
    IF (diag_level>10) _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
 
 END SUBROUTINE aed_calculate_benthic_oxygen
