@@ -126,9 +126,9 @@ MODULE aed_core
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    INTEGER :: cur_mod_base = 0
-   INTEGER :: n_aed_vars, a_vars
-   INTEGER :: n_vars, n_sheet_vars
-   INTEGER :: n_diags, n_sheet_diags
+   INTEGER :: n_aed_vars = 0, a_vars = 0
+   INTEGER :: n_vars = 0, n_sheet_vars = 0
+   INTEGER :: n_diags = 0, n_sheet_diags = 0
 
    TYPE(aed_variable_t),DIMENSION(:),ALLOCATABLE,TARGET :: all_vars
 
@@ -204,7 +204,7 @@ SUBROUTINE display_var(var, idx)
 
 !  line = line(1:4) // "  " // TRIM(var%name) // '                    '
    line = TRIM(var%name) // '                    '
-   IF ( var%found ) THEN
+   IF ( var%found .AND. ASSOCIATED(var%model) ) THEN
       line = line(1:20) // ' ' // var%model%aed_model_name
    ELSE
       line = line(1:20) // ' ???'
@@ -387,9 +387,13 @@ FUNCTION aed_find_variable(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = 0
+   IF ( .NOT. ALLOCATED(all_vars) ) RETURN
    DO ret=1,n_aed_vars
       IF ( all_vars(ret)%name == name ) RETURN
-      IF ( TRIM(all_vars(ret)%model%aed_model_name)//'_'//TRIM(all_vars(ret)%name) == name ) RETURN
+      IF ( .NOT. ASSOCIATED(all_vars(ret)%model) ) CYCLE
+      IF ( TRIM(all_vars(ret)%model%aed_model_name)//'_'//  &
+                                  TRIM(all_vars(ret)%name) == name ) RETURN
 !print*,TRIM(name), ' is neither ', TRIM(all_vars(ret)%name), ' nor ',  &
 !       TRIM(all_vars(ret)%model%aed_model_name)//'_'//TRIM(all_vars(ret)%name)
    ENDDO
