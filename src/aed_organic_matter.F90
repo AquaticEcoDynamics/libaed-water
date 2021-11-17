@@ -1043,21 +1043,34 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    fDOM = 1.
 
    IF (data%use_Fsed_link_doc) THEN !Get the flux value from the linked variable
-     Fsed_doc = _STATE_VAR_S_(data%id_Fsed_doc)
+     IF ( aed_is_const_var(data%id_Fsed_doc)) THEN
+        Fsed_doc = _STATE_VAR_S_(data%id_Fsed_doc) * fDO * fT * fDOM
+     ELSE
+        Fsed_doc = _STATE_VAR_S_(data%id_Fsed_doc)
+     ENDIF
    ELSE                             !Compute directly
      Fsed_doc = data%Fsed_doc * fDO * fT * fDOM
    ENDIF
+
    IF (data%use_Fsed_link_don) THEN
-     Fsed_don = _STATE_VAR_S_(data%id_Fsed_don)
+     IF ( aed_is_const_var(data%id_Fsed_don) ) THEN
+        Fsed_don = _STATE_VAR_S_(data%id_Fsed_don) * fDO * fT * fDOM
+     ELSE
+        Fsed_don = _STATE_VAR_S_(data%id_Fsed_don)
+     ENDIF
    ELSE
      Fsed_don = data%Fsed_don * fDO * fT * fDOM
    ENDIF
+
    IF (data%use_Fsed_link_dop) THEN
-     Fsed_dop = _STATE_VAR_S_(data%id_Fsed_dop)
+     IF ( aed_is_const_var(data%id_Fsed_dop) ) THEN
+        Fsed_dop = _STATE_VAR_S_(data%id_Fsed_dop) * fDO * fT * fDOM
+     ELSE
+        Fsed_dop = _STATE_VAR_S_(data%id_Fsed_dop)
+     ENDIF
    ELSE
      Fsed_dop = data%Fsed_dop * fDO * fT * fDOM
    ENDIF
-
 
    ! Set flux rate of particulate organic matter pools
    IF (data%use_Fsed_link_poc) THEN
