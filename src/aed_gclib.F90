@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2020 -  The University of Western Australia               #
+!#  Copyright 2012 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -30,8 +30,16 @@
 !#                                                                             #
 !###############################################################################
 
-#include "aed+.h"
+#include "aed.h"
 #include "aed_debug.h"
+
+#define REACTION_START_CH  '['
+#define REACTION_END_CH    ']'
+#define PLUS               '+'
+#define MINUS              '-'
+#define EQUALS             '='
+#define L_PAREN            '('
+#define R_PAREN            ')'
 
 MODULE aed_gclib
 

@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -78,7 +78,7 @@ MODULE aed_zooplankton
 
       !# Model parameters
       INTEGER  :: num_zoops
-      TYPE(type_zoop_data),DIMENSION(:),ALLOCATABLE :: zoops
+      TYPE(zoop_data_t),DIMENSION(:),ALLOCATABLE :: zoops
       LOGICAL  :: simDNexcr, simDPexcr, simDCexcr
       LOGICAL  :: simPNexcr, simPPexcr, simPCexcr
       LOGICAL  :: simZoopFeedback
@@ -93,8 +93,11 @@ MODULE aed_zooplankton
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
-   LOGICAL :: debug = .TRUE.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -107,7 +110,7 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
-   TYPE(type_zoop_params),INTENT(out) :: zoop_param(MAX_ZOOP_TYPES)
+   TYPE(zoop_param_t),INTENT(out) :: zoop_param(MAX_ZOOP_TYPES)
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol
@@ -197,8 +200,8 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
    INTEGER  :: i,j,tfil,sort_i(MAX_ZOOP_PREY)
    AED_REAL :: Pzoo_prey(MAX_ZOOP_PREY)
 
-   TYPE(type_zoop_params)  :: zoop_param(MAX_ZOOP_TYPES)
-   NAMELIST /zoop_params/ zoop_param
+   TYPE(zoop_param_t)  :: zoop_param(MAX_ZOOP_TYPES)
+   NAMELIST /zoop_params/ zoop_param         ! %% zoop_param_t - see aed_zoop_utils
 !-------------------------------------------------------------------------------
 !BEGIN
     SELECT CASE (param_file_type(dbase))
@@ -287,10 +290,10 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
 
    INTEGER  :: zoop_i, prey_i, phy_i
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_zooplankton/
+!  %% Last Checked 20/08/2021
    INTEGER  :: num_zoops
    INTEGER  :: the_zoops(MAX_ZOOP_TYPES)
-   LOGICAL  :: simZoopFeedback = .TRUE.
 
    CHARACTER(len=64)  :: dn_target_variable='' !dissolved nitrogen target variable
    CHARACTER(len=64)  :: pn_target_variable='' !particulate nitrogen target variable
@@ -299,12 +302,20 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    CHARACTER(len=64)  :: dc_target_variable='' !dissolved carbon target variable
    CHARACTER(len=64)  :: pc_target_variable='' !particulate carbon target variable
    CHARACTER(len=128) :: dbase='aed_zoop_pars.nml'
-!  %% END NAMELIST
+
+   LOGICAL  :: simZoopFeedback = .TRUE.
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_zooplankton/
 
    NAMELIST /aed_zooplankton/ num_zoops, the_zoops, &
                     dn_target_variable, pn_target_variable, dp_target_variable, &
                     pp_target_variable, dc_target_variable, pc_target_variable, &
-                    dbase, simZoopFeedback
+                    dbase, simZoopFeedback, diag_level
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_zooplankton initialization"

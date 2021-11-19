@@ -14,7 +14,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2020 -  The University of Western Australia               #
+!#  Copyright 2012 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -35,7 +35,7 @@
 !#                                                                             #
 !###############################################################################
 
-#include "aed+.h"
+#include "aed.h"
 #include "aed_debug.h"
 
 #define DP 8
@@ -4056,44 +4056,32 @@ END SUBROUTINE UpdateUnknownsWithdX
             IF (Q(JMN,N2).LT.0.) IPHASE = 1
          END DO
       END IF
-      IF (KODE.EQ.0) GO TO 150
-      DO 110 J=1,N
-!        IF (X(J)) 90, 110, 100
-!  90      CU(1,J) = 1.
-!          IU(1,J) = 1
-!        GO TO 110
-! 100      CU(2,J) = 1.
-!          IU(2,J) = 1
-         IF (X(J) < 0) THEN
-           CU(1,J) = 1.
-           IU(1,J) = 1
-         ELSE IF (X(J) > 0) THEN
-           CU(2,J) = 1.
-           IU(2,J) = 1
-         ENDIF
+      IF (KODE.NE.0) THEN
+         DO J=1,N
+            IF (X(J) < 0) THEN
+              CU(1,J) = 1.
+              IU(1,J) = 1
+            ELSE IF (X(J) > 0) THEN
+              CU(2,J) = 1.
+              IU(2,J) = 1
+            ENDIF
+         ENDDO
 
-  110 CONTINUE
-      DO 140 J=1,K
-         JPN = J + N
-!        IF (RES(J)) 120, 140, 130
-! 120    CU(1,JPN) = 1.
-!        IU(1,JPN) = 1
-!        IF (Q(J,N2).GT.0.0) IPHASE = 1
-!        GO TO 140
-! 130    CU(2,JPN) = 1.
-!        IU(2,JPN) = 1
-!        IF (Q(J,N2).LT.0.0) IPHASE = 1
-         IF (RES(J) < 0 ) THEN
-            CU(1,JPN) = 1.
-            IU(1,JPN) = 1
-            IF (Q(J,N2).GT.0.0) IPHASE = 1
-         ELSEIF (RES(J) > 0) THEN
-            CU(2,JPN) = 1.
-            IU(2,JPN) = 1
-            IF (Q(J,N2).LT.0.0) IPHASE = 1
-         ENDIF
-  140 CONTINUE
-  150 IF (IPHASE.EQ.2) GO TO 500
+         DO J=1,K
+            JPN = J + N
+            IF (RES(J) < 0 ) THEN
+               CU(1,JPN) = 1.
+               IU(1,JPN) = 1
+               IF (Q(J,N2).GT.0.0) IPHASE = 1
+            ELSEIF (RES(J) > 0) THEN
+               CU(2,JPN) = 1.
+               IU(2,JPN) = 1
+               IF (Q(J,N2).LT.0.0) IPHASE = 1
+            ENDIF
+         ENDDO
+      ENDIF
+
+      IF (IPHASE.EQ.2) GO TO 500
 ! COMPUTE THE MARGINAL COSTS.
   160 DO J=JS,N1
          SUM = 0.D0
@@ -4120,58 +4108,64 @@ END SUBROUTINE UpdateUnknownsWithdX
 ! DETERMINE THE VECTOR TO ENTER THE BASIS.
   240 XMAX = 0.
       IF (JS.GT.N) GO TO 490
-      DO 280 J=JS,N
+      DO J=JS,N
          ZU = Q(KLM1,J)
          II = INT( Q(KLM2,J) )
-         IF (II.GT.0) GO TO 250
-         II = -II
-         ZV = ZU
-         ZU = -ZU - CU(1,II) - CU(2,II)
-         GO TO 260
-  250    ZV = -ZU - CU(1,II) - CU(2,II)
-  260    IF (KFORCE.EQ.1 .AND. II.GT.N) GO TO 280
-         IF (IU(1,II).EQ.1) GO TO 270
-         IF (ZU.LE.XMAX) GO TO 270
-         XMAX = ZU
-         IN = J
-  270    IF (IU(2,II).EQ.1) GO TO 280
-         IF (ZV.LE.XMAX) GO TO 280
-         XMAX = ZV
-         IN = J
-  280 CONTINUE
+         IF (II.LE.0) THEN
+            II = -II
+            ZV = ZU
+            ZU = -ZU - CU(1,II) - CU(2,II)
+         ELSE
+            ZV = -ZU - CU(1,II) - CU(2,II)
+         ENDIF
+         IF (.NOT. (KFORCE.EQ.1 .AND. II.GT.N)) THEN
+            IF (IU(1,II).NE.1) THEN
+               IF (ZU.GT.XMAX) THEN
+                  XMAX = ZU
+                  IN = J
+               ENDIF
+            ENDIF
+            IF (IU(2,II).NE.1) THEN
+               IF (ZV.GT.XMAX) THEN
+                  XMAX = ZV
+                  IN = J
+               ENDIF
+            ENDIF
+         ENDIF
+      ENDDO
       IF (XMAX.LE.TOLER) GO TO 490
       IF (Q(KLM1,IN).EQ.XMAX) GO TO 300
-      DO 290 I=1,KLM2
+      DO I=1,KLM2
          Q(I,IN) = -Q(I,IN)
-  290 CONTINUE
+      ENDDO
       Q(KLM1,IN) = XMAX
 ! DETERMINE THE VECTOR TO LEAVE THE BASIS.
   300 IF (IPHASE.EQ.1 .OR. IA.EQ.0) GO TO 330
       XMAX = 0.
-      DO 310 I=1,IA
+      DO I=1,IA
          Z = ABS(Q(I,IN))
-         IF (Z.LE.XMAX) GO TO 310
+         IF (Z.LE.XMAX) CYCLE
          XMAX = Z
          IOUT = I
-  310 CONTINUE
+      ENDDO
       IF (XMAX.LE.TOLER) GO TO 330
-      DO 320 J=1,N2
+      DO J=1,N2
          Z = Q(IA,J)
          Q(IA,J) = Q(IOUT,J)
          Q(IOUT,J) = Z
-  320 CONTINUE
+      ENDDO
       IOUT = IA
       IA = IA - 1
       PIVOT = Q(IOUT,IN)
       GO TO 420
   330 KK = 0
-      DO 340 I=1,KLM
+      DO I=1,KLM
          Z = Q(I,IN)
-         IF (Z.LE.TOLER) GO TO 340
+         IF (Z.LE.TOLER) CYCLE
          KK = KK + 1
          RES(KK) = Q(I,N1)/Z
          S(KK) = I
-  340 CONTINUE
+      ENDDO
   350 IF (KK.GT.0) GO TO 360
       KODE = 2
       GO TO 590
@@ -4179,12 +4173,12 @@ END SUBROUTINE UpdateUnknownsWithdX
       IOUT = S(1)
       J = 1
       IF (KK.EQ.1) GO TO 380
-      DO 370 I=2,KK
-         IF (RES(I).GE.XMIN) GO TO 370
+      DO I=2,KK
+         IF (RES(I).GE.XMIN) CYCLE
          J = I
          XMIN = RES(I)
          IOUT = S(I)
-  370 CONTINUE
+      ENDDO
       RES(J) = RES(KK)
       S(J) = S(KK)
   380 KK = KK - 1
@@ -4200,11 +4194,11 @@ END SUBROUTINE UpdateUnknownsWithdX
       CUV = CU(1,II) + CU(2,II)
       IF (Q(KLM1,IN)-PIVOT*CUV.LE.TOLER) GO TO 420
 ! BYPASS INTERMEDIATE VERTICES.
-      DO 410 J=JS,N1
+      DO J=JS,N1
          Z = Q(IOUT,J)
          Q(KLM1,J) = Q(KLM1,J) - Z*CUV
          Q(IOUT,J) = -Z
-  410 CONTINUE
+      ENDDO
       Q(IOUT,N2) = -Q(IOUT,N2)
       GO TO 350
 ! GAUSS-JORDAN ELIMINATION.
@@ -4212,18 +4206,18 @@ END SUBROUTINE UpdateUnknownsWithdX
       KODE = 3
       GO TO 590
   430 ITER = ITER + 1
-      DO 440 J=JS,N1
+      DO J=JS,N1
          IF (J.NE.IN) Q(IOUT,J) = Q(IOUT,J)/PIVOT
-  440 CONTINUE
+      ENDDO
 ! IF PERMITTED, USE SUBROUTINE COLVEC OF THE DESCRIPTION
 ! SECTION AND REPLACE THE FOLLOWING SEVEN STATEMENTS DOWN
 ! TO AND INCLUDING STATEMENT NUMBER 460 BY..
 
-     DO 460 J=JS,N1
-        IF(J .EQ. IN) GO TO 460
+     DO J=JS,N1
+        IF(J .EQ. IN) CYCLE
         Z = -Q(IOUT,J)
         CALL COLVEC(Q(:,J), Q(:,IN), Z, IOUT, KLM1)
- 460 CONTINUE
+     ENDDO
 
 ! IF COLVEC IS A PROBLEM THEN USE THIS INSTEAD OF ABOVE:
 !      DO 460 J=JS,N1
@@ -4235,20 +4229,20 @@ END SUBROUTINE UpdateUnknownsWithdX
 !  460 CONTINUE
 
       TPIVOT = -PIVOT
-      DO 470 I=1,KLM1
+      DO I=1,KLM1
          IF (I.NE.IOUT) Q(I,IN) = Q(I,IN)/TPIVOT
-  470 CONTINUE
+      ENDDO
       Q(IOUT,IN) = 1./PIVOT
       Z = Q(IOUT,N2)
       Q(IOUT,N2) = Q(KLM2,IN)
       Q(KLM2,IN) = Z
       II = INT( ABS(Z) )
       IF (IU(1,II).EQ.0 .OR. IU(2,II).EQ.0) GO TO 240
-      DO 480 I=1,KLM2
+      DO I=1,KLM2
          Z = Q(I,IN)
          Q(I,IN) = Q(I,JS)
          Q(I,JS) = Z
-  480 CONTINUE
+      ENDDO
       JS = JS + 1
       GO TO 240
 ! TEST FOR OPTIMALITY.
@@ -4266,22 +4260,23 @@ END SUBROUTINE UpdateUnknownsWithdX
          CU(1,J) = 1.
          CU(2,J) = 1.
       END DO
-      DO 560 I=1,KLM
+      DO I=1,KLM
          II = INT( Q(I,N2) )
-         IF (II.GT.0) GO TO 530
-         II = -II
-         IF (IU(2,II).EQ.0) GO TO 560
-         CU(2,II) = 0.
-         GO TO 540
-  530    IF (IU(1,II).EQ.0) GO TO 560
-         CU(1,II) = 0.
-  540    IA = IA + 1
-         DO 550 J=1,N2
+         IF (II.LE.0) THEN
+            II = -II
+            IF (IU(2,II).EQ.0) CYCLE
+            CU(2,II) = 0.
+         ELSE
+            IF (IU(1,II).EQ.0) CYCLE
+            CU(1,II) = 0.
+         ENDIF
+         IA = IA + 1
+         DO J=1,N2
             Z = Q(IA,J)
             Q(IA,J) = Q(I,J)
             Q(I,J) = Z
-  550    CONTINUE
-  560 CONTINUE
+         ENDDO
+      ENDDO
       GO TO 160
   570 IF (Q(KLM1,N1).LE.TOLER) GO TO 500
       KODE = 1
@@ -4290,26 +4285,27 @@ END SUBROUTINE UpdateUnknownsWithdX
 ! PREPARE OUTPUT.
       KODE = 0
   590 SUM = 0.D0
-      DO 600 J=1,N
+      DO J=1,N
          X(J) = 0.
-  600 CONTINUE
-      DO 610 I=1,KLM
+      ENDDO
+      DO I=1,KLM
          RES(I) = 0.
-  610 CONTINUE
-      DO 640 I=1,KLM
+      ENDDO
+      DO I=1,KLM
          II = INT( Q(I,N2) )
          SN = 1.
-         IF (II.GT.0) GO TO 620
-         II = -II
-         SN = -1.
-  620    IF (II.GT.N) GO TO 630
-         X(II) = SN*Q(I,N1)
-         GO TO 640
-  630    IIMN = II - N
-         RES(IIMN) = SN*Q(I,N1)
-         IF (II.GE.N1 .AND. II.LE.NK) SUM = SUM + &
-         DBLE(Q(I,N1))
-  640 CONTINUE
+         IF (II.LE.0) THEN
+           II = -II
+           SN = -1.
+         ENDIF
+         IF (II.LE.N) THEN
+            X(II) = SN*Q(I,N1)
+         ELSE
+            IIMN = II - N
+            RES(IIMN) = SN*Q(I,N1)
+            IF (II.GE.N1 .AND. II.LE.NK) SUM = SUM + DBLE(Q(I,N1))
+         ENDIF
+      ENDDO
       ERROR = SUM
       RETURN
 

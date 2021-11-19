@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -97,7 +97,11 @@ MODULE aed_nitrogen
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -118,16 +122,9 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 !
 !LOCALS
    INTEGER           :: status
-   INTEGER           :: oxy_lim = 1
-   INTEGER           :: simN2O  = 0
-   INTEGER           :: n2o_piston_model = 4
-   INTEGER           :: Fsed_nit_model = 1
-   LOGICAL           :: simNitrfpH = .false.
-   LOGICAL           :: simNitrfLight = .false.
-   LOGICAL           :: simDryDeposition = .false.
-   LOGICAL           :: simWetDeposition = .false.
 
-!  %% NAMELIST
+!  %% NAMELIST    %%  /aed_nitrogen/
+!  %% Last Checked 20/08/2021
    AED_REAL          :: n_min         = zero_
    AED_REAL          :: n_max         =   1e6
    AED_REAL          :: nit_initial   =   4.5
@@ -167,6 +164,15 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    AED_REAL          :: atm_pn_dd     = zero_
    AED_REAL          :: f_dindep_nox  = 0.5
 
+   INTEGER           :: simN2O  = 0
+   INTEGER           :: oxy_lim = 1
+   INTEGER           :: n2o_piston_model = 4
+   INTEGER           :: Fsed_nit_model = 1
+
+   LOGICAL           :: simNitrfpH = .false.
+   LOGICAL           :: simNitrfLight = .false.
+   LOGICAL           :: simDryDeposition = .false.
+   LOGICAL           :: simWetDeposition = .false.
 
    CHARACTER(len=64) :: nitrif_reactant_variable=''
    CHARACTER(len=64) :: denit_product_variable=''
@@ -175,7 +181,13 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    CHARACTER(len=64) :: Fsed_nit_variable=''
    CHARACTER(len=64) :: Fsed_n2o_variable=''
    CHARACTER(len=64) :: Fsed_no2_variable=''
-!  %% END NAMELIST
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST    %%  /aed_nitrogen/
 
    NAMELIST /aed_nitrogen/     n_min, n_max,                                  &
                 nit_initial, amm_initial, n2o_initial, no2_initial,            &
@@ -188,7 +200,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
                 Ranammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
                 simNitrfpH, simNitrfLight, simDryDeposition, simWetDeposition, &
-                atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model
+                atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model, &
+                diag_level
 !
 !------------------------------------------------------------------------------+
 !BEGIN
@@ -287,16 +300,16 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%id_Fsed_n2o = -1 ; data%id_Fsed_no2 = -1
    data%use_sed_model_amm = Fsed_amm_variable .NE. ''
    IF (data%use_sed_model_amm) &
-     data%id_Fsed_amm = aed_locate_global_sheet(Fsed_amm_variable)
+     data%id_Fsed_amm = aed_locate_sheet_variable(Fsed_amm_variable)
    data%use_sed_model_nit = Fsed_nit_variable .NE. ''
    IF (data%use_sed_model_nit) &
-     data%id_Fsed_nit = aed_locate_global_sheet(Fsed_nit_variable)
+     data%id_Fsed_nit = aed_locate_sheet_variable(Fsed_nit_variable)
    data%use_sed_model_n2o = Fsed_n2o_variable .NE. ''
    IF (data%use_sed_model_n2o .and. simN2O>0 ) &
-     data%id_Fsed_n2o = aed_locate_global_sheet(Fsed_n2o_variable)
+     data%id_Fsed_n2o = aed_locate_sheet_variable(Fsed_n2o_variable)
    data%use_sed_model_no2 = Fsed_no2_variable .NE. ''
    IF (data%use_sed_model_no2 .and. simN2O>1 ) &
-     data%id_Fsed_no2 = aed_locate_global_sheet(Fsed_no2_variable)
+     data%id_Fsed_no2 = aed_locate_sheet_variable(Fsed_no2_variable)
 
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
@@ -322,8 +335,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    ! Register environmental dependencies
    data%id_temp    = aed_locate_global('temperature')
    data%id_salt    = aed_locate_global('salinity')
-   IF( simWetDeposition ) data%id_E_rain  = aed_locate_global_sheet('rain')
-   IF( simN2O>0 )         data%id_wind    = aed_locate_global_sheet('wind_speed')
+   IF( simWetDeposition ) data%id_E_rain  = aed_locate_sheet_global('rain')
+   IF( simN2O>0 )         data%id_wind    = aed_locate_sheet_global('wind_speed')
    IF( simN2O>0 )         data%id_E_depth = aed_locate_global('layer_ht')
    IF( simN2O>0 )         data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
   !IF( simN2O>0 )         data%id_E_tau   = aed_locate_global('taub')    ! tau to be converted to velocity

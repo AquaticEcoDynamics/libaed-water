@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -53,12 +53,8 @@ MODULE aed_water
    USE aed_bio_particles
    USE aed_geochemistry
    USE aed_pathogens
+   USE aed_pesticides
    USE aed_habitat_water
-
-   USE aed_benthic
-   USE aed_riparian
-   USE aed_demo
-   USE aed_dev
 
    IMPLICIT NONE
 
@@ -67,15 +63,14 @@ MODULE aed_water
 
    PRIVATE   !# By default make everything private
 
-   PUBLIC aed_new_model, aed_print_version
-
+   PUBLIC aed_new_wat_model, aed_print_wat_version
 
 CONTAINS
 !===============================================================================
 
 
 !###############################################################################
-FUNCTION aed_new_model(modelname) RESULT(model)
+FUNCTION aed_new_wat_model(modelname) RESULT(model)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: modelname
@@ -103,6 +98,7 @@ FUNCTION aed_new_model(modelname) RESULT(model)
       CASE ('aed_noncohesive');    prefix = 'NCS'; ALLOCATE(aed_noncohesive_data_t::model)
       CASE ('aed_geochemistry');   prefix = 'GEO'; ALLOCATE(aed_geochemistry_data_t::model)
       CASE ('aed_pathogens');      prefix = 'PAT'; ALLOCATE(aed_pathogens_data_t::model)
+      CASE ('aed_pesticides');     prefix = 'PST'; ALLOCATE(aed_pesticides_data_t::model)
       CASE ('aed_totals');         prefix = 'TOT'; ALLOCATE(aed_totals_data_t::model)
       CASE ('aed_dummy');          prefix = 'DUM'; ALLOCATE(aed_dummy_data_t::model)
       CASE ('aed_habitat_water');  prefix = 'HAB'; ALLOCATE(aed_habitat_water_data_t::model)
@@ -112,26 +108,13 @@ FUNCTION aed_new_model(modelname) RESULT(model)
    IF (ASSOCIATED(model)) THEN
       model%aed_model_name = modelname
       model%aed_model_prefix = prefix
-   ELSE
-      model => aed_new_ben_model(modelname)
-      IF (.NOT. ASSOCIATED(model)) model => aed_new_rip_model(modelname)
-      IF (.NOT. ASSOCIATED(model)) model => aed_new_dmo_model(modelname)
-      IF (.NOT. ASSOCIATED(model)) model => aed_new_dev_model(modelname)
    ENDIF
-
-   IF (ASSOCIATED(model)) THEN
-      IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
-      IF ( ASSOCIATED(last_model) ) last_model%next => model
-      last_model => model
-   ELSE
-       print *,'*** Unknown module ', TRIM(modelname)
-   ENDIF
-END FUNCTION aed_new_model
+END FUNCTION aed_new_wat_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_print_version
+SUBROUTINE aed_print_wat_version
 !-------------------------------------------------------------------------------
 !BEGIN
    print*,"    libaed-water version ", TRIM(AED_VERSION)
@@ -152,12 +135,7 @@ SUBROUTINE aed_print_version
 #  endif
 # endif
 #endif
-
-   CALL aed_print_version_ben
-   CALL aed_print_version_rip
-   CALL aed_print_version_dmo
-   CALL aed_print_version_dev
-END SUBROUTINE aed_print_version
+END SUBROUTINE aed_print_wat_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !===============================================================================

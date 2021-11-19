@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -78,7 +78,11 @@ MODULE aed_silica
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -100,7 +104,8 @@ SUBROUTINE aed_define_silica(data, namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_silica/
+!  %% Last Checked 20/08/2021
    AED_REAL          :: rsi_initial=4.5
    AED_REAL          :: rsi_min=zero_
    AED_REAL          :: rsi_max=nan_
@@ -109,10 +114,16 @@ SUBROUTINE aed_define_silica(data, namlst)
    AED_REAL          :: theta_sed_rsi = 1.0
    CHARACTER(len=64) :: silica_reactant_variable=''
    CHARACTER(len=64) :: Fsed_rsi_variable=''
-!  %% END NAMELIST
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_silica/
 
    NAMELIST /aed_silica/ rsi_initial,rsi_min,rsi_max,Fsed_rsi,Ksed_rsi,theta_sed_rsi, &
-                         silica_reactant_variable,Fsed_rsi_variable
+                         silica_reactant_variable,Fsed_rsi_variable, diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -140,7 +151,7 @@ SUBROUTINE aed_define_silica(data, namlst)
 
    data%use_sed_model = Fsed_rsi_variable .NE. ''
    IF (data%use_sed_model) &
-      data%id_Fsed_rsi = aed_locate_global_sheet(Fsed_rsi_variable)
+      data%id_Fsed_rsi = aed_locate_sheet_variable(Fsed_rsi_variable)
 
    ! Register diagnostic variables
    data%id_sed_rsi = aed_define_sheet_diag_variable('sed_rsi','mmol/m**2/d', &

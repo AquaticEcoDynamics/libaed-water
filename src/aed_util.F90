@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -45,7 +45,7 @@ MODULE aed_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, qsort, exp_integral
+   PUBLIC find_free_lun, aed_real2str, aed_int2str, qsort, exp_integral
    PUBLIC water_viscosity
    PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
@@ -83,6 +83,36 @@ INTEGER FUNCTION find_free_lun()
 
    find_free_lun = -1
 END FUNCTION find_free_lun
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_real2str(num, str)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL, INTENT(in) :: num
+   CHARACTER(*), INTENT(out) :: str
+!
+!BEGIN
+!-------------------------------------------------------------------------------
+   WRITE(str, "(e12.4)") num
+   str = TRIM(ADJUSTL(str))
+END SUBROUTINE aed_real2str
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_int2str(num, str)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER, INTENT(in) :: num
+   CHARACTER(*), INTENT(out) :: str
+!
+!BEGIN
+!-------------------------------------------------------------------------------
+   WRITE(str, *) num
+   str = TRIM(ADJUSTL(str))
+END SUBROUTINE aed_int2str
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

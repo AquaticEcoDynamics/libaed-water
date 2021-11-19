@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -46,14 +46,14 @@ MODULE aed_bio_utils
 
    PRIVATE   ! By default make everything private
 !
-   PUBLIC phyto_data, phyto_nml_data
+   PUBLIC phyto_data_t, phyto_param_t
    PUBLIC phyto_salinity, phyto_fN, phyto_fP, phyto_fSi
    PUBLIC phyto_internal_nitrogen, phyto_internal_phosphorus
    PUBLIC photosynthesis_irradiance, bio_respiration
    PUBLIC ino3, inh4, idon, in2, ifrp, idop
    PUBLIC findMin
 !
-   TYPE phyto_data
+   TYPE phyto_data_t
       ! General Attributes
       CHARACTER(64) :: p_name
       AED_REAL :: p0,Xcc
@@ -84,10 +84,11 @@ MODULE aed_bio_utils
       AED_REAL :: w_p, d_phy, rho_phy, f1, f2, c1, c3
       ! Resuspension parameters
       AED_REAL  :: resuspension, tau_0
-   END TYPE
+   END TYPE phyto_data_t
 
 
-   TYPE phyto_nml_data
+   ! %% NAMELIST   %% phyto_param_t
+   TYPE phyto_param_t
       CHARACTER(64) :: p_name
       AED_REAL :: p_initial
       AED_REAL :: p0, w_p, Xcc, R_growth
@@ -109,7 +110,8 @@ MODULE aed_bio_utils
       ! Silica parameters
       INTEGER  :: simSiUptake
       AED_REAL :: Si_0, K_Si, X_sicon
-   END TYPE
+   END TYPE phyto_param_t
+   ! %% END NAMELIST   %% phyto_param_t
 
 !Module Locals
    INTEGER,PARAMETER :: ino3 = 1, inh4 = 2, idon = 3, in2 = 4, ifrp = 1, idop = 2
@@ -128,7 +130,7 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
 ! Calculates the biotic group internal phosphorus stores and fluxes
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    INTEGER,INTENT(in)                          :: npup
    AED_REAL,INTENT(in)                         :: phy
@@ -200,7 +202,7 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
 !-------------------------------------------------------------------------------
 
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    LOGICAL,INTENT(in)                          :: do_N2uptake
    AED_REAL,INTENT(in)                         :: phy
@@ -260,7 +262,8 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
          uptake(1) = zero_
       ELSE
          ! Reduce n-uptake by the amount fixed:
-         uptake(1) = uptake(1) * (ABS(uptake(1))-a_nfix) / ABS(uptake(1))
+         IF ( uptake(1) /= 0. ) &
+            uptake(1) = uptake(1) * (ABS(uptake(1))-a_nfix) / ABS(uptake(1))
       ENDIF
    ENDIF
 
@@ -301,7 +304,7 @@ FUNCTION phyto_fN(phytos, group, IN, din, don) RESULT(fN)
 ! Michaelis-Menton type formulation or droop model for species with IN
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    AED_REAL,INTENT(in),OPTIONAL                :: IN
    AED_REAL,INTENT(in),OPTIONAL                :: din
@@ -343,7 +346,7 @@ FUNCTION phyto_fP(phytos, group, IP, frp) RESULT(fP)
 ! Phosphorus limitation of phytoplankton
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    AED_REAL,INTENT(in), OPTIONAL               :: IP
    AED_REAL,INTENT(in), OPTIONAL               :: frp
@@ -375,7 +378,7 @@ FUNCTION phyto_fSi(phytos, group, Si) RESULT(fSi)
 ! Silica limitation (eg. for diatoms)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    AED_REAL,INTENT(in)                         :: Si
 !
@@ -402,7 +405,7 @@ FUNCTION phyto_pN(phytos,group,NH4,NO3) RESULT(pN)
 ! Calculates the relative preference of uptake by phytoplankton of
 ! ammonia uptake over nitrate.
 !-------------------------------------------------------------------------------
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    AED_REAL,INTENT(in)                         :: NH4
    AED_REAL,INTENT(in)                         :: NO3
@@ -451,7 +454,7 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 ! and Lassiter option also
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(phyto_data),DIMENSION(:),INTENT(in)    :: phytos
+   TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
    AED_REAL,INTENT(in)                         :: salinity
 !

@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2020 -  The University of Western Australia               #
+!#  Copyright 2012 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -31,7 +31,7 @@
 !#                                                                             #
 !###############################################################################
 
-#include "aed+.h"
+#include "aed.h"
 
 
 MODULE aed_gctypes
@@ -142,6 +142,7 @@ MODULE aed_gctypes
     REAL,  DIMENSION(:), POINTER :: Stoich => NULL()    !stoichiometric coeffs
   END TYPE PurePhaseInfo
 
+#if 0
 !#----------------- sed_candi types ----------------------------------
 !#----------------- sed_candi types ----------------------------------
 !#----------------- sed_candi types ----------------------------------
@@ -226,7 +227,7 @@ MODULE aed_gctypes
       INTEGER  :: OMapproach       !# 1
       INTEGER  :: OMModel          !# 1
       INTEGER  :: FTemswitch       !# 2
-      INTEGER  :: fancyNswitch         !# 1
+      INTEGER  :: fancyNswitch     !# 1
       INTEGER  :: FTswitch
       INTEGER  :: FBIOswitch       !# 1
       INTEGER  :: FINswitch        !# 2
@@ -437,7 +438,7 @@ MODULE aed_gctypes
       SED_REAL :: YAerOAc     !# 17.25 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YDenOAc     !# 16.82 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YDenH2      !# 04.49 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
-      SED_REAL :: YManH2      !#
+      SED_REAL :: YManH2      !#    CAB - Not Used?
       SED_REAL :: YManOAc     !# 14.14 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011
       SED_REAL :: YIroOAc     !# 18.70 ! /CellWeight #gB/mol OAc / g/mol cell Roden and Jin 2011 |  #9.0/CellWeight #Watson 2003
       SED_REAL :: YIroH2      !# 04.54 ! /CellWeight #gB/mol H2  / g/mol cell Roden and Jin 2011 |  #9.0/CellWeight #Watson 2003
@@ -1028,6 +1029,7 @@ MODULE aed_gctypes
      REAL                      :: Xmk, Xfl, Xfm
   END TYPE AEDConstDiagenesisType
 !-------------------------------------------------------------------------------
+#endif
 
 END MODULE aed_gctypes
 !------------------------------------------------------------------------------!

@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -78,8 +78,12 @@ MODULE aed_dummy
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
    AED_REAL :: today = 1.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -105,32 +109,34 @@ SUBROUTINE aed_define_dummy(data, namlst)
 
    CHARACTER(len=4),POINTER :: prefix => null()
 
-!  %% NAMELIST
-   CHARACTER(len=40) :: dm_vars(100)
-   AED_REAL          :: dm_max(100)
-   AED_REAL          :: dm_min(100)
-   AED_REAL          :: dm_init(100)
-   CHARACTER(len=40) :: dm_dvars(100)
-   CHARACTER(len=40) :: dm_svars(100)
-   AED_REAL          :: dm_smax(100)
-   AED_REAL          :: dm_smin(100)
-   AED_REAL          :: dm_sinit(100)
-   CHARACTER(len=40) :: dm_dsvars(100)
-!  %% END NAMELIST
+!  %% NAMELIST   %%  /aed_dummy/
+!  %% Last Checked 20/08/2021
+   CHARACTER(len=40) :: dm_vars(100) = ''
+   AED_REAL          :: dm_max(100) = NaN_
+   AED_REAL          :: dm_min(100) = NaN_
+   AED_REAL          :: dm_init(100) = 0.
+   CHARACTER(len=40) :: dm_dvars(100) = ''
+   CHARACTER(len=40) :: dm_svars(100) = ''
+   AED_REAL          :: dm_smax(100) = NaN_
+   AED_REAL          :: dm_smin(100) = NaN_
+   AED_REAL          :: dm_sinit(100) = 0.
+   CHARACTER(len=40) :: dm_dsvars(100) = ''
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_dummy/
 
    NAMELIST /aed_dummy/ dm_vars, dm_max, dm_min, dm_init,             &
                         dm_dvars,                                     &
                         dm_svars, dm_smax, dm_smin, dm_sinit,         &
-                        dm_dsvars
+                        dm_dsvars, diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_dummy initialization"
-
-   dm_vars = ''    ; dm_dvars = ''
-   dm_max = NaN_   ; dm_min = NaN_   ; dm_init = 0
-   dm_svars = ''   ; dm_dsvars = ''
-   dm_smax = NaN_  ; dm_smin = NaN_  ; dm_sinit = 0
 
    num_v = 0 ; num_dv = 0 ; num_sv = 0 ; num_dsv = 0
 
@@ -181,7 +187,6 @@ SUBROUTINE aed_define_dummy(data, namlst)
 
    data%id_vsine = aed_define_diag_variable('DUM_vol_sine', 'no units', 'DBG volume sine between 0.0 and 1.0')
    data%id_sine = aed_define_sheet_diag_variable('DUM_sine', 'no units', 'DBG sine wave between 0.0 and 1.0', .FALSE.)
-
 END SUBROUTINE aed_define_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

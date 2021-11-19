@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018-2020 -  The University of Western Australia                 #
+!#  Copyright 2018 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -67,8 +67,6 @@ MODULE aed_bio_particles
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
 
-      LOGICAL :: extra_diag
-
       CONTAINS
          PROCEDURE :: define             => aed_define_bio_particles
 !        PROCEDURE :: calculate          => aed_calculate_bio_particles
@@ -87,7 +85,13 @@ MODULE aed_bio_particles
    INTEGER, PARAMETER :: PTM_BIRTH  = 17
    INTEGER, PARAMETER :: PTM_AGE    = 18
    INTEGER, PARAMETER :: PTM_STATUS = 19
-   INTEGER :: diag_level = 10
+
+   LOGICAL :: extra_diag = .false.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 
 !===============================================================================
@@ -109,9 +113,27 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 !
 !LOCALS
    INTEGER  :: status
-   AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old, &
-               mass_limit, X_cdw, X_nc, X_pc, X_dwww
-   LOGICAL  :: extra_diag
+
+!  %% NAMELIST    %%  /aed_bio_particles/
+!  %% Last Checked 20/08/2021
+   AED_REAL :: vvel_new = 0.
+   AED_REAL :: vvel_old = 0.
+   AED_REAL :: decay_rate_new = 0.
+   AED_REAL :: decay_rate_old = 0.
+   AED_REAL :: mass_limit = 10.
+   AED_REAL :: X_cdw = 0.5
+   AED_REAL :: X_nc = 0.1
+   AED_REAL :: X_pc = 0.01
+   AED_REAL :: X_dwww = 1.0
+
+!  From Module Globals
+!  LOGICAL  :: extra_diag = .false.      !## Obsolete Use diag_level = 10
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST    %%  /aed_bio_particles/
 
    NAMELIST /aed_bio_particles/ vvel_new, vvel_old, &
                            decay_rate_new, decay_rate_old, &
@@ -122,11 +144,6 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 !BEGIN
 
    ! Initialise
-   mass_limit = 10.
-   X_dwww = 1.0; X_cdw = 0.5;  X_nc = 0.1;  X_pc= 0.01
-   decay_rate_new = 0.; decay_rate_old = 0.
-   vvel_new = 0.; vvel_old = 0.
-   extra_diag = .false.
 
    ! Read the namelist
    read(namlst,nml=aed_bio_particles,iostat=status)
@@ -134,13 +151,14 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 
    print *,"        aed_bio_particles initialization"
 
+   IF ( extra_diag ) diag_level = 10
+
    ! Set module parameters
    data%vvel_new       = vvel_new/secs_per_day
    data%vvel_old       = vvel_old/secs_per_day
    data%decay_rate_new = decay_rate_new/secs_per_day
    data%decay_rate_old = decay_rate_old/secs_per_day
    data%mass_limit     = mass_limit
-   data%extra_diag     = extra_diag
    data%X_dwww         = X_dwww
    data%X_cdw          = X_cdw
    data%X_nc           = X_nc
@@ -158,7 +176,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%id_ptm118 = aed_define_diag_variable('age', 'days', 'last particle age')
 
    ! Junk properties
-   IF( data%extra_diag ) THEN
+   IF( diag_level >= 10 ) THEN
     data%id_ptm_01 = aed_define_diag_variable('bioptm01', '', 'bio_particles 01')
     data%id_ptm_02 = aed_define_diag_variable('bioptm02', '', 'bio_particles 02')
     data%id_ptm_03 = aed_define_diag_variable('bioptm03', '', 'bio_particles 03')
@@ -206,7 +224,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%id_dop = aed_locate_variable('OGM_dop')
 
    ! Environment variables
-   data%id_larea = aed_locate_global_sheet('layer_area')
+   data%id_larea = aed_locate_sheet_global('layer_area')
    data%id_lht = aed_locate_global('layer_ht')
 
 END SUBROUTINE aed_define_bio_particles
@@ -246,7 +264,7 @@ SUBROUTINE aed_particle_bgc_bio_particles(data,column,layer_idx,ppid,partcl)
      _DIAG_VAR_(data%id_d_dn)  = zero_
      _DIAG_VAR_(data%id_d_dp)  = zero_
 
-     IF( data%extra_diag ) THEN
+     IF( diag_level >= 10 ) THEN
       _DIAG_VAR_(data%id_ptm_01) = zero_
       _DIAG_VAR_(data%id_ptm_02) = zero_
       _DIAG_VAR_(data%id_ptm_03) = zero_
@@ -318,7 +336,7 @@ SUBROUTINE aed_particle_bgc_bio_particles(data,column,layer_idx,ppid,partcl)
    _DIAG_VAR_(data%id_ptm_17) = _DIAG_VAR_(data%id_ptm_17) + partcl(PTM_BIRTH)
    _DIAG_VAR_(data%id_ptm_18) = &
                   _DIAG_VAR_(data%id_ptm_18) + (partcl(PTM_AGE)-partcl(PTM_BIRTH)) /secs_per_day
-   IF( data%extra_diag ) THEN
+   IF( diag_level >= 10 ) THEN
     _DIAG_VAR_(data%id_ptm_01) = _DIAG_VAR_(data%id_ptm_01) + partcl(1)
     _DIAG_VAR_(data%id_ptm_02) = _DIAG_VAR_(data%id_ptm_02) + partcl(2)
     _DIAG_VAR_(data%id_ptm_03) = _DIAG_VAR_(data%id_ptm_03) + partcl(3)
@@ -340,7 +358,7 @@ SUBROUTINE aed_particle_bgc_bio_particles(data,column,layer_idx,ppid,partcl)
    _DIAG_VAR_(data%id_ptm115) = partcl(PTM_MASS)
    _DIAG_VAR_(data%id_ptm117) = partcl(PTM_BIRTH)
    _DIAG_VAR_(data%id_ptm118) = (partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day
-   IF( data%extra_diag ) THEN
+   IF( diag_level >= 10 ) THEN
     _DIAG_VAR_(data%id_ptm101) = partcl(1)
     _DIAG_VAR_(data%id_ptm102) = partcl(2)
     _DIAG_VAR_(data%id_ptm103) = partcl(3)

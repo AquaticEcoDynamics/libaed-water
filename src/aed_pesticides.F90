@@ -1,6 +1,6 @@
 !###############################################################################
 !#                                                                             #
-!# aed_pathogens.F90                                                           #
+!# aed_pesticides.F90                                                          #
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2017 - 2021 -  The University of Western Australia               #
+!#  Copyright 2021 -  The University of Western Australia                      #
 !#                                                                             #
 !#   AED2+ is free software: you can redistribute it and/or modify             #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -41,9 +41,9 @@
 #include "aed.h"
 
 
-MODULE aed_pathogens
+MODULE aed_pesticides
 !-------------------------------------------------------------------------------
-!  aed_pathogens --- pathogen biogeochemical model
+!  aed_pesticides --- pesticide biogeochemical model
 !-------------------------------------------------------------------------------
    USE aed_core
    USE aed_util
@@ -52,12 +52,11 @@ MODULE aed_pathogens
 
    PRIVATE   ! By default make everything private
 !
-   PUBLIC aed_pathogens_data_t
+   PUBLIC aed_pesticides_data_t
 !
-
    !----------------------------------------------------------------------------
-!  %% NAMELIST    %%  pathogen_param_t
-   TYPE pathogen_param_t
+!  %% NAMELIST   %%  pesticide_param_t
+   TYPE pesticide_param_t
       CHARACTER(64) :: p_name
       AED_REAL      :: coef_grwth_uMAX                     !-- Max growth rate at 20C
       AED_REAL      :: coef_grwth_Tmin, coef_grwth_Tmax    !-- Tmin and Tmax, f(T)
@@ -80,19 +79,19 @@ MODULE aed_pathogens
       AED_REAL      :: coef_sett_w_path      !-- Sedimentation velocity (m/d) at 20C (-ve means down) for NON-ATTACHED orgs
       AED_REAL      :: coef_resus_epsilonP   !-- Pathogen resuspension rate
       AED_REAL      :: coef_resus_tauP_0     !-- Critical shear stress for organism resuspension
-   END TYPE
-!  %% END NAMELIST    %%  pathogen_param_t
+   END TYPE pesticide_param_t
+!  %% END NAMELIST   %%  pesticide_param_t
 
-!  TYPE pathogen_data
+!  TYPE pesticide_data
 !     ! General Attributes
-!     TYPE(pathogen_param_t) :: par
+!     TYPE(pesticide_param_t) :: par
 !  END TYPE
 
-   TYPE,extends(aed_model_data_t) :: aed_pathogens_data_t
+   TYPE,extends(aed_model_data_t) :: aed_pesticides_data_t
       !# Variable identifiers
-      INTEGER,ALLOCATABLE :: id_pf(:), id_pd(:)            ! Column ID of pathogens (alive and dead)
-      INTEGER,ALLOCATABLE :: id_pa(:)                      ! Column ID of pathogens attached to ss
-      INTEGER,ALLOCATABLE :: id_ps(:)                      ! Column ID of pathogens in sediment
+      INTEGER,ALLOCATABLE :: id_pf(:), id_pd(:)            ! Column ID of pesticides (alive and dead)
+      INTEGER,ALLOCATABLE :: id_pa(:)                      ! Column ID of pesticides attached to ss
+      INTEGER,ALLOCATABLE :: id_ps(:)                      ! Column ID of pesticides in sediment
       INTEGER,ALLOCATABLE :: id_ss(:)                      ! Column ID of ss if chosen
 
       ! Diagnostic IDs for processes
@@ -106,8 +105,8 @@ MODULE aed_pathogens
       INTEGER  :: id_epsilon, id_taub
 
       !# Model parameters
-      INTEGER  :: num_pathogens
-      TYPE(pathogen_param_t),DIMENSION(:),ALLOCATABLE :: pathogens
+      INTEGER  :: num_pesticides
+      TYPE(pesticide_param_t),DIMENSION(:),ALLOCATABLE :: pesticides
       INTEGER  :: num_ss
       AED_REAL :: tau_0_min, kTau_0
       AED_REAL,ALLOCATABLE :: epsilon(:), tau_0(:), tau_r(:), Ke_ss(:)
@@ -117,16 +116,15 @@ MODULE aed_pathogens
       AED_REAL :: att_ts
 
      CONTAINS
-         PROCEDURE :: define            => aed_define_pathogens
-         PROCEDURE :: calculate         => aed_calculate_pathogens
-         PROCEDURE :: calculate_benthic => aed_calculate_benthic_pathogens
-         PROCEDURE :: mobility          => aed_mobility_pathogens
-         PROCEDURE :: light_extinction  => aed_light_extinction_pathogens
-!        PROCEDURE :: delete            => aed_delete_pathogens
+         PROCEDURE :: define            => aed_define_pesticides
+         PROCEDURE :: calculate         => aed_calculate_pesticides
+         PROCEDURE :: calculate_benthic => aed_calculate_benthic_pesticides
+         PROCEDURE :: mobility          => aed_mobility_pesticides
+         PROCEDURE :: light_extinction  => aed_light_extinction_pesticides
+!        PROCEDURE :: delete            => aed_delete_pesticides
    END TYPE
 
 !MODULE GLOBALS
-   LOGICAL  :: extra_diag = .false.
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
                                               ! 1 = basic diagnostic outputs
                                               ! 2 = flux rates, and supporitng
@@ -139,26 +137,27 @@ CONTAINS
 
 
 !###############################################################################
-SUBROUTINE aed_define_pathogens(data, namlst)
+SUBROUTINE aed_define_pesticides(data, namlst)
 !-------------------------------------------------------------------------------
-! Initialise the pathogen biogeochemical model
+! Initialise the pesticide biogeochemical model
 !
 !  Here, the aed_p_m namelist is read and te variables exported
 !  by the model are registered with AED2.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
-   CLASS (aed_pathogens_data_t),INTENT(inout) :: data
+   CLASS (aed_pesticides_data_t),INTENT(inout) :: data
 
 !
 !LOCALS
    INTEGER  :: status
    INTEGER  :: i
+   CHARACTER(4) :: trac_name
 
-!  %% NAMELIST   %%  /aed_pathogens/
+!  %% NAMELIST   %% /aed_pesticides/
 !  %% Last Checked 20/08/2021
-   INTEGER  :: num_pathogens
-   INTEGER  :: the_pathogens(MAX_PATHO_TYPES)
+   INTEGER  :: num_pesticides
+   INTEGER  :: the_pesticides(MAX_PATHO_TYPES)
    INTEGER  :: num_ss = 0
    AED_REAL :: ss_set(MAX_PATHO_TYPES)=zero_
    AED_REAL :: ss_tau(MAX_PATHO_TYPES)=one_
@@ -173,29 +172,28 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    INTEGER  :: resuspension
    LOGICAL  :: sim_sedorgs = .FALSE.
    CHARACTER(len=64)  :: oxy_variable = ''
-   CHARACTER(4) :: trac_name
-   CHARACTER(len=128) :: dbase='aed_pathogen_pars.nml'
+   CHARACTER(len=128) :: dbase='aed_pesticide_pars.nml'
 
 ! From Module Globals
-!  LOGICAL  :: extra_diag = .false.      !## Obsolete Use diag_level = 10
+   LOGICAL  :: extra_diag = .FALSE.      !## Obsolete Use diag_level = 10
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
 !                                             ! 3 = other metrics
 !                                             !10 = all debug & checking outputs
-!  %% END NAMELIST   %%  /aed_pathogens/
+!  %% END NAMELIST   %% /aed_pesticides/
 
-   NAMELIST /aed_pathogens/ num_pathogens, the_pathogens, resuspension, &
+   NAMELIST /aed_pesticides/ num_pesticides, the_pesticides, resuspension, &
             num_ss, ss_set, ss_tau, ss_ke, sim_sedorgs, oxy_variable,    &
             epsilon, tau_0, tau_0_min, Ktau_0, dbase, extra_diag, att_ts,&
             diag_level
 !-----------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_pathogens initialization"
+   print *,"        aed_pesticides initialization"
 
    ! Read the namelist
-   read(namlst,nml=aed_pathogens,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_pathogens'
+   read(namlst,nml=aed_pesticides,iostat=status)
+   IF (status /= 0) STOP 'Error reading namelist aed_pesticides'
 
    IF ( extra_diag ) diag_level = 10
 
@@ -206,7 +204,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
-   CALL aed_pathogens_load_params(data, dbase, num_pathogens, the_pathogens)
+   CALL aed_pesticides_load_params(data, dbase, num_pesticides, the_pesticides)
 
    IF ( num_ss > 0 ) THEN
       ALLOCATE(data%id_ss(num_ss))
@@ -245,7 +243,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
       data%id_taub = aed_locate_sheet_global('taub')
 
    data%resuspension = resuspension
-END SUBROUTINE aed_define_pathogens
+END SUBROUTINE aed_define_pesticides
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -256,7 +254,7 @@ INTEGER FUNCTION load_csv(dbase, pd)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
-   TYPE(pathogen_param_t) :: pd(MAX_PHYTO_TYPES)
+   TYPE(pesticide_param_t) :: pd(MAX_PHYTO_TYPES)
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol
@@ -341,10 +339,10 @@ END FUNCTION load_csv
 
 
 !###############################################################################
-SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
+SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_pathogens_data_t),INTENT(inout) :: data
+   CLASS (aed_pesticides_data_t),INTENT(inout) :: data
    CHARACTER(len=*),INTENT(in) :: dbase
    INTEGER,INTENT(in) :: count
    INTEGER,INTENT(in) :: list(*)
@@ -355,8 +353,8 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
    INTEGER  :: i,tfil
    AED_REAL :: minPath
 
-   TYPE(pathogen_param_t) :: pd(MAX_PATHO_TYPES)
-   NAMELIST /pathogen_data/ pd    ! %% pathogen_param_t - see above
+   TYPE(pesticide_param_t) :: pd(MAX_PATHO_TYPES)
+   NAMELIST /pesticide_data/ pd   ! %% pesticide_param_t - see above
 !-------------------------------------------------------------------------------
 !BEGIN
     minPath = 1e-5
@@ -366,17 +364,17 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
        CASE (NML_TYPE)
            tfil = find_free_lun()
            open(tfil,file=dbase, status='OLD',iostat=status)
-           IF (status /= 0) STOP 'Error opening namelist pathogen_data'
-           read(tfil,nml=pathogen_data,iostat=status)
+           IF (status /= 0) STOP 'Error opening namelist pesticide_data'
+           read(tfil,nml=pesticide_data,iostat=status)
            close(tfil)
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
-    IF (status /= 0) STOP 'Error reading namelist pathogen_data'
+    IF (status /= 0) STOP 'Error reading namelist pesticide_data'
 
 
-    data%num_pathogens = count
-    ALLOCATE(data%pathogens(count))
+    data%num_pesticides = count
+    ALLOCATE(data%pesticides(count))
     ALLOCATE(data%id_pf(count))
     ALLOCATE(data%id_pd(count))
     ALLOCATE(data%id_pa(count))
@@ -392,68 +390,68 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
 
     DO i=1,count
        ! Assign parameters from database to simulated groups
-       data%pathogens(i) = pd(list(i))
-       data%pathogens(i)%coef_sett_w_path = data%pathogens(i)%coef_sett_w_path/secs_per_day
-       data%pathogens(i)%coef_mort_kd20 = data%pathogens(i)%coef_mort_kd20/secs_per_day
+       data%pesticides(i) = pd(list(i))
+       data%pesticides(i)%coef_sett_w_path = data%pesticides(i)%coef_sett_w_path/secs_per_day
+       data%pesticides(i)%coef_mort_kd20 = data%pesticides(i)%coef_mort_kd20/secs_per_day
 
        ! Register group as a state variable
        data%id_pf(i) = aed_define_variable(                                  &
-                             TRIM(data%pathogens(i)%p_name)//'_f',            &
-                             'orgs/m**3', 'pathogen alive',                   &
+                             TRIM(data%pesticides(i)%p_name)//'_f',            &
+                             'orgs/m**3', 'pesticide alive',                   &
                              minPath,                                         &
                             ! pd(list(i))%p_initial,                          &
                              minimum=minPath,                                 &
                              !minimum=pd(list(i))%p0,                         &
-                             mobility = data%pathogens(i)%coef_sett_w_path)
+                             mobility = data%pesticides(i)%coef_sett_w_path)
 
 
        ! Check if we need to registrer a variable for the attached fraction
-       IF (data%pathogens(i)%coef_sett_fa > zero_) THEN
+       IF (data%pesticides(i)%coef_sett_fa > zero_) THEN
          data%id_pa(i) = aed_define_variable(                                &
-                             TRIM(data%pathogens(i)%p_name)//'_a',            &
-                             'orgs/m**3', 'pathogen attached',                &
+                             TRIM(data%pesticides(i)%p_name)//'_a',            &
+                             'orgs/m**3', 'pesticide attached',                &
                              minPath,                                         &
                             ! pd(list(i))%p_initial,                          &
                              minimum=minPath,                                 &
                              !minimum=pd(list(i))%p0,                         &
-                             mobility = data%pathogens(i)%coef_sett_w_path)
+                             mobility = data%pesticides(i)%coef_sett_w_path)
        ENDIF
 
-      !IF (data%pathogens(i)%p_name == 'crypto') THEN
+      !IF (data%pesticides(i)%p_name == 'crypto') THEN
          ! Register a state variable for dead fraction
          data%id_pd(i) = aed_define_variable(                               &
-                             TRIM(data%pathogens(i)%p_name)//'_d',           &
-                             'orgs/m**3', 'pathogen dead',                   &
+                             TRIM(data%pesticides(i)%p_name)//'_d',           &
+                             'orgs/m**3', 'pesticide dead',                   &
                              zero_,                                          &
                              zero_,                                          &
-                             mobility = data%pathogens(i)%coef_sett_w_path)
+                             mobility = data%pesticides(i)%coef_sett_w_path)
 
       !ENDIF
 
 
        IF (data%sim_sedorgs) THEN
-          data%id_ps(i) = aed_define_sheet_variable( TRIM(data%pathogens(i)%p_name)//'_s', 'orgs/m2', 'pathogens in sediment')
+          data%id_ps(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%p_name)//'_s', 'orgs/m2', 'pesticides in sediment')
           PRINT *,'WARNING: sim_sedorgs is not complete, and sediment population is not growing or resuspending'
        ENDIF
 
-       data%id_total(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_t', 'orgs/m3', 'total')
+       data%id_total(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%p_name)//'_t', 'orgs/m3', 'total')
        IF ( diag_level >= 10 ) THEN
-          data%id_growth(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_g', 'orgs/m3/day', 'growth')
-          data%id_sunlight(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_l', 'orgs/m3/day', 'sunlight')
-          data%id_mortality(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
+          data%id_growth(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%p_name)//'_g', 'orgs/m3/day', 'growth')
+          data%id_sunlight(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%p_name)//'_l', 'orgs/m3/day', 'sunlight')
+          data%id_mortality(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
        ENDIF
    ENDDO
-END SUBROUTINE aed_pathogens_load_params
+END SUBROUTINE aed_pesticides_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
+SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Right hand sides of pathogen biogeochemical model
+! Right hand sides of pesticide biogeochemical model
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_pathogens_data_t),INTENT(in) :: data
+   CLASS (aed_pesticides_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !
@@ -497,11 +495,11 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       uvb = (par/0.45)*0.003          ! uvb is 0.3% of sw
    ENDIF
 
-   DO pth_i=1,data%num_pathogens
+   DO pth_i=1,data%num_pesticides
 
-      ! Retrieve this pathogen group
+      ! Retrieve this pesticide group
       pth_f = _STATE_VAR_(data%id_pf(pth_i))
-      IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
+      IF (data%pesticides(pth_i)%coef_sett_fa > zero_) THEN
         pth_a = _STATE_VAR_(data%id_pa(pth_i))
       END IF
 
@@ -511,10 +509,10 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       ! Natural mortality (as impacted by T, S, pH; see Hipsey et al 2008)
       f_AOC = 1.0 ! aoc / (K_AOC + aoc)
       f_pH  = 1.0 ! + c_PH * ( pH_star**delta / (pH_star**delta+K_PH**delta) )
-      mortality = data%pathogens(pth_i)%coef_mort_kd20  &
-                + (data%pathogens(pth_i)%coef_mort_c_SM*salinity**data%pathogens(pth_i)%coef_mort_alpha) &
-                * ((1.0-f_AOC)**data%pathogens(pth_i)%coef_mort_beta) * f_pH
-      mortality = mortality * (data%pathogens(pth_i)%coef_mort_theta**(temp-20.0))
+      mortality = data%pesticides(pth_i)%coef_mort_kd20  &
+                + (data%pesticides(pth_i)%coef_mort_c_SM*salinity**data%pesticides(pth_i)%coef_mort_alpha) &
+                * ((1.0-f_AOC)**data%pesticides(pth_i)%coef_mort_beta) * f_pH
+      mortality = mortality * (data%pesticides(pth_i)%coef_mort_theta**(temp-20.0))
 
 
       ! Sunlight inactivation (as impacted by S, DO and pH; see Hipsey et al 2008)
@@ -522,36 +520,36 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       lightBW   = zero_
       phi  = 1e-6  ! Convert J to MJ as kb is in m2/MJ)
       ! Visible
-      f_DO = oxy / (data%pathogens(pth_i)%coef_light_kDOb_vis + oxy)
+      f_DO = oxy / (data%pesticides(pth_i)%coef_light_kDOb_vis + oxy)
       f_pH = 1.0
            !(1.0+coef_light_cpHb_vis*(pH_star**coef_light_delb_vis/(coef_light_KpHb_vis**coef_light_delb_vis+pH_star**coef_light_delb_vis)))
-      lightBW = phi * (data%pathogens(pth_i)%coef_light_kb_vis + data%pathogens(pth_i)%coef_light_cSb_vis*salinity)
+      lightBW = phi * (data%pesticides(pth_i)%coef_light_kb_vis + data%pesticides(pth_i)%coef_light_cSb_vis*salinity)
       lightBW = lightBW * par * f_pH * f_DO
       light     = light + lightBW
       ! UV-A
-      f_DO = oxy / (data%pathogens(pth_i)%coef_light_kDOb_uva + oxy)
+      f_DO = oxy / (data%pesticides(pth_i)%coef_light_kDOb_uva + oxy)
       f_pH = 1.0
            !(1.0 + coef_light_cpHb_uva*(pH_star**coef_light_delb_uva/(coef_light_KpHb_uva**coef_light_delb_uva+pH_star**coef_light_delb_uva)))
-      lightBW = phi * (data%pathogens(pth_i)%coef_light_kb_uva + data%pathogens(pth_i)%coef_light_cSb_uva*salinity)
+      lightBW = phi * (data%pesticides(pth_i)%coef_light_kb_uva + data%pesticides(pth_i)%coef_light_cSb_uva*salinity)
       lightBW = lightBW * uva * f_pH * f_DO
       light     = light + lightBW
       ! UV-B
-      f_DO = oxy / (data%pathogens(pth_i)%coef_light_kDOb_uvb + oxy)
+      f_DO = oxy / (data%pesticides(pth_i)%coef_light_kDOb_uvb + oxy)
       f_pH = 1.0
            !(1.0 + coef_light_cpHb_uvb*(pH_star**coef_light_delb_uvb/(coef_light_KpHb_uvb**coef_light_delb_uvb+pH_star**coef_light_delb_uvb)))
-      lightBW = phi * (data%pathogens(pth_i)%coef_light_kb_uvb + data%pathogens(pth_i)%coef_light_cSb_uvb*salinity)
+      lightBW = phi * (data%pesticides(pth_i)%coef_light_kb_uvb + data%pesticides(pth_i)%coef_light_cSb_uvb*salinity)
       lightBW = lightBW * uvb * f_pH * f_DO
       light   = light + lightBW
 
       ! Attachment of free orgs to particles (as impacted by SS and desired attachment ratio)
       attachment = zero_
-      IF (data%pathogens(pth_i)%coef_sett_fa > zero_ .AND. (pth_f+pth_a) > 1e-2) THEN
+      IF (data%pesticides(pth_i)%coef_sett_fa > zero_ .AND. (pth_f+pth_a) > 1e-2) THEN
          ! First check if ratio at last time step is less than desired (ie coef_sett_fa)
          att_frac = pth_a/(pth_a+pth_f)
-         IF (att_frac<data%pathogens(pth_i)%coef_sett_fa) THEN
+         IF (att_frac<data%pesticides(pth_i)%coef_sett_fa) THEN
             ! Assume rate of attachment is slow based on att_ts (orgs/m3/s)
             ! Small fraction, so the "attachment deficit" is redistributed each time step
-            attachment = data%att_ts * (data%pathogens(pth_i)%coef_sett_fa*pth_a - pth_f)
+            attachment = data%att_ts * (data%pesticides(pth_i)%coef_sett_fa*pth_a - pth_f)
             IF(attachment>zero_ .AND. attachment > _FLUX_VAR_(data%id_pf(pth_i)))THEN
               ! proposed attachment is more than is available.
               attachment = 0.5 * _FLUX_VAR_(data%id_pf(pth_i))
@@ -570,8 +568,8 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
                                       ( (growth - light - mortality - predation)*pth_f - attachment)
       _FLUX_VAR_(data%id_pd(pth_i)) = _FLUX_VAR_(data%id_pd(pth_i)) +          &
                                       ( ( light + mortality + predation)*pth_f)
-      ! Now the separate attached pathogen fraction
-      IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
+      ! Now the separate attached pesticide fraction
+      IF (data%pesticides(pth_i)%coef_sett_fa > zero_) THEN
          _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) +      &
                                       ( (growth - light/2. - mortality )*pth_a + attachment )
          _FLUX_VAR_(data%id_pd(pth_i)) = _FLUX_VAR_(data%id_pd(pth_i)) +      &
@@ -588,18 +586,18 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
          _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a)  ! orgs/m3/s
       ENDIF
    ENDDO
-END SUBROUTINE aed_calculate_pathogens
+END SUBROUTINE aed_calculate_pesticides
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_calculate_benthic_pathogens(data,column,layer_idx)
+SUBROUTINE aed_calculate_benthic_pesticides(data,column,layer_idx)
 !-------------------------------------------------------------------------------
-! Calculate pelagic sedimentation of pathogen.
+! Calculate pelagic sedimentation of pesticide.
 ! Everything in units per surface area (not volume!) per time.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_pathogens_data_t),INTENT(in) :: data
+   CLASS (aed_pesticides_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !
@@ -647,22 +645,22 @@ SUBROUTINE aed_calculate_benthic_pathogens(data,column,layer_idx)
       ! Dynamic sediment pool of organisms that increase and decrease
       sett_flux = zero_
 
-      DO pth_i=1,data%num_pathogens
+      DO pth_i=1,data%num_pesticides
          ! Retrieve current (local) state variable values.
-         pth_wat_free = _STATE_VAR_(data%id_pf(pth_i))     ! pathogen (benthic water - free)
-         IF (data%pathogens(pth_i)%coef_sett_fa>zero_) THEN
-            pth_wat_att  = _STATE_VAR_(data%id_pa(pth_i))  ! pathogen (benthic water - attached)
+         pth_wat_free = _STATE_VAR_(data%id_pf(pth_i))     ! pesticide (benthic water - free)
+         IF (data%pesticides(pth_i)%coef_sett_fa>zero_) THEN
+            pth_wat_att  = _STATE_VAR_(data%id_pa(pth_i))  ! pesticide (benthic water - attached)
          END IF
 
-         pth_sed = _STATE_VAR_S_(data%id_ps(pth_i)) ! pathogen (sediment pool)
+         pth_sed = _STATE_VAR_S_(data%id_ps(pth_i)) ! pesticide (sediment pool)
 
 
          ! Compute the resuspension flux from the sediment to water
-         resus_flux = zero_  !data%pathogens(pth_i)%w_p*MAX(pth,zero_)
+         resus_flux = zero_  !data%pesticides(pth_i)%w_p*MAX(pth,zero_)
 
          ! Compute the settling flux from the  water to sediment
-         sett_flux = data%pathogens(pth_i)%coef_sett_w_path * pth_wat_free
-         IF (data%pathogens(pth_i)%coef_sett_fa>zero_)  THEN
+         sett_flux = data%pesticides(pth_i)%coef_sett_w_path * pth_wat_free
+         IF (data%pesticides(pth_i)%coef_sett_fa>zero_)  THEN
             sett_flux = sett_flux + data%ss_set(1)  * pth_wat_att
          ENDIF
 
@@ -674,16 +672,16 @@ SUBROUTINE aed_calculate_benthic_pathogens(data,column,layer_idx)
 
          ! Add to respective pools in water (free/attached)
          _FLUX_VAR_(data%id_pf(pth_i)) = _FLUX_VAR_(data%id_pf(pth_i)) +      &
-                                                        (resus_flux)*(1.-data%pathogens(pth_i)%coef_sett_fa)
-         IF (data%pathogens(pth_i)%coef_sett_fa>zero_) THEN
+                                                        (resus_flux)*(1.-data%pesticides(pth_i)%coef_sett_fa)
+         IF (data%pesticides(pth_i)%coef_sett_fa>zero_) THEN
             _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) +      &
-                                                        (resus_flux)*data%pathogens(pth_i)%coef_sett_fa
+                                                        (resus_flux)*data%pesticides(pth_i)%coef_sett_fa
          ENDIF
       ENDDO
    ELSE
 
       ! Unresolved sediment pool of organisms, but we will still predict generic resuspension flux
-      DO pth_i=1,data%num_pathogens
+      DO pth_i=1,data%num_pesticides
 
          ! Compute the resuspension flux from the sediment to water
          IF ( data%resuspension > 0 ) THEN
@@ -693,12 +691,12 @@ SUBROUTINE aed_calculate_benthic_pathogens(data,column,layer_idx)
                resus_flux = data%epsilonP(pth_i) * ( bottom_stress - data%tauP_0(pth_i)) / data%tau_r(1)
 
               ! Add to respective pools in water (free/attached)
-              IF (bottom_stress > data%tau_0(1) .AND. data%pathogens(pth_i)%coef_sett_fa>zero_) THEN
+              IF (bottom_stress > data%tau_0(1) .AND. data%pesticides(pth_i)%coef_sett_fa>zero_) THEN
                 ! Attached and free organisms lifting in association with uplifted ss
                 _FLUX_VAR_(data%id_pf(pth_i)) = _FLUX_VAR_(data%id_pf(pth_i)) +      &
-                                                        (resus_flux)*(1.-data%pathogens(pth_i)%coef_sett_fa)
+                                                        (resus_flux)*(1.-data%pesticides(pth_i)%coef_sett_fa)
                 _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) +      &
-                                                        (resus_flux)*data%pathogens(pth_i)%coef_sett_fa
+                                                        (resus_flux)*data%pesticides(pth_i)%coef_sett_fa
               ELSE
                 ! Free organisms only (surfical organisms lifting before sediment uplift)
                 _FLUX_VAR_(data%id_pf(pth_i)) = _FLUX_VAR_(data%id_pf(pth_i)) + (resus_flux)
@@ -709,17 +707,17 @@ SUBROUTINE aed_calculate_benthic_pathogens(data,column,layer_idx)
       ENDDO
    ENDIF
 
-END SUBROUTINE aed_calculate_benthic_pathogens
+END SUBROUTINE aed_calculate_benthic_pesticides
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_mobility_pathogens(data,column,layer_idx,mobility)
+SUBROUTINE aed_mobility_pesticides(data,column,layer_idx,mobility)
 !-------------------------------------------------------------------------------
 ! Get the vertical movement values
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_pathogens_data_t),INTENT(in) :: data
+   CLASS (aed_pesticides_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    AED_REAL,INTENT(inout) :: mobility(:)
@@ -732,9 +730,9 @@ SUBROUTINE aed_mobility_pathogens(data,column,layer_idx,mobility)
 !BEGIN
    temp = _STATE_VAR_(data%id_tem)
 
-   ! First set velocity for free pathogen groups
-   DO pth_i=1,data%num_pathogens
-      mobility(data%id_pf(pth_i)) =  data%pathogens(pth_i)%coef_sett_w_path
+   ! First set velocity for free pesticide groups
+   DO pth_i=1,data%num_pesticides
+      mobility(data%id_pf(pth_i)) =  data%pesticides(pth_i)%coef_sett_w_path
    ENDDO
 
    ! Compute settling rate of particles
@@ -743,24 +741,24 @@ SUBROUTINE aed_mobility_pathogens(data,column,layer_idx,mobility)
       mobility(data%id_ss(ss_i)) = data%ss_set(ss_i)  !Stokes()
    ENDDO
 
-   ! Set velocity of attached pathogens, if simulated.
+   ! Set velocity of attached pesticides, if simulated.
    !##NB Currently attached all assume on SS1
-   DO pth_i=1,data%num_pathogens
-      IF (data%pathogens(pth_i)%coef_sett_fa>zero_)  THEN
+   DO pth_i=1,data%num_pesticides
+      IF (data%pesticides(pth_i)%coef_sett_fa>zero_)  THEN
          mobility(data%id_pa(pth_i)) =  data%ss_set(1)
       ENDIF
    ENDDO
-END SUBROUTINE aed_mobility_pathogens
+END SUBROUTINE aed_mobility_pesticides
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_light_extinction_pathogens(data,column,layer_idx,extinction)
+SUBROUTINE aed_light_extinction_pesticides(data,column,layer_idx,extinction)
 !-------------------------------------------------------------------------------
 ! Get the light extinction coefficient due to ss variables
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_pathogens_data_t),INTENT(in) :: data
+   CLASS (aed_pesticides_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    AED_REAL,INTENT(inout) :: extinction
@@ -779,8 +777,8 @@ SUBROUTINE aed_light_extinction_pathogens(data,column,layer_idx,extinction)
       ! m^-1 = (m^-1)/(g/m3) * (g/m3)
       extinction = extinction + (data%ss_ke(ss_i)*ss)
    ENDDO
-END SUBROUTINE aed_light_extinction_pathogens
+END SUBROUTINE aed_light_extinction_pesticides
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-END MODULE aed_pathogens
+END MODULE aed_pesticides

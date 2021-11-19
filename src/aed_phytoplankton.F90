@@ -87,7 +87,7 @@ MODULE aed_phytoplankton
 
       !# Model parameters
       INTEGER  :: num_phytos
-      TYPE(phyto_data),DIMENSION(:),ALLOCATABLE :: phytos
+      TYPE(phyto_data_t),DIMENSION(:),ALLOCATABLE :: phytos
       ! LOGICAL  :: do_exc,do_mort,do_upt, do_N2uptake
       LOGICAL  :: do_Puptake, do_Nuptake, do_Cuptake
       LOGICAL  :: do_Siuptake, do_DOuptake, do_N2uptake
@@ -111,9 +111,13 @@ MODULE aed_phytoplankton
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER  :: diag_level = 10
    AED_REAL :: dtlim = 0.9 * 3600
    LOGICAL  :: extra_diag = .false.
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -126,7 +130,7 @@ INTEGER FUNCTION load_csv(dbase,pd)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
-   TYPE(phyto_nml_data) :: pd(MAX_PHYTO_TYPES)
+   TYPE(phyto_param_t) :: pd(MAX_PHYTO_TYPES)
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol
@@ -232,8 +236,8 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
    INTEGER  :: i,tfil
    AED_REAL :: minNut
 
-   TYPE(phyto_nml_data) :: pd(MAX_PHYTO_TYPES)
-   NAMELIST /phyto_data/ pd
+   TYPE(phyto_param_t) :: pd(MAX_PHYTO_TYPES)
+   NAMELIST /phyto_data/ pd     ! %% type phyto_param_t - see aed_bio_utils
 !-------------------------------------------------------------------------------
 !BEGIN
     SELECT CASE (param_file_type(dbase))
@@ -257,7 +261,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
     ALLOCATE(data%id_ip(count)) ; data%id_ip(:) = 0
     ALLOCATE(data%id_rho(count)) ; data%id_rho(:) = 0
     ALLOCATE(data%id_NtoP(count)) ; data%id_NtoP(:) = 0
-    IF (extra_diag) THEN
+    IF ( diag_level >= 10 ) THEN
        ALLOCATE(data%id_fT(count)) ; data%id_fT(:) = 0
        ALLOCATE(data%id_fI(count)) ; data%id_fI(:) = 0
        ALLOCATE(data%id_fNit(count)) ; data%id_fNit(:) = 0
@@ -319,7 +323,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%K_Si         = pd(list(i))%K_Si
        data%phytos(i)%X_sicon      = pd(list(i))%X_sicon
 
-       data%phytos(i)%c1           = 0.0124/60.   ! From Chung et al (2014)
+       data%phytos(i)%c1           = 0.1240/60.   ! From Chung et al (2014)
        data%phytos(i)%c3           = 0.0230/60.   !  "
        data%phytos(i)%f1           = 0.675        ! Ross and Sharples (2007)
        data%phytos(i)%f2           = 0.750        !  "
@@ -389,7 +393,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
 
        ! Group specific diagnostic variables
        data%id_NtoP(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_NtoP','-', 'internal n:p ratio')
-       IF (extra_diag) THEN
+       IF ( diag_level >= 10 ) THEN
           data%id_fI(i)   = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fI', '-', 'fI (0-1)')
           data%id_fNit(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fNit', '-', 'fNit (0-1)')
           data%id_fPho(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fPho', '-', 'fPho (0-1)')
@@ -423,6 +427,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    INTEGER  :: status,i
 
 !  %% NAMELIST
+!  %% Last Checked 20/08/2021
    ! Default settings
    INTEGER            :: num_phytos = 0
    INTEGER            :: the_phytos(MAX_PHYTO_TYPES) = 0
@@ -456,13 +461,21 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    AED_REAL           :: theta_mpb_resp   = 1.05
    AED_REAL           :: min_rho = 900.
    AED_REAL           :: max_rho = 1200.
-   LOGICAL            :: extra_debug = .false.
    INTEGER            :: do_mpb = 0
    INTEGER            :: n_zones = 0
    AED_REAL           :: active_zones(1000) = 0
+
+!  From module globals
+   LOGICAL  :: extra_debug = .false.      !## Obsolete Use diag_level = 10
+!  LOGICAL  :: extra_diag = .false.      !## Obsolete Use diag_level = 10
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 !  %% END NAMELIST
 
-   NAMELIST /aed_phytoplankton/ num_phytos, the_phytos, settling,resuspension,&
+   NAMELIST /aed_phytoplankton/ num_phytos, the_phytos, settling, resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
                     n_excretion_target_variable,n_mortality_target_variable,   &
@@ -485,6 +498,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    IF (status /= 0) STOP 'Error reading namelist aed_phytoplankton'
    dtlim = zerolimitfudgefactor
    IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
+   IF ( extra_diag ) diag_level = 10
 
    ! Set module parameters
    data%min_rho = min_rho ; data%max_rho = max_rho
@@ -568,7 +582,8 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    IF (data%do_Puptake) THEN
    ! IF (data%npup>0) THEN ; data%id_Pupttarget(1) = aed_locate_variable(p1_uptake_target_variable); ifrp=1 ; ENDIF
    ! IF (data%npup>1) THEN ; data%id_Pupttarget(2) = aed_locate_variable(p2_uptake_target_variable); idop=2 ; ENDIF
-     IF (data%npup>0) data%id_Pupttarget(ifrp) = aed_locate_variable(p1_uptake_target_variable)  ! CAB ifrp and idop are now constants in bio_utils
+     !# CAB ifrp and idop are now constants in bio_utils
+     IF (data%npup>0) data%id_Pupttarget(ifrp) = aed_locate_variable(p1_uptake_target_variable)
      IF (data%npup>1) data%id_Pupttarget(idop) = aed_locate_variable(p2_uptake_target_variable)
    ENDIF
    data%nnup = 0
@@ -583,7 +598,8 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    ! IF (data%nnup>1) THEN ; data%id_Nupttarget(2) = aed_locate_variable( n2_uptake_target_variable); inh4=2 ; ENDIF
    ! IF (data%nnup>2) THEN ; data%id_Nupttarget(3) = aed_locate_variable( n3_uptake_target_variable); idon=3 ; ENDIF
    ! IF (data%nnup>3) THEN ; data%id_Nupttarget(4) = aed_locate_variable( n4_uptake_target_variable); in2 =4 ; ENDIF
-     IF (data%nnup>0) data%id_Nupttarget(ino3) = aed_locate_variable( n1_uptake_target_variable)  ! CAB ino3, inh4, idon and in2 are now constants in bio_utils
+     !# CAB ino3, inh4, idon and in2 are now constants in bio_utils
+     IF (data%nnup>0) data%id_Nupttarget(ino3) = aed_locate_variable( n1_uptake_target_variable)
      IF (data%nnup>1) data%id_Nupttarget(inh4) = aed_locate_variable( n2_uptake_target_variable)
      IF (data%nnup>2) data%id_Nupttarget(idon) = aed_locate_variable( n3_uptake_target_variable)
      IF (data%nnup>3) data%id_Nupttarget(in2)  = aed_locate_variable( n4_uptake_target_variable)
@@ -606,7 +622,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
 
    !-- resuspension link variable
    IF ( .NOT.resus_link .EQ. '' ) THEN
-      data%id_l_resus  = aed_locate_global_sheet(TRIM(resus_link))
+      data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link))
    ELSE
       data%id_l_resus = 0
       data%resuspension = 0.
@@ -615,17 +631,17 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    ! Register diagnostic variables
    data%id_GPP = aed_define_diag_variable('GPP','mmol/m**3/d',  'gross primary production')
    data%id_NCP = aed_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
-   IF (extra_diag) data%id_PPR = aed_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
-   IF (extra_diag) data%id_NPR = aed_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
+   IF ( diag_level >= 10 ) data%id_PPR = aed_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
+   IF ( diag_level >= 10 ) data%id_NPR = aed_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
 
    data%id_NUP = aed_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
    data%id_NUP2= aed_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
    data%id_PUP = aed_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
-   IF (extra_diag) data%id_dPAR = aed_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
+   IF ( diag_level >= 10 ) data%id_dPAR = aed_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
    data%id_TCHLA = aed_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
-   IF (extra_diag) data%id_TPHY = aed_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
+   IF ( diag_level >= 10 ) data%id_TPHY = aed_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
    data%id_TIN = aed_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
    data%id_TIP = aed_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
    IF(do_mpb>0) THEN
@@ -639,11 +655,11 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    data%id_tem = aed_locate_global('temperature')
    data%id_sal = aed_locate_global('salinity')
    data%id_par = aed_locate_global('par')
-   data%id_I_0 = aed_locate_global_sheet('par_sf')
+   data%id_I_0 = aed_locate_sheet_global('par_sf')
    data%id_dz = aed_locate_global('layer_ht')
    data%id_extc = aed_locate_global('extc_coef')
    data%id_dens = aed_locate_global('density')
-   data%id_sedzone = aed_locate_global_sheet('sed_zone')
+   data%id_sedzone = aed_locate_sheet_global('sed_zone')
 
 END SUBROUTINE aed_define_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -879,7 +895,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       ! Diagnostic info
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 
-      IF (extra_diag) THEN
+      IF ( diag_level >= 10 ) THEN
          _DIAG_VAR_(data%id_fT(phy_i))   =  fT
          _DIAG_VAR_(data%id_fI(phy_i))   =  fI
          _DIAG_VAR_(data%id_fNit(phy_i)) =  fNit
@@ -1085,16 +1101,16 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    ! Set diagnostic arrays for combined assemblage properties
    _DIAG_VAR_(data%id_GPP) =  sum(cuptake)*secs_per_day
    _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
-   IF (extra_diag) _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
-   IF (extra_diag) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
+   IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
+   IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
    _DIAG_VAR_(data%id_NUP) =  sum(nuptake(:,1))*secs_per_day
    _DIAG_VAR_(data%id_NUP2)=  sum(nuptake(:,2))*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
 
-   IF (extra_diag) _DIAG_VAR_(data%id_dPAR) =  par
+   IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_dPAR) =  par
    _DIAG_VAR_(data%id_TCHLA)=  tchla
-   IF (extra_diag) _DIAG_VAR_(data%id_TPHY) =  tphy
+   IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_TPHY) =  tphy
    _DIAG_VAR_(data%id_TIN)  =  tin
    _DIAG_VAR_(data%id_TIP)  =  tip
 
@@ -1279,7 +1295,7 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
       END SELECT
       ! set global mobility array
       mobility(data%id_p(phy_i)) = vvel
-      IF(extra_diag .AND. data%id_vvel(phy_i)>0) &
+      IF( diag_level >= 10  .AND. data%id_vvel(phy_i)>0) &
               _DIAG_VAR_(data%id_vvel(phy_i)) = vvel * secs_per_day
       ! set sedimentation flux (mmmol/m2) for later use/reporting
       _DIAG_VAR_(data%id_Psed_phy) =   &

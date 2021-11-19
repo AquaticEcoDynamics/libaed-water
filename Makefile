@@ -9,7 +9,7 @@
 #                                                                             #
 #      http://aquatic.science.uwa.edu.au/                                     #
 #                                                                             #
-#  Copyright 2013 - 2020 -  The University of Western Australia               #
+#  Copyright 2013 - 2021 -  The University of Western Australia               #
 #                                                                             #
 #   GLM is free software: you can redistribute it and/or modify               #
 #   it under the terms of the GNU General Public License as published by      #
@@ -45,19 +45,13 @@ endif
 
 INCLUDES=-I${incdir}
 
-ifeq ("$(HAVEPLUS)","true")
-  HAVEPLUS=-DHAVE_PLUS
-else
-  HAVEPLUS=
-endif
-
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OPT_FFLAGS=-O3
   FFLAGS=-fPIC -warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused $(DEFINES) $(INCLUDES)
   ifeq ($(WITH_CHECKS),true)
-    FFLAGS+=-check
+    FFLAGS+=-check all -check noarg_temp_created
   endif
   ifeq ($(SINGLE),true)
     FFLAGS+=-real-size 32
@@ -112,7 +106,7 @@ ifeq ($(SINGLE),true)
 endif
 
 
-FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS) $(HAVEPLUS)
+FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS)
 
 OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_util.o \
@@ -132,6 +126,7 @@ OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_organic_matter.o \
      ${objdir}/aed_oxygen.o \
      ${objdir}/aed_pathogens.o \
+     ${objdir}/aed_pesticides.o \
      ${objdir}/aed_phosphorus.o \
      ${objdir}/aed_phytoplankton.o \
      ${objdir}/aed_sedflux.o \
@@ -172,4 +167,4 @@ ${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed_core.F90 ${incdir}/aed.h
 
 ${objdir}/aed_external.o: ${srcdir}/aed_external.F90 ${objdir}/aed_core.o ${incdir}/aed.h
 	$(F90) $(FFLAGS) -DLIBDEF -g -c $< -o $@
-${objdir}/aed_water.o: ${srcdir}/aed_water.F90 ${srcdir}/aed_core.F90 ${objdir}/aed_external.o ${incdir}/aed.h
+${objdir}/aed_common.o: ${srcdir}/aed_common.F90 ${srcdir}/aed_core.F90 ${objdir}/aed_external.o ${incdir}/aed.h

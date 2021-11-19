@@ -51,7 +51,7 @@
 !
 MODULE aed_carbon
 !-------------------------------------------------------------------------------
-! aed_carbon --- carbon biogeochemical model
+! aed_carbon --- (inorganic) carbon biogeochemical model
 !
 ! The AED module carbon contains equations that describe exchange of
 ! dissolved inorganic carbon across the air/water interface and sediment flux,
@@ -70,27 +70,30 @@ MODULE aed_carbon
    TYPE,extends(aed_model_data_t) :: aed_carbon_data_t
       !# Variable identifiers
       INTEGER  :: id_dic, id_pH, id_ch4, id_oxy, id_talk, id_ch4_bub
-      INTEGER  :: id_Fsed_dic, id_Fsed_ch4
+      INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_ch4_ebb
       INTEGER  :: id_temp, id_salt
       INTEGER  :: id_wind, id_vel, id_depth
+      INTEGER  :: id_par, id_extc, id_dz, id_tau
       INTEGER  :: id_ch4ox, id_pco2
       INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb, id_sed_ch4_ebb_3d
       INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb, id_ch4_ebb_df
-      INTEGER  :: id_par, id_extc, id_dz, id_tau, id_Fsed_ch4_ebb
 
       !# Model parameters
       AED_REAL :: Fsed_dic, Ksed_dic, theta_sed_dic
-      AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4, Fsed_ch4_ebb, ch4_bub_tau0
-      AED_REAL :: Rch4ox, Kch4ox, vTch4ox, atm_co2, atm_ch4, ionic
-      AED_REAL :: maxMPBProdn, IkMPB
-      AED_REAL :: ch4_bub_aLL, ch4_bub_cLL, ch4_bub_kLL, ch4_bub_ws
+      AED_REAL :: Fsed_ch4, Ksed_ch4, theta_sed_ch4, Fsed_ch4_ebb
+      AED_REAL :: Rch4ox, Kch4ox, vTch4ox
+      AED_REAL :: atm_co2, atm_ch4, ionic
+      AED_REAL :: ch4_bub_aLL, ch4_bub_cLL, ch4_bub_kLL
       AED_REAL :: ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp
+      AED_REAL :: ch4_bub_tau0, ch4_bub_ws
+      AED_REAL :: maxMPBProdn, IkMPB
 
 
       !# Model options
       LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4, use_sed_model_ebb
       LOGICAL  :: simDIC, simCH4, simCH4ebb
-      INTEGER  :: alk_mode, co2_model, co2_piston_model, ch4_piston_model
+      INTEGER  :: alk_mode, co2_model, ebb_model
+      INTEGER  :: co2_piston_model, ch4_piston_model
 
      CONTAINS
          PROCEDURE :: define            => aed_define_carbon
@@ -98,13 +101,14 @@ MODULE aed_carbon
          PROCEDURE :: calculate         => aed_calculate_carbon
          PROCEDURE :: calculate_benthic => aed_calculate_benthic_carbon
          PROCEDURE :: equilibrate       => aed_equilibrate_carbon
-!        PROCEDURE :: mobility          => aed_mobility_carbon
-!        PROCEDURE :: light_extinction  => aed_light_extinction_carbon
-!        PROCEDURE :: delete            => aed_delete_carbon
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -117,7 +121,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_carbon_data_t),INTENT(inout) :: data
@@ -126,7 +130,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
 !LOCALS
    INTEGER           :: status
 
-!  %% NAMELIST VARS
+!  %% NAMELIST   %%  /aed_carbon/
+!  %% Last Checked 05/09/2021
    AED_REAL          :: dic_initial      = 1000.0
    AED_REAL          :: pH_initial       = 7.5
    AED_REAL          :: ch4_initial      = 4.5
@@ -145,20 +150,15 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: Kch4ox           = 0.01
    AED_REAL          :: vTch4ox          = 1.05
    CHARACTER(len=64) :: methane_reactant_variable=''
-!  CHARACTER(len=64) :: carbon_pco2_link = 'CAR_pCO2'  ! added by PHuang
-!                                                      ! removed by CAB because it's not used
-
-   AED_REAL          :: maxMPBProdn      =  40.0   ! mmolC/m2/day
-   AED_REAL          :: IkMPB            = 180.0   ! Light sensitivity of MPB
 
    INTEGER           :: co2_model        = 1
    INTEGER           :: alk_mode         = 1
+   INTEGER           :: ebb_model        = 0
    INTEGER           :: co2_piston_model = 1
    INTEGER           :: ch4_piston_model = 1
 
    LOGICAL           :: simCH4ebb
    AED_REAL          :: Fsed_ch4_ebb     = zero_
-   AED_REAL          :: ch4_bub_tau0     = one_
    CHARACTER(len=64) :: Fsed_ebb_variable=''
    AED_REAL          :: ch4_bub_aLL      = 42.9512677
    AED_REAL          :: ch4_bub_cLL      = 0.634
@@ -166,23 +166,35 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: ch4_bub_disf1    = 0.07
    AED_REAL          :: ch4_bub_disf2    = 0.33
    AED_REAL          :: ch4_bub_disdp    = 20.0
+
    AED_REAL          :: ch4_bub_ws       = zero_
+   AED_REAL          :: ch4_bub_tau0     = one_
+   AED_REAL          :: maxMPBProdn      =  40.0   ! mmolC/m2/day
+   AED_REAL          :: IkMPB            = 180.0   ! Light sensitivity of MPB
 
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
 
-!  %% END NAMELIST VARS
+!  %% END NAMELIST   %%  /aed_carbon/
 
-   NAMELIST /aed_carbon/ dic_initial,pH_initial,ch4_initial,ionic,         &
+   NAMELIST /aed_carbon/ dic_initial,pH_initial,ch4_initial,                &
+                         ionic,Rch4ox,Kch4ox,vTch4ox,                       &
+                         methane_reactant_variable,                         &
                          Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable, &
                          Fsed_ch4,Ksed_ch4,theta_sed_ch4,Fsed_ch4_variable, &
-                         atm_co2,atm_ch4,Rch4ox,Kch4ox,vTch4ox,             &
-                         methane_reactant_variable,                         &
-                         maxMPBProdn, IkMPB,                                &
-                         co2_model, alk_mode,                               &
+                         atm_co2,atm_ch4,                                   &
                          co2_piston_model, ch4_piston_model,                &
-                         simCH4ebb, Fsed_ch4_ebb, Fsed_ebb_variable,        &
+                         co2_model, alk_mode, ebb_model,                    &
+                         Fsed_ch4_ebb, Fsed_ebb_variable,                   &
                          ch4_bub_aLL,ch4_bub_cLL, ch4_bub_kLL,              &
                          ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp,       &
-                         ch4_bub_ws, ch4_bub_tau0
+                         ch4_bub_ws, ch4_bub_tau0,                          &
+                         maxMPBProdn, IkMPB,                                &
+                         diag_level
 
 
 !-------------------------------------------------------------------------------
@@ -190,9 +202,10 @@ SUBROUTINE aed_define_carbon(data, namlst)
    print *,"        aed_carbon initialization"
 
    !# Set defaults
-   data%simCH4ebb     = .false.
    data%simDIC        = .false.
    data%simCH4        = .false.
+   data%simCH4ebb     = .false.
+   IF (ebb_model>0) data%simCH4ebb = .true.
 
    !# Read the namelist
    read(namlst,nml=aed_carbon,iostat=status)
@@ -201,9 +214,9 @@ SUBROUTINE aed_define_carbon(data, namlst)
       STOP
    ENDIF
 
-   !# Store parameter values in our own derived type
-   !  NB: all rates must be provided in values per day,
-   !  and are converted here to values per second.
+   !# Store parameter values in modules own derived type
+   !  Note: rates are provided in values per day, and
+   !        are converted here to values per second.
    data%Fsed_dic         = Fsed_dic/secs_per_day
    data%Ksed_dic         = Ksed_dic
    data%theta_sed_dic    = theta_sed_dic
@@ -221,25 +234,26 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%vTch4ox          = vTch4ox
    data%atm_ch4          = atm_ch4
    data%ch4_piston_model = ch4_piston_model
-   data%simCH4ebb        = simCH4ebb
+   data%ebb_model        = ebb_model
    data%Fsed_ch4_ebb     = Fsed_ch4_ebb
-   data%ch4_bub_tau0     = ch4_bub_tau0
    data%ch4_bub_aLL      = ch4_bub_aLL
    data%ch4_bub_cLL      = ch4_bub_cLL
    data%ch4_bub_kLL      = ch4_bub_kLL
    data%ch4_bub_disf1    = ch4_bub_disf1
    data%ch4_bub_disf2    = ch4_bub_disf2
    data%ch4_bub_disdp    = ch4_bub_disdp
-   data%ch4_bub_ws       = ch4_bub_ws
 
-   data%maxMPBProdn      = maxMPBProdn
-   data%IkMPB            = IkMPB
+   data%ch4_bub_ws       = ch4_bub_ws    !unused
+   data%ch4_bub_tau0     = ch4_bub_tau0  !unused
+   data%maxMPBProdn      = maxMPBProdn   !unused
+   data%IkMPB            = IkMPB         !unused
+
 
    !# Register state variables
    IF (dic_initial>MISVAL) THEN
+      data%simDIC = .true.
       data%id_dic = aed_define_variable('dic','mmol/m**3','dissolved inorganic carbon', &
                                        dic_initial,minimum=zero_)
-      data%simDIC = .true.
       data%id_pH = aed_define_variable('pH','-','pH',     &
                                        pH_initial,minimum=zero_)
    ENDIF
@@ -255,47 +269,47 @@ SUBROUTINE aed_define_carbon(data, namlst)
    ENDIF
 
    !# Register external state variable dependencies
-   data%use_oxy = methane_reactant_variable .NE. '' !This means oxygen module switched on
+   data%use_oxy = methane_reactant_variable .NE. '' !i.e., oxygen module engaged
    IF (data%use_oxy) THEN
       data%id_oxy = aed_locate_variable(methane_reactant_variable)
    ENDIF
 
    data%use_sed_model_dic = Fsed_dic_variable .NE. ''
    IF (data%use_sed_model_dic) &
-      data%id_Fsed_dic = aed_locate_global_sheet(Fsed_dic_variable)
+      data%id_Fsed_dic = aed_locate_sheet_variable(Fsed_dic_variable)
 
    data%use_sed_model_ch4 = Fsed_ch4_variable .NE. ''
    IF (data%use_sed_model_ch4) &
-      data%id_Fsed_ch4 = aed_locate_global_sheet(Fsed_ch4_variable)
+      data%id_Fsed_ch4 = aed_locate_sheet_variable(Fsed_ch4_variable)
 
    data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''
    IF (data%use_sed_model_ebb) &
-      data%id_Fsed_ch4_ebb = aed_locate_global_sheet(Fsed_ebb_variable)
+      data%id_Fsed_ch4_ebb = aed_locate_sheet_variable(Fsed_ebb_variable)
 
    !# Register diagnostic variables
    data%id_pco2 = aed_define_diag_variable('pCO2','atm', 'pCO2')
-
-   data%id_sed_dic = aed_define_sheet_diag_variable('sed_dic','mmol/m**2/d', &
+   IF (diag_level>0) THEN
+     data%id_sed_dic = aed_define_sheet_diag_variable('sed_dic','mmol/m**2/d', &
                             'CO2 exchange across sed/water interface')
-
-   data%id_atm_co2 = aed_define_sheet_diag_variable('atm_co2_flux',          &
+     data%id_atm_co2 = aed_define_sheet_diag_variable('atm_co2_flux',          &
                             'mmol/m**2/d', 'CO2 exchange across atm/water interface')
 
-   IF( data%simCH4 ) THEN
-     data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol/m**3/d', 'methane oxidation rate')
-     data%id_sed_ch4 = aed_define_sheet_diag_variable('sed_ch4','mmol/m**2/d', &
+     IF( data%simCH4 ) THEN
+       data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol/m**3/d', 'methane oxidation rate')
+       data%id_sed_ch4 = aed_define_sheet_diag_variable('sed_ch4','mmol/m**2/d', &
                             'CH4 exchange across sed/water interface')
-     data%id_atm_ch4 = aed_define_sheet_diag_variable('atm_ch4_flux',        &
+       data%id_atm_ch4 = aed_define_sheet_diag_variable('atm_ch4_flux',        &
                             'mmol/m**2/d', 'CH4 exchange across atm/water interface')
-     IF( data%simCH4ebb ) THEN
-       data%id_sed_ch4_ebb_3d = aed_define_diag_variable('sed_ch4_ebb_3d','mmol/m**3/d', &
+       IF( data%simCH4ebb ) THEN
+         data%id_sed_ch4_ebb_3d = aed_define_diag_variable('sed_ch4_ebb_3d','mmol/m**3/d', &
                             'CH4 ebullition release rate')
-       data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_df','mmol/m**3/d', &
+         data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_df','mmol/m**3/d', &
                             'CH4 bubble dissolution rate')
-       data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
+         data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
                             'CH4 ebullition across sed/water interface')
-       data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('atm_ch4_ebb_flux', &
+         data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('atm_ch4_ebb_flux', &
                             'mmol/m**2/d', 'CH4 ebullition across atm/water interface')
+       ENDIF
      ENDIF
    ENDIF
 
@@ -308,8 +322,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%id_vel  = aed_locate_global('cell_vel')           ! needed for k600
    data%id_depth= aed_locate_global('depth')
 !  data%id_depth= aed_locate_global('layer_ht')
-   data%id_wind = aed_locate_global_sheet('wind_speed')
-   IF( data%simCH4ebb ) data%id_tau  = aed_locate_global_sheet('taub')
+   data%id_wind = aed_locate_sheet_global('wind_speed')
+   IF( data%simCH4ebb ) data%id_tau  = aed_locate_sheet_global('taub')
 
 END SUBROUTINE aed_define_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -341,7 +355,7 @@ SUBROUTINE aed_calculate_carbon(data,column,layer_idx)
       IF (data%use_oxy) THEN
          oxy = _STATE_VAR_(data%id_oxy) ! O2
       ELSE
-         oxy = 0.0
+         oxy = zero_
       ENDIF
 
       !# Retrieve current environmental conditions.
@@ -354,13 +368,13 @@ SUBROUTINE aed_calculate_carbon(data,column,layer_idx)
       _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (ch4*ch4oxidation)
       _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (-ch4*ch4oxidation)
 
-      !# If a linked oxygen pool is present, take oxidation from it
+      !# If a linked oxygen pool is present, take oxidation from it assume 1:1 stoichometry
       IF (data%use_oxy) THEN
-         _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (-(32./12.)*ch4*ch4oxidation)
+         _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) - ch4*ch4oxidation  ! *(32./12.) not mass
       ENDIF
 
       !# Export diagnostic variables
-      _DIAG_VAR_(data%id_ch4ox) =  ch4*ch4oxidation*secs_per_day
+      IF (diag_level>0) _DIAG_VAR_(data%id_ch4ox) =  ch4*ch4oxidation*secs_per_day
    ENDIF
 
 END SUBROUTINE aed_calculate_carbon
@@ -387,7 +401,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    ! Temporary variables
 
    AED_REAL :: pCO2 = 0.,FCO2,FCH4,henry
-   AED_REAL :: Ko,kCH4,KCO2, CH4solub
+   AED_REAL :: Ko, kCH4, KCO2, CH4solub
    AED_REAL :: Tabs,windHt,atm
    AED_REAL :: A1,A2,A3,A4,B1,B2,B3,logC
    AED_REAL :: a,b,c,dcf
@@ -402,6 +416,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 !BEGIN
 
    IF(.NOT.data%simDIC .AND. .NOT.data%simCH4) RETURN
+
+   Ko = 0.
 
    !----------------------------------------------------------------------------
    !# Get dependent state variables from physical driver
@@ -430,17 +446,20 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
      IF ( data%co2_model == 1 ) THEN
        !# Use the CO2SYS code for computing pCO2 & pH
-
        S=salt; T=temp
+       a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
+       b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
+       c    =  4.8314d-4
        dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
                 - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
-       TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
+       TCO2 = dic / (1.0D6*dcf) ! change unit to mol/kgSW
 
        IF( data%alk_mode == 0 ) THEN
          ! Freshwater system - carbonate alkalinity assumed
          pH = pHin
          deltapH = 5.
          ! As carbonate alkalinity depends on H+, lets iterate
+         iter = 0
          DO WHILE (abs(deltapH) > 1e-10)
            ! Use CO2SYS to estimate TA, from past pH
            CALL CO2SYS(1,T,S,zero_,tadum,TCO2,pH,pHdum,co2dum,talk)
@@ -537,12 +556,11 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
      kCO2 = aed_gas_piston_velocity(windHt,wind,temp,salt,                     &
          vel=vel,depth=depth,schmidt_model=2,piston_model=data%co2_piston_model)
 
-
      !# Now compute the CO2 flux
-     ! FCO2 = kCO2 * Ko * (pCO2 - PCO2a)
-     ! pCO2a = 367e-6 atm (Keeling & Wharf, 1999)
-     ! mmol/m2/s = m/s * mmol/m3/atm * atm
-     ! FCO2 = - kCO2 * Ko*1e6 * ((pCO2 * 1e-6) - data%atm_co2) ! dCO2/dt
+     !  FCO2 = kCO2 * Ko * (pCO2 - PCO2a)
+     !  pCO2a = 367e-6 atm (Keeling & Wharf, 1999)
+     !  mmol/m2/s = m/s * mmol/m3/atm * atm
+     !  FCO2 = - kCO2 * Ko*1e6 * ((pCO2 * 1e-6) - data%atm_co2) ! dCO2/dt
      FCO2 = kCO2 * (1e6*Ko) * (pCO2 - data%atm_co2)
 
      !--------------------------------------------------------------------------
@@ -551,7 +569,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
      !# Also store co2 flux across the atm/water interface as a
      !  diagnostic variable (mmmol/m2/d)
-     _DIAG_VAR_S_(data%id_atm_co2) = FCO2*secs_per_day
+     IF (diag_level>0) _DIAG_VAR_S_(data%id_atm_co2) = FCO2*secs_per_day
 
    END IF
 
@@ -569,7 +587,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
          vel=vel,depth=depth,schmidt_model=4,piston_model=data%ch4_piston_model)
 
      ! Solubility, Ko (mol/L/atm)
-     atm = data%atm_ch4    ! 1.76 * 1e-6 !## current atmospheric CH4 data from NOAA (in ppm? atm)
+     atm = data%atm_ch4   ! 1.76 e-6 !## recent atmospheric CH4 from NOAA (in atm)
 
      A1 = -415.2807
      A2 =  596.8104
@@ -594,7 +612,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
      !# Also store CH4 flux across the atm/water interface as
      !  diagnostic variable (mmmol/m2/d)
-     _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
+     IF (diag_level>0) _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
 
    END IF
    !----------------------------------------------------------------------------
@@ -687,31 +705,36 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    ! Set bottom fluxes for the pelagic (flux per surface area, per second)
    ! Increment sediment flux value into derivative of water column variable
    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
-   IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
+   IF( data%simCH4 .and. diag_level>0) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
    ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day)
-   _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
-   IF( data%simCH4) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
+   IF ( diag_level > 0 ) THEN
+      _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
+      IF( data%simCH4) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
+   ENDIF
 
    ! Re-distribute bubbles to the water or atmosphere, or dissolve
    IF( data%simCH4ebb ) THEN
-     ! Add bubbles to layer
+      ! Add bubbles to layer
       !_FLUX_VAR_(data%id_ch4_bub) = _FLUX_VAR_(data%id_ch4_bub) + (ebb_flux)
 
       ! Dissolve bubbles in this bottom layer, depending on depth
       ch4_bub_disf = data%ch4_bub_disf1
       IF( depth > data%ch4_bub_disdp) ch4_bub_disf = data%ch4_bub_disf2
       IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*ch4_bub_disf
-      _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*ch4_bub_disf * secs_per_day !/ dz. MH Something wrong with dz here?
 
-     ! Release the remainder to the atmosphere (mmol/m2/day)
-      _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
+      IF (diag_level>0) THEN
+         _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*ch4_bub_disf * secs_per_day !/ dz. MH Something wrong with dz here?
 
-     ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
-      _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+         ! Release the remainder to the atmosphere (mmol/m2/day)
+         _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
 
-      ! Note the bubble flux, as the water sees it  (mmol/m3/day)
-      _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
+         ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
+         _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+
+         ! Note the bubble flux, as the water sees it  (mmol/m3/day)
+         _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
+      ENDIF
     ENDIF
 
 
@@ -758,11 +781,17 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
     temp = _STATE_VAR_(data%id_temp) ! Temperature
     pHin = _STATE_VAR_(data%id_pH)   ! pH (from previous time-step)
 
+    pH = pHin
 
     IF ( data%co2_model == 1 ) THEN
-      !# Use the CO2SYS code for computing pCO2 & pH
 
       S=salt; T=temp
+
+      !# Use the CO2SYS code for computing pCO2 & pH
+      a    =  8.24493d-1 - 4.0899d-3*T + 7.6438d-5*T**2 - 8.2467d-7*T**3 + 5.3875d-9*T**4
+      b    = -5.72466d-3 + 1.0227d-4*T - 1.6546d-6*T**2
+      c    =  4.8314d-4
+
       dcf  = (999.842594 + 6.793952d-2*T- 9.095290d-3*T**2 + 1.001685d-4*T**3 &
                - 1.120083d-6*T**4 + 6.536332d-9*T**5+a*S+b*S**1.5+c*S**2)/1.0D3
       TCO2  = dic / (1.0D6*dcf) ! change unit to mol/kgSW
@@ -773,6 +802,7 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
         pH = pHin
         deltapH = 5.
         ! As carbonate alkalinity depends on H+, lets iterate
+        iter = 0
         DO WHILE (abs(deltapH) > 1e-10)
           ! Use CO2SYS to estimate TA, from past pH
           CALL CO2SYS(1,T,S,zero_,tadum,TCO2,pH,pHdum,co2dum,talk)

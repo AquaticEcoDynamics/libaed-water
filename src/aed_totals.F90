@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -90,7 +90,11 @@ MODULE aed_totals
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -114,31 +118,38 @@ SUBROUTINE aed_define_totals(data, namlst)
    INTEGER :: status
    INTEGER :: i, num_tn,num_tkn,num_tp,num_toc,num_tss,num_turb,num_tfe,num_tal
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_totals/
+!  %% Last Checked 20/08/2021
    CHARACTER(len=40) :: tn_vars(100)       = ''
-   CHARACTER(len=40) :: tkn_vars(100)      = ''
-   CHARACTER(len=40) :: tp_vars(100)       = ''
-   CHARACTER(len=40) :: toc_vars(100)      = ''
-   CHARACTER(len=40) :: tss_vars(100)      = ''
-   CHARACTER(len=40) :: turb_vars(100)     = ''
-   CHARACTER(len=40) :: tfe_vars(10)       = ''
-   CHARACTER(len=40) :: tal_vars(10)       = ''
    AED_REAL          :: tn_varscale(100)   = 1.0
+   CHARACTER(len=40) :: tkn_vars(100)      = ''
    AED_REAL          :: tkn_varscale(100)  = 1.0
+   CHARACTER(len=40) :: tp_vars(100)       = ''
    AED_REAL          :: tp_varscale(100)   = 1.0
+   CHARACTER(len=40) :: toc_vars(100)      = ''
    AED_REAL          :: toc_varscale(100)  = 1.0
+   CHARACTER(len=40) :: tss_vars(100)      = ''
    AED_REAL          :: tss_varscale(100)  = 1.0
+   CHARACTER(len=40) :: turb_vars(100)     = ''
    AED_REAL          :: turb_varscale(100) = 1.0
+   CHARACTER(len=40) :: tfe_vars(10)       = ''
    AED_REAL          :: tfe_varscale(10)   = 1.0
+   CHARACTER(len=40) :: tal_vars(10)       = ''
    AED_REAL          :: tal_varscale(10)   = 1.0
    LOGICAL           :: outputLight        = .FALSE.
-!  %% END NAMELIST
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_totals/
 
    NAMELIST /aed_totals/ tn_vars,  tn_varscale,  tkn_vars,  tkn_varscale,  &
-                          tp_vars,  tp_varscale,  toc_vars, toc_varscale,   &
-                          tss_vars, tss_varscale, turb_vars, turb_varscale, &
-                          tfe_vars, tfe_varscale, tal_vars, tal_varscale,   &
-                          outputLight
+                         tp_vars,  tp_varscale,  toc_vars, toc_varscale,   &
+                         tss_vars, tss_varscale, turb_vars, turb_varscale, &
+                         tfe_vars, tfe_varscale, tal_vars, tal_varscale,   &
+                         outputLight
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -273,7 +284,7 @@ SUBROUTINE aed_define_totals(data, namlst)
      data%id_totals_light = aed_define_diag_variable('light',         &
                      'W/m2', 'Shortwave light flux')
 
-     data%id_totals_par = aed_define_diag_variable('par',             &
+     data%id_totals_par = aed_define_diag_variable('par',            &
                      'W/m2', 'Photosynthetically active light flux')
 
      data%id_totals_uv = aed_define_diag_variable('uv',               &

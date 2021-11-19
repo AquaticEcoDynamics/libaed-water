@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -95,7 +95,11 @@ MODULE aed_tracer
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -118,7 +122,8 @@ SUBROUTINE aed_define_tracer(data, namlst)
    INTEGER  :: status,i
    CHARACTER(4) :: trac_name
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_tracer/
+!  %% Last Checked 20/08/2021
    INTEGER           :: num_tracers
    LOGICAL           :: retention_time = .FALSE.
    INTEGER           :: resuspension   = 0
@@ -136,7 +141,13 @@ SUBROUTINE aed_define_tracer(data, namlst)
    AED_REAL          :: tau_0(100)     = 0.04
    AED_REAL          :: fs(100)        = 1.0
    CHARACTER(len=64) :: macrophyte_link_var = ''
-!  %% END NAMELIST
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_tracer/
 
    NAMELIST /aed_tracer/ num_tracers, decay, Fsed, Ke_ss, &
                           settling, w_ss, rho_ss, d_ss, &
@@ -147,19 +158,6 @@ SUBROUTINE aed_define_tracer(data, namlst)
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_tracer initialization"
-
-   ! set default parameter values
-   decay = zero_
-   Fsed = zero_
-   Ke_ss = 0.02
-   w_ss = zero_
-   d_ss = 1e-6
-   rho_ss = 1.6e3
-   epsilon = 0.02
-   tau_r = 1.0
-   tau_0 = 0.04
-   kTau_0 = 1.0
-   fs = 1.0
 
    ! Read the namelist
    read(namlst,nml=aed_tracer,iostat=status)
@@ -237,8 +235,8 @@ SUBROUTINE aed_define_tracer(data, namlst)
       data%id_rho = aed_locate_global('density')
    ENDIF
    IF ( resuspension > 0 ) THEN
-      data%id_taub = aed_locate_global_sheet('taub')
-      data%id_E_sedzone = aed_locate_global_sheet('sed_zone')
+      data%id_taub = aed_locate_sheet_global('taub')
+      data%id_E_sedzone = aed_locate_sheet_global('material')
       data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
       data%id_resus =  aed_define_sheet_diag_variable('resus','g/m**2/s', 'resuspension rate')
    ENDIF

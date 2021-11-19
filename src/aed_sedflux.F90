@@ -88,16 +88,20 @@ MODULE aed_sedflux
                   Fsed_ch4_ebb_P
 
      CONTAINS
-         PROCEDURE :: define            => aed_define_sedflux
-         PROCEDURE :: initialize        => aed_initialize_sedflux
-         PROCEDURE :: calculate_benthic => aed_calculate_benthic_sedflux
-!        PROCEDURE :: mobility          => aed_mobility_sedflux
-!        PROCEDURE :: light_extinction  => aed_light_extinction_sedflux
-!        PROCEDURE :: delete            => aed_delete_sedflux
+         PROCEDURE :: define             => aed_define_sedflux
+         PROCEDURE :: initialize_benthic => aed_initialize_benthic_sedflux
+         PROCEDURE :: calculate_benthic  => aed_calculate_benthic_sedflux
+!        PROCEDURE :: mobility           => aed_mobility_sedflux
+!        PROCEDURE :: light_extinction   => aed_light_extinction_sedflux
+!        PROCEDURE :: delete             => aed_delete_sedflux
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -113,7 +117,8 @@ SUBROUTINE load_sed_zone_data(data,namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_sed_const2d/
+!  %% Last Checked 20/08/2021
    INTEGER  :: n_zones=0                       !% number of sediment zones active in the domain
                                                !% -
                                                !% integer
@@ -216,7 +221,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_sed_const2d/
 
    NAMELIST /aed_sed_const2d/ n_zones, &
                               Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,&
@@ -317,13 +322,13 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 !LOCALS
    INTEGER  :: status
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_sedflux/
    CHARACTER(len=64) :: sedflux_model=''
-!  %% END NAMELIST
+!  %% END NAMELIST   %%  /aed_sedflux/
 
    NAMELIST /aed_sedflux/ sedflux_model
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_sed_constant/
    INTEGER  :: nzones = 1
    AED_REAL :: Fsed_oxy  = MISVAL
    AED_REAL :: Fsed_rsi  = MISVAL
@@ -341,7 +346,13 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Fsed_ch4_ebb  = MISVAL
    AED_REAL :: Fsed_feii = MISVAL
    AED_REAL :: Fsed_n2o  = MISVAL
-!  %% END NAMELIST
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_sed_constant/
 
    NAMELIST /aed_sed_constant/ nzones,                                          &
                             Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,   &
@@ -389,7 +400,6 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    ELSEIF ( sedflux_model .EQ. "dynamic" ) THEN
       data%sed_modl = SED_DYNAMIC
 
-!     data%id_zones = aed_locate_global_sheet('sed_zone')
       data%Fsed_oxy = 10. / secs_per_day
    ELSEIF ( sedflux_model .EQ. "constant2d" .OR. sedflux_model .EQ. "dynamic2d" ) THEN
       IF ( sedflux_model .EQ. "constant2d" ) THEN
@@ -398,7 +408,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
          data%sed_modl = SED_DYNAMIC_2D
       ENDIF
 
-      data%id_zones = aed_locate_global_sheet('sed_zone')
+      data%id_zones = aed_locate_sheet_global('sed_zone')
 
       CALL load_sed_zone_data(data,namlst)
       IF (ALLOCATED(data%Fsed_oxy_P))  Fsed_oxy  = data%Fsed_oxy_P(1)
@@ -441,7 +451,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
-   IF ( data%Fsed_oxy .GT. MISVAL ) &
+   IF ( Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol/m**2',   &
                                           'flux rate of oxygen across the swi')
    IF ( Fsed_rsi .GT. MISVAL ) &
@@ -490,6 +500,25 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
                                           'flux rate of feii across the swi')
 
+   IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
+      CALL aed_set_const_var(data%id_Fsed_oxy)
+      CALL aed_set_const_var(data%id_Fsed_rsi)
+      CALL aed_set_const_var(data%id_Fsed_amm)
+      CALL aed_set_const_var(data%id_Fsed_nit)
+      CALL aed_set_const_var(data%id_Fsed_n2o)
+      CALL aed_set_const_var(data%id_Fsed_frp)
+      CALL aed_set_const_var(data%id_Fsed_pon)
+      CALL aed_set_const_var(data%id_Fsed_don)
+      CALL aed_set_const_var(data%id_Fsed_pop)
+      CALL aed_set_const_var(data%id_Fsed_dop)
+      CALL aed_set_const_var(data%id_Fsed_poc)
+      CALL aed_set_const_var(data%id_Fsed_dic)
+      CALL aed_set_const_var(data%id_Fsed_dic)
+      CALL aed_set_const_var(data%id_Fsed_ch4)
+      CALL aed_set_const_var(data%id_Fsed_ch4_ebb)
+      CALL aed_set_const_var(data%id_Fsed_feii)
+   ENDIF
+
    !data%id_Fsed_oxy_pel = aed_define_diag_variable('Fsed_oxy_pel','mmol/m**2',&
    !                                          'sedimentation rate of oxygen')
 
@@ -499,7 +528,7 @@ END SUBROUTINE aed_define_sedflux
 
 
 !###############################################################################
-SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
+SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 ! Routine to set initial state of SEDFLUX variables                            !
 !-------------------------------------------------------------------------------
@@ -509,7 +538,6 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL :: Rzone
    INTEGER  :: zone
    ! Temporary variables
    AED_REAL :: Fsed_oxy = 0., Fsed_rsi = 0.
@@ -549,8 +577,7 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
        !# select the material zone for this cell
        !# set sediment values accordingly
        !# This sets the value to the values in &aed_sed_const2d
-       Rzone = _STATE_VAR_S_(data%id_zones)
-       zone = INT(Rzone)
+       zone = INT(_STATE_VAR_S_(data%id_zones))
 
        IF ( zone .LE. 0 .OR. zone .GT. data%n_zones ) zone = 1
 
@@ -589,7 +616,7 @@ SUBROUTINE aed_initialize_sedflux(data, column, layer_idx)
    IF ( data%id_Fsed_ch4  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4)  = Fsed_ch4
    IF ( data%id_Fsed_feii > 0 ) _DIAG_VAR_S_(data%id_Fsed_feii) = Fsed_feii
    IF ( data%id_Fsed_ch4_ebb  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_ebb)  = Fsed_ch4_ebb
-END SUBROUTINE aed_initialize_sedflux
+END SUBROUTINE aed_initialize_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -602,13 +629,18 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
    CLASS (aed_sedflux_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
+!LOCALS
+!   INTEGER :: zone
 !
 !-------------------------------------------------------------------------------
 !
    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
-      CALL aed_initialize_sedflux(data, column, layer_idx)
+      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
+
+!zone = INT(_STATE_VAR_S_(data%id_zones))
 
    !_DIAG_VAR_(data%id_Fsed_oxy_pel) =   _DIAG_VAR_S_(data%id_Fsed_oxy)* secs_per_day
+!print*,"sedflux oxy in zone ",zone," := ", _DIAG_VAR_S_(data%id_Fsed_oxy)
 END SUBROUTINE aed_calculate_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

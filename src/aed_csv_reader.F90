@@ -13,7 +13,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2020 -  The University of Western Australia               #
+!#  Copyright 2013 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -316,7 +316,7 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
    IF (quot .NE. CNUL) THEN
       !* looking for an end of quote
       s1=s1+1
-      e1=s1+1
+      e1=s1
       DO WHILE((e1 .LE. aedr%buf_len) .AND. (aedr%buf(e1:e1) .NE. quot))
          e1=e1+1
       ENDDO
@@ -448,7 +448,7 @@ FUNCTION extract_string(sym) RESULT(str)
     TYPE(AED_SYMBOL)  :: sym
 
 !LOCALS
-    CHARACTER(len=5)  :: str
+    CHARACTER(len=20) :: str
     INTEGER           :: i
 !
 !-------------------------------------------------------------------------------
@@ -588,17 +588,12 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
 
          values(i) = sym
          NULLIFY(sym%sym)
-!print*,"values(",i,") = '",values(i)%sym,"'"
       ENDIF
    ENDDO
    IF ( i > 0 .AND. i /= ncols ) &
       print *, "data row had ", i, " columns : expecting ", ncols
 
    aed_csv_read_row = (i > 0)
-
-!DO i=1,ncols
-!print*,"values(",i,") = '",values(i)%sym,"'"
-!ENDDO
 END FUNCTION aed_csv_read_row
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -614,9 +609,9 @@ LOGICAL FUNCTION aed_csv_close(unit)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   aed_csv_close = .FALSE.
    aedr => units(unit)%p
-   aed_csv_close = end_parse(aedr)
-   DEALLOCATE(aedr)
+   IF (ASSOCIATED(aedr)) aed_csv_close = end_parse(aedr)
    NULLIFY(aedr)
    units(unit)%p => aedr
 END FUNCTION aed_csv_close

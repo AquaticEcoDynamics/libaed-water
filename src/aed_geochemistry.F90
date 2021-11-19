@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2020 -  The University of Western Australia               #
+!#  Copyright 2012 - 2021 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -101,7 +101,11 @@ MODULE aed_geochemistry
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -126,31 +130,43 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
 !
 !LOCALS
    INTEGER           :: status, i
+
+!  %% NAMELIST   %%  /aed_geochemistry/
+!  %% Last Checked 20/08/2021
    INTEGER           :: speciation_dt
    INTEGER           :: num_components,num_minerals
    INTEGER           :: nDissTransportables, nPartTransportables
    LOGICAL           :: simEq = .TRUE.
    AED_REAL          :: min
-   AED_REAL          :: dis_initial(MAX_GC_COMPONENTS)
+   AED_REAL          :: dis_initial(MAX_GC_COMPONENTS) = 0.0
    AED_REAL          :: Fsed_gch(MAX_GC_COMPONENTS)
    AED_REAL          :: Ksed_gch_o2(MAX_GC_COMPONENTS)
    AED_REAL          :: Ksed_gch_pH(MAX_GC_COMPONENTS)
-   AED_REAL          :: min_initial(MAX_GC_MINERALS)
+   AED_REAL          :: min_initial(MAX_GC_MINERALS) = 0.0
    AED_REAL          :: w_gch(MAX_GC_MINERALS)
-   AED_REAL          :: pH_initial, pe_initial
+   AED_REAL          :: pH_initial = 7.5
+   AED_REAL          :: pe_initial = 8.0
    AED_REAL          :: Riron_red, theta_iron_red, Kiron_red
    AED_REAL          :: Riron_aox, Riron_box, theta_iron_ox
    AED_REAL          :: Rsulf_red, theta_sulf_red, Ksulf_red
    AED_REAL          :: Rsulf_ox, theta_sulf_ox, Ksulf_ox
-   CHARACTER(len=64) :: geochem_file
-   CHARACTER(len=64) :: dis_components(MAX_GC_COMPONENTS)
-   CHARACTER(len=64) :: component_link(MAX_GC_COMPONENTS)
-   CHARACTER(len=64) :: speciesOutput(10)
-   CHARACTER(len=64) :: the_minerals(MAX_GC_MINERALS)
-   CHARACTER(len=64) :: mineral_link(MAX_GC_MINERALS)
+   CHARACTER(len=64) :: geochem_file = ''
+   CHARACTER(len=64) :: dis_components(MAX_GC_COMPONENTS) = ''
+   CHARACTER(len=64) :: component_link(MAX_GC_COMPONENTS) = ''
+   CHARACTER(len=64) :: speciesOutput(10) = ''
+   CHARACTER(len=64) :: the_minerals(MAX_GC_MINERALS) = ''
+   CHARACTER(len=64) :: mineral_link(MAX_GC_MINERALS) = ''
    CHARACTER(len=64) :: ph_link = 'CAR_pH'
    CHARACTER(len=64) :: pco2_link = 'CAR_pCO2'
    CHARACTER(len=64) :: oxy_link = 'OXY_oxy'
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_geochemistry/
+
    CHARACTER(len=64), DIMENSION(:), ALLOCATABLE :: diagnosticList
 
    NAMELIST /aed_geochemistry/ speciation_dt, geochem_file,                   &
@@ -161,7 +177,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                     Riron_aox, Riron_box, theta_iron_ox, &
                     Rsulf_red, theta_sulf_red, Ksulf_red, &
                     Rsulf_ox, theta_sulf_ox, Ksulf_ox, &
-                    ph_link, pco2_link
+                    ph_link, pco2_link, diag_level
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_geochemistry initialization"
@@ -177,13 +193,14 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%component_linked(:) = .FALSE.
    data%mineral_linked(:) = .FALSE.
 
-   dis_initial = 0.0  ! default, overwritten by namelist
-   min_initial = 0.0  ! default, overwritten by namelist
-   pH_initial  = 7.5  ! default, overwritten by namelist
-   pe_initial  = 8.0  ! default, not used
+! Initialisation now done in declaration
+!  dis_initial = 0.0  ! default, overwritten by namelist
+!  min_initial = 0.0  ! default, overwritten by namelist
+!  pH_initial  = 7.5  ! default, overwritten by namelist
+!  pe_initial  = 8.0  ! default, not used
 
-   ph_link     = 'CAR_pH'
-   pco2_link   = 'CAR_pCO2'
+!  ph_link     = 'CAR_pH'
+!  pco2_link   = 'CAR_pCO2'
 
    !----------------------------------------------------------------------------
    ! Read the namelist
@@ -296,18 +313,18 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    !----------------------------------------------------------------------------
    ! Register links to other modules
 
-   data%id_o_oxy = aed_locate_global(oxy_link)
+   data%id_o_oxy = aed_locate_variable(oxy_link)
 
    IF ( ph_link .EQ. '' ) THEN
      ! Register as a diagnostic variable
      data%id_pH = aed_define_diag_variable( 'pH', 'pH', 'pH')
    ELSE
      ! Link to module
-     data%id_pH = aed_locate_global(ph_link)
+     data%id_pH = aed_locate_variable(ph_link)
    ENDIF
 
    ! solution to get aed_carbon's pCO2 updated for atm exchange ...
-   data%id_c_pco2 = aed_locate_global(pco2_link)
+   data%id_c_pco2 = aed_locate_variable(pco2_link)
 
    !----------------------------------------------------------------------------
    ! Register diagnostic variables

@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018 - 2020 - The University of Western Australia                #
+!#  Copyright 2018 - 2021 - The University of Western Australia                #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -88,19 +88,23 @@ MODULE aed_noncohesive
       AED_REAL             :: sed_porosity
 
      CONTAINS
-         PROCEDURE :: define            => aed_define_noncohesive
-         PROCEDURE :: initialize        => aed_initialize_noncohesive
-         PROCEDURE :: calculate         => aed_calculate_noncohesive
-         PROCEDURE :: calculate_benthic => aed_calculate_benthic_noncohesive
-         PROCEDURE :: mobility          => aed_mobility_noncohesive
-         PROCEDURE :: light_extinction  => aed_light_extinction_noncohesive
-        !PROCEDURE :: delete            => aed_delete_noncohesive
+         PROCEDURE :: define             => aed_define_noncohesive
+         PROCEDURE :: initialize_benthic => aed_initialize_benthic_noncohesive
+         PROCEDURE :: calculate          => aed_calculate_noncohesive
+         PROCEDURE :: calculate_benthic  => aed_calculate_benthic_noncohesive
+         PROCEDURE :: mobility           => aed_mobility_noncohesive
+         PROCEDURE :: light_extinction   => aed_light_extinction_noncohesive
+        !PROCEDURE :: delete             => aed_delete_noncohesive
 
    END TYPE
 
 ! MODULE GLOBALS
-   INTEGER :: diag_level = 10
    AED_REAL :: sed_depth = 1.0
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 
 !===============================================================================
@@ -124,7 +128,8 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    INTEGER  :: status,i
    CHARACTER(4) :: ncs_name
 
-!  %% NAMELIST
+!  %% NAMELIST   %%  /aed_noncohesive/
+!  %% Last Checked 20/08/2021
    ! Set default parameter values
    INTEGER           :: num_ss          = 0
    INTEGER           :: resuspension    = 0
@@ -145,13 +150,19 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    AED_REAL          :: sed_porosity    = 0.3
    AED_REAL          :: sed_initial     = zero_
    CHARACTER(len=64) :: macrophyte_link_var = ''
-!  %% END NAMELIST
+! %% From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_noncohesive/
 
-   NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss, &
-                               settling, w_ss, rho_ss, d_ss, &
-                               resuspension, epsilon, tau_0, tau_r, Ktau_0, &
-                               macrophyte_link_var, Fsed, fs, &
-                               simSedimentMass, ss_initial, sed_porosity
+   NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss,                         &
+                              settling, w_ss, rho_ss, d_ss,                 &
+                              resuspension, epsilon, tau_0, tau_r, Ktau_0,  &
+                              macrophyte_link_var, Fsed, fs,                &
+                              simSedimentMass, ss_initial, sed_porosity, diag_level
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -244,8 +255,8 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    IF ( resuspension > 0 ) THEN
       data%id_resus = aed_define_sheet_diag_variable('resus','g/m**2/s','resuspension rate')
       data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m**2','taub diagnostic')
-      data%id_e_taub = aed_locate_global_sheet('taub')
-      data%id_e_sedzone = aed_locate_global_sheet('sed_zone')
+      data%id_e_taub = aed_locate_sheet_global('taub')
+      data%id_e_sedzone = aed_locate_sheet_global('sed_zone')
    ENDIF
 
 END SUBROUTINE aed_define_noncohesive
@@ -253,7 +264,7 @@ END SUBROUTINE aed_define_noncohesive
 
 
 !###############################################################################
-SUBROUTINE aed_initialize_noncohesive(data, column, layer_idx)
+SUBROUTINE aed_initialize_benthic_noncohesive(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 ! Routine to set initial state of NCS variables (in the sediment)
 !-------------------------------------------------------------------------------
@@ -277,7 +288,7 @@ SUBROUTINE aed_initialize_noncohesive(data, column, layer_idx)
     ENDDO
    ENDIF
    !---------------------------------------------------------------------------+
-END SUBROUTINE aed_initialize_noncohesive
+END SUBROUTINE aed_initialize_benthic_noncohesive
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

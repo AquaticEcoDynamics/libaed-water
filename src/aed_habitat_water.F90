@@ -30,7 +30,7 @@
 !#                                                                             #
 !###############################################################################
 
-#include "aed+.h"
+#include "aed.h"
 
 !
 MODULE aed_habitat_water
@@ -87,7 +87,11 @@ MODULE aed_habitat_water
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    AED_REAL, PARAMETER :: DDT = 0.25/24.    ! Currently assuming 15 min timestep
-   INTEGER :: diag_level = 10
+   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              ! 1 = basic diagnostic outputs
+                                              ! 2 = flux rates, and supporitng
+                                              ! 3 = other metrics
+                                              !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
@@ -107,13 +111,37 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
    CLASS (aed_habitat_water_data_t),INTENT(inout) :: data
 !
 !LOCALS
-   INTEGER :: i, f, z, status, num_mtox, num_fish
-   LOGICAL :: simFishTolerance,simCyanoRisk,simMosquitoRisk,simClearWater,simMetalTox
+   INTEGER :: i, f, z, status
+
+!  %% NAMELIST   %%  /aed_habitat_water/
+!  %% Last Checked 20/08/2021
+   LOGICAL           :: simFishTolerance
+   INTEGER           :: num_mtox
+   INTEGER           :: num_fish
+   LOGICAL           :: simCyanoRisk
+   LOGICAL           :: simClearWater
+   LOGICAL           :: simMetalTox
    AED_REAL          :: mtox_lims(10)
-   AED_REAL          :: fish_alpha(20),fish_Tmax(20),fish_Taccl(20),fish_Ocrit(20),fish_KO(20)
-   CHARACTER(len=40) :: mtox_acid_link, mtox_aass_link, fish_oxy_link
+   AED_REAL          :: fish_alpha(20)
+   AED_REAL          :: fish_Tmax(20)
+   AED_REAL          :: fish_Taccl(20)
+   AED_REAL          :: fish_Ocrit(20)
+   AED_REAL          :: fish_KO(20)
    CHARACTER(len=40) :: mtox_vars(10)
-   CHARACTER(6) :: fish_name
+   CHARACTER(6)      :: fish_name
+
+! From Module Globals
+!  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             ! 1 = basic diagnostic outputs
+!                                             ! 2 = flux rates, and supporitng
+!                                             ! 3 = other metrics
+!                                             !10 = all debug & checking outputs
+!  %% END NAMELIST   %%  /aed_habitat_water/
+
+   CHARACTER(len=40) :: mtox_acid_link
+   CHARACTER(len=40) :: mtox_aass_link
+   CHARACTER(len=40) :: fish_oxy_link
+   LOGICAL           :: simMosquitoRisk
 
    NAMELIST /aed_habitat_water/                                                   &
                                simFishTolerance, num_fish,                        &
@@ -165,6 +193,7 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
      mtox_aass_link = 'ASS_uzaass'
 
      mtox_vars = '' ;  mtox_lims = 1.0
+     num_mtox = 0
      DO i=1,10 ; IF (mtox_vars(i)  .EQ. '' ) THEN ; num_mtox = i-1 ; EXIT ; ENDIF ; ENDDO
      ALLOCATE(data%id_l_mtox(num_mtox)); ALLOCATE(data%mtox_lims(num_mtox))
      data%num_mtox = num_mtox
