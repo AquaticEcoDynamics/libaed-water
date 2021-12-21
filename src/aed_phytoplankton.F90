@@ -784,7 +784,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       IF (data%phytos(phy_i)%simNFixation /= 0) THEN
          ! Nitrogen fixer: apply no N limitation. N Fixation ability
          ! depends on DIN concentration
-         a_nfix = (one_ - fNit)
+         a_nfix(phy_i) = (one_ - fNit)
          fNit = one_
       ENDIF
 
