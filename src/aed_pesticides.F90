@@ -8,9 +8,9 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2021 -  The University of Western Australia                      #
+!#  Copyright 2022 -  The University of Western Australia                      #
 !#                                                                             #
-!#   AED2+ is free software: you can redistribute it and/or modify             #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
@@ -26,15 +26,13 @@
 !#                                                                             #
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
-!# Originally created July 2012 by Matthew Hipsey, UWA                         #
-!# Follow updates @ https://github.com/AquaticEcoDynamics/libaed2-plus         #
+!# Originally created Dec 2021 by Matthew Hipsey and Thanh Hoang, UWA          #
+!# Follow updates @ https://github.com/AquaticEcoDynamics/libaed-water         #
 !#                                                                             #
-!# For background to the module, please refer to the original implmentation    #
+!# For information about the module, please refer to the documentation         #
 !# published here:                                                             #
 !#                                                                             #
-!# Hipsey, M.R., Antenucci, J.P. and Brookes, J.D., 2008. A generic,           #
-!#       process based model of microbial pollution in aquatic systems.        #
-!#       Water Resources Research, 44(7).                                      #
+!# https://aquaticecodynamics.github.io/aed-science/index.html                 #                                     #
 !#                                                                             #
 !###############################################################################
 
@@ -43,7 +41,7 @@
 
 MODULE aed_pesticides
 !-------------------------------------------------------------------------------
-!  aed_pesticides --- pesticide biogeochemical model
+!  aed_pesticides --- pesticide contaminant model
 !-------------------------------------------------------------------------------
    USE aed_core
    USE aed_util
@@ -139,10 +137,10 @@ CONTAINS
 !###############################################################################
 SUBROUTINE aed_define_pesticides(data, namlst)
 !-------------------------------------------------------------------------------
-! Initialise the pesticide biogeochemical model
+! Initialise the pesticide model
 !
-!  Here, the aed_p_m namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  Here, the aed_p_m namelist is read and the variables exported
+!  by the model are registered with AED core.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
@@ -155,7 +153,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
    CHARACTER(4) :: trac_name
 
 !  %% NAMELIST   %% /aed_pesticides/
-!  %% Last Checked 20/08/2021
+!  %% Last Checked 26/12/2021
    INTEGER  :: num_pesticides
    INTEGER  :: the_pesticides(MAX_PATHO_TYPES)
    INTEGER  :: num_ss = 0
@@ -190,7 +188,10 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_pesticides initialization"
+   print *,"          NOTE : UNDER DEVELOPMENT ... STOPPING"
 
+   stop "Please disable the pesticide model in your configuration"
+   
    ! Read the namelist
    read(namlst,nml=aed_pesticides,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed_pesticides'
