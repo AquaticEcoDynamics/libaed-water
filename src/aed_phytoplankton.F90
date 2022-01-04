@@ -836,7 +836,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       IF (data%phytos(phy_i)%simNFixation /= 0) THEN
          ! Nitrogen fixing species, and the growth rate to  must be reduced
          ! to compensate for the increased metabolic cost of this process
-         primprod(phy_i) = primprod(phy_i) * (data%phytos(phy_i)%k_nfix + &
+         primprod(phy_i) = primprod(phy_i) * ( &
                            (1.0-a_nfix(phy_i))*(1.0-data%phytos(phy_i)%k_nfix))
       ENDIF
 
@@ -846,7 +846,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
 
       ! Salinity stress effect on respiration (or growth)
       fSal =  phyto_salinity(data%phytos,phy_i,salinity)
-      IF( data%phytos(phy_i)%salTol >= 4) THEN
+      IF( data%phytos(phy_i)%salTol <= 4) THEN
         primprod(phy_i) = primprod(phy_i) * fSal   ! growth limtation rather than mortality enhancement
       ELSE
         respiration(phy_i) = respiration(phy_i) * fSal
