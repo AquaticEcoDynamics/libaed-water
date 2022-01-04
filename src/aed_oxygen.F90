@@ -202,10 +202,12 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ! somehow only print and STOP screen echoes if AED is being used
    print *,"        aed_oxygen initialization"
 
    ! Read the namelist
    read(namlst,nml=aed_oxygen,iostat=status)
+   ! somehow only print and STOP screen echoes if AED is being used
    IF (status /= 0) STOP 'Error reading namelist aed_oxygen'
 
    ! Store parameter values in the modules own derived type
