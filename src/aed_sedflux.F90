@@ -454,6 +454,15 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol/m**2',   &
                                           'flux rate of oxygen across the swi')
+   IF ( Fsed_dic .GT. MISVAL ) &
+      data%id_Fsed_dic = aed_define_sheet_diag_variable('Fsed_dic','mmol/m**2',   &
+                                          'flux rate of dic across the swi')
+   IF ( Fsed_ch4 .GT. MISVAL ) &
+      data%id_Fsed_ch4 = aed_define_sheet_diag_variable('Fsed_ch4','mmol/m**2',   &
+                                          'flux rate of ch4 across the swi')
+   IF ( Fsed_ch4_ebb .GT. MISVAL ) &
+      data%id_Fsed_ch4_ebb = aed_define_sheet_diag_variable('Fsed_ch4_ebb','mmol/m**2',   &
+                                          'flux rate of ch4 bubbles across the swi')
    IF ( Fsed_rsi .GT. MISVAL ) &
       data%id_Fsed_rsi = aed_define_sheet_diag_variable('Fsed_rsi','mmol/m**2',   &
                                           'flux rate of rsi across the swi')
@@ -469,6 +478,12 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Fsed_frp .GT. MISVAL ) &
       data%id_Fsed_frp = aed_define_sheet_diag_variable('Fsed_frp','mmol/m**2',   &
                                           'flux rate of frp across the swi')
+   IF ( Fsed_poc .GT. MISVAL ) &
+      data%id_Fsed_poc = aed_define_sheet_diag_variable('Fsed_poc','mmol/m**2',   &
+                                          'sedimentation rate of poc')
+   IF ( Fsed_doc .GT. MISVAL ) &
+      data%id_Fsed_doc = aed_define_sheet_diag_variable('Fsed_doc','mmol/m**2',   &
+                                          'flux rate of doc across the swi')
    IF ( Fsed_pon .GT. MISVAL ) &
       data%id_Fsed_pon = aed_define_sheet_diag_variable('Fsed_pon','mmol/m**2',   &
                                           'sedimentation rate of pon')
@@ -481,21 +496,6 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Fsed_dop .GT. MISVAL ) &
       data%id_Fsed_dop = aed_define_sheet_diag_variable('Fsed_dop','mmol/m**2',   &
                                           'flux rate of dop across the swi')
-   IF ( Fsed_poc .GT. MISVAL ) &
-      data%id_Fsed_poc = aed_define_sheet_diag_variable('Fsed_poc','mmol/m**2',   &
-                                          'sedimentation rate of poc')
-   IF ( Fsed_doc .GT. MISVAL ) &
-      data%id_Fsed_doc = aed_define_sheet_diag_variable('Fsed_doc','mmol/m**2',   &
-                                          'flux rate of doc across the swi')
-   IF ( Fsed_dic .GT. MISVAL ) &
-      data%id_Fsed_dic = aed_define_sheet_diag_variable('Fsed_dic','mmol/m**2',   &
-                                          'flux rate of dic across the swi')
-   IF ( Fsed_ch4 .GT. MISVAL ) &
-      data%id_Fsed_ch4 = aed_define_sheet_diag_variable('Fsed_ch4','mmol/m**2',   &
-                                          'flux rate of ch4 across the swi')
-   IF ( Fsed_ch4_ebb .GT. MISVAL ) &
-      data%id_Fsed_ch4_ebb = aed_define_sheet_diag_variable('Fsed_ch4_ebb','mmol/m**2',   &
-                                          'flux rate of ch4 bubbles across the swi')
    IF ( Fsed_feii .GT. MISVAL ) &
       data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
                                           'flux rate of feii across the swi')

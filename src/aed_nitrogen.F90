@@ -368,7 +368,7 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
                          nitrousation, denitrousation, &
                          ammonium_oxidation, ammonium_release
 
-   AED_REAL,PARAMETER :: Xon  =  3.0     !ratio of O2 to N utilised during nitrification
+   AED_REAL,PARAMETER :: Xon  =  2.0     !ratio of O2 to N utilised during nitrification
    AED_REAL,PARAMETER :: Knev =  3.0     !Nevison nitrification O2 threshold
    AED_REAL,PARAMETER :: aa   =  0.26    !Nevison nitrification parameter
    AED_REAL,PARAMETER :: bb   = -0.0006  !Nevison nitrification parameter
