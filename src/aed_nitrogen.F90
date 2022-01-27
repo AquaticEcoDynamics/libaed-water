@@ -605,8 +605,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
     !-----------------------------------------------
     ! Also store deposition across the atm/water interface as a
     ! diagnostic variable (mmmol/m2/day).
-    _DIAG_VAR_S_(data%id_atm_dep) = _DIAG_VAR_S_(data%id_atm_dep) &
-        + (_FLUX_VAR_T_(data%id_nox) + _FLUX_VAR_T_(data%id_amm)) * secs_per_day
+    _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_nox) + _FLUX_VAR_T_(data%id_amm)) * secs_per_day ! BMT pull request - included
   ENDIF
 
 END SUBROUTINE aed_calculate_surface_nitrogen

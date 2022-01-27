@@ -72,7 +72,8 @@ MODULE aed_phytoplankton
       INTEGER,ALLOCATABLE :: id_NtoP(:)
       INTEGER,ALLOCATABLE :: id_vvel(:)
       INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), &
-                             id_fPho(:), id_fSil(:), id_fSal(:)
+                             id_fPho(:), id_fSil(:), id_fSal(:), &
+                             id_PhyCUP(:), id_PhyNCP(:), id_PhySed(:) ! BMT pull request  - included
       INTEGER :: id_Pexctarget,id_Pmorttarget,id_Pupttarget(1:2)
       INTEGER :: id_Nexctarget,id_Nmorttarget,id_Nupttarget(1:4)
       INTEGER :: id_Cexctarget,id_Cmorttarget,id_Cupttarget
@@ -269,6 +270,9 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        ALLOCATE(data%id_fSil(count)) ; data%id_fSil(:) = 0
        ALLOCATE(data%id_fSal(count)) ; data%id_fSal(:) = 0
        ALLOCATE(data%id_vvel(count)) ; data%id_vvel(:) = 0
+       ALLOCATE(data%id_PhyCUP(count)) ; data%id_PhyCUP(:) = 0 ! BMT pull request  - included
+       ALLOCATE(data%id_PhyNCP(count)) ; data%id_PhyNCP(:) = 0 ! BMT pull request  - included
+       ALLOCATE(data%id_PhySed(count)) ; data%id_PhySed(:) = 0 ! BMT pull request  - included
     ENDIF
 
     DO i=1,count
@@ -400,6 +404,9 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
           data%id_fSil(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSil', '-', 'fSil (0-1)')
           data%id_fT(i)   = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fT', '-', 'fT (>0)')
           data%id_fSal(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSal', '-', 'fSal (>1)')
+          data%id_PhyCUP(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_GPP', 'mmol/m**3/d', 'group primary production') ! BMT pull request  - included
+          data%id_PhyNCP(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_NCP', 'mmol/m**3/d', 'group net production') ! BMT pull request  - included
+          data%id_PhySed(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_SED', 'mmol/m**2/d', 'group sedimentation') ! BMT pull request  - included
           ! Register vertical velocity diagnostic, where relevant
           IF (data%phytos(i)%settling == _MOB_STOKES_ .OR. &
                                    data%phytos(i)%settling == _MOB_MOTILE_) THEN
@@ -902,6 +909,8 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          _DIAG_VAR_(data%id_fPho(phy_i)) =  fPho
          _DIAG_VAR_(data%id_fSil(phy_i)) =  fSil
          _DIAG_VAR_(data%id_fSal(phy_i)) =  fSal
+         _DIAG_VAR_(data%id_PhyCUP(phy_i)) =  cuptake(phy_i) * secs_per_day ! BMT pull request  - included
+         _DIAG_VAR_(data%id_PhyNCP(phy_i)) =  (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day ! BMT pull request  - included
       ENDIF
    END DO
 
@@ -1300,7 +1309,8 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
       ! set sedimentation flux (mmmol/m2) for later use/reporting
       _DIAG_VAR_(data%id_Psed_phy) =   &
               _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
-    ENDDO
+      _DIAG_VAR_(data%id_PhySed(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i)) ! BMT pull request - included
+   ENDDO
 END SUBROUTINE aed_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
