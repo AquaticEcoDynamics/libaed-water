@@ -909,8 +909,8 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          _DIAG_VAR_(data%id_fPho(phy_i)) =  fPho
          _DIAG_VAR_(data%id_fSil(phy_i)) =  fSil
          _DIAG_VAR_(data%id_fSal(phy_i)) =  fSal
-         _DIAG_VAR_(data%id_PhyCUP(phy_i)) =  cuptake(phy_i) * secs_per_day !BMT
-         _DIAG_VAR_(data%id_PhyNCP(phy_i)) =  (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day !BMT
+         _DIAG_VAR_(data%id_PhyCUP(phy_i)) =  cuptake(phy_i) * secs_per_day
+         _DIAG_VAR_(data%id_PhyNCP(phy_i)) =  (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
       ENDIF
    END DO
 
