@@ -427,7 +427,8 @@ SUBROUTINE aed_light_extinction_noncohesive(data,column,layer_idx,extinction)
 !
 !-----------------------------------------------------------------------
 !BEGIN
-   DO ss_i=1,ubound(data%id_ss,1)
+  !DO ss_i=1,ubound(data%id_ss,1)
+   DO ss_i=1,data%num_ss
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_ss(ss_i))
 

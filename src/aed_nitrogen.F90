@@ -368,7 +368,7 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
                          nitrousation, denitrousation, &
                          ammonium_oxidation, ammonium_release
 
-   AED_REAL,PARAMETER :: Xon  =  3.0     !ratio of O2 to N utilised during nitrification
+   AED_REAL,PARAMETER :: Xon  =  2.0     !ratio of O2 to N utilised during nitrification
    AED_REAL,PARAMETER :: Knev =  3.0     !Nevison nitrification O2 threshold
    AED_REAL,PARAMETER :: aa   =  0.26    !Nevison nitrification parameter
    AED_REAL,PARAMETER :: bb   = -0.0006  !Nevison nitrification parameter
@@ -605,7 +605,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
     !-----------------------------------------------
     ! Also store deposition across the atm/water interface as a
     ! diagnostic variable (mmmol/m2/day).
-    _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_nox) + _FLUX_VAR_T_(data%id_amm)) * secs_per_day ! BMT pull request - included
+    _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_nox) + _FLUX_VAR_T_(data%id_amm)) * secs_per_day
   ENDIF
 
 END SUBROUTINE aed_calculate_surface_nitrogen
