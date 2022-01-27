@@ -370,22 +370,11 @@ SUBROUTINE aed_calculate_surface_phosphorus(data,column,layer_idx)
     !-----------------------------------------------
     ! Also store deposition across the atm/water interface as a
     ! diagnostic variable (mmmol/m2/day).
-<<<<<<< HEAD
-   IF (data%simPO4Adsorption) THEN                                                                                ! BMT pull request  - included
-        _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_frp) + _FLUX_VAR_T_(data%id_frpads)) * secs_per_day ! BMT pull request  - included
-   ELSE                                                                                                           ! BMT pull request  - included
-        _DIAG_VAR_S_(data%id_atm_dep) = _FLUX_VAR_T_(data%id_frp) * secs_per_day                                  ! BMT pull request  - included
-   END IF                                                                                                         ! BMT pull request  - included
-=======
    IF (data%simPO4Adsorption) THEN !# id_frpads is not set unless simPO4Adsorption is true
         _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_frp) + _FLUX_VAR_T_(data%id_frpads)) * secs_per_day
    ELSE
         _DIAG_VAR_S_(data%id_atm_dep) = _FLUX_VAR_T_(data%id_frp) * secs_per_day
    END IF
-       
-   
->>>>>>> 64f934b7664ed1163489638ce5bc43b563e5951d
-  ENDIF
 
 END SUBROUTINE aed_calculate_surface_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
