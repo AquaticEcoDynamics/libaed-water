@@ -648,7 +648,6 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
        aed_define_diag_variable('photolysis','mmol C/m3/d',  'photolysis rate of breakdown of DOC')
 
      data%id_pom_vvel  = aed_define_diag_variable('pom_vvel','m/d','POM vertical velocity')
-     
      IF (simRpools) data%id_cpom_vvel = aed_define_diag_variable('cpom_vvel','m/d','CPOM vertical velocity')
 
    ENDIF
