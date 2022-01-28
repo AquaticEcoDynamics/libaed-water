@@ -910,7 +910,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          _DIAG_VAR_(data%id_fSil(phy_i)) =  fSil
          _DIAG_VAR_(data%id_fSal(phy_i)) =  fSal
          _DIAG_VAR_(data%id_PhyCUP(phy_i)) =  cuptake(phy_i) * secs_per_day
-         _DIAG_VAR_(data%id_PhyNCP(phy_i)) =  (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
+         _DIAG_VAR_(data%id_PhyNCP(phy_i)) =  (-cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
       ENDIF
    END DO
 
@@ -1047,12 +1047,12 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       ENDIF
       IF (data%do_Cuptake) THEN
          _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) +           &
-                       (  cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy )
+                       (  cuptake(phy_i) + respiration(phy_i)*data%phytos(phy_i)%k_fres*phy )
       ENDIF
-      net_cuptake = net_cuptake + (cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy)
+      net_cuptake = net_cuptake + (-cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy)
       IF (data%do_DOuptake) THEN
          _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) +         &
-                   ( -cuptake(phy_i) + respiration(phy_i)*data%phytos(phy_i)%k_fres*phy )
+                   ( -cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy )
       ENDIF
       IF (data%do_Siuptake) THEN
          _FLUX_VAR_(data%id_Siupttarget) = _FLUX_VAR_(data%id_Siupttarget) + ( siuptake(phy_i))
@@ -1108,14 +1108,14 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
 
    !---------------------------------------------------------------------------+
    ! Set diagnostic arrays for combined assemblage properties
-   _DIAG_VAR_(data%id_GPP) =  sum(cuptake)*secs_per_day
+   _DIAG_VAR_(data%id_GPP) =  sum(-cuptake)*secs_per_day
    _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
-   _DIAG_VAR_(data%id_NUP) =  sum(nuptake(:,1))*secs_per_day
-   _DIAG_VAR_(data%id_NUP2)=  sum(nuptake(:,2))*secs_per_day
-   _DIAG_VAR_(data%id_PUP) =  sum(puptake)*secs_per_day
-   _DIAG_VAR_(data%id_CUP) =  sum(cuptake)*secs_per_day
+   _DIAG_VAR_(data%id_NUP) =  sum(-nuptake(:,1))*secs_per_day
+   _DIAG_VAR_(data%id_NUP2)=  sum(-nuptake(:,2))*secs_per_day
+   _DIAG_VAR_(data%id_PUP) =  sum(-puptake)*secs_per_day
+   _DIAG_VAR_(data%id_CUP) =  sum(-cuptake)*secs_per_day
 
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_dPAR) =  par
    _DIAG_VAR_(data%id_TCHLA)=  tchla
