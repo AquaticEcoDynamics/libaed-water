@@ -95,7 +95,7 @@ MODULE aed_organic_matter
       INTEGER  :: id_swi_pon,    id_swi_don
       INTEGER  :: id_swi_pop,    id_swi_dop
       INTEGER  :: id_swi_poc,    id_swi_doc
-      INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner
+      INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner,  id_cpom_bdown
       INTEGER  :: id_sed_toc,    id_sed_ton,     id_sed_top
       INTEGER  :: id_l_resus,    id_denit,       id_anaerobic
       INTEGER  :: id_pom_vvel,   id_cpom_vvel
@@ -612,7 +612,8 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_docr_miner = 0
    data%id_donr_miner = 0
    data%id_dopr_miner = 0
-
+   data%id_cpom_bdown = 0
+   
     IF ( diag_level>0 ) THEN
       data%id_cdom = aed_define_diag_variable('CDOM','/m',  'Chromophoric DOM (CDOM)')
       data%id_sed_toc  = aed_define_sheet_diag_variable('sed_toc','mmol/m**2',  'Sediment TOC mass')
@@ -640,6 +641,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
         data%id_docr_miner = aed_define_diag_variable('docr_miner','mmol/m**3/d','DOCR mineralisation')
         data%id_donr_miner = aed_define_diag_variable('donr_miner','mmol/m**3/d','DONR mineralisation')
         data%id_dopr_miner = aed_define_diag_variable('dopr_miner','mmol/m**3/d','DOPR mineralisation')
+        data%id_cpom_bdown = aed_define_diag_variable('cpom_bdown','mmol/m**3/d','CPOM breakdown')
      ENDIF
 
      data%id_bod = aed_define_diag_variable('BOD5','mg O2/L',  'Biochemical Oxygen Demand (BOD)')
@@ -973,6 +975,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
        _DIAG_VAR_(data%id_docr_miner) = docr_mineralisation*secs_per_day
        _DIAG_VAR_(data%id_donr_miner) = donr_mineralisation*secs_per_day
        _DIAG_VAR_(data%id_dopr_miner) = dopr_mineralisation*secs_per_day
+       _DIAG_VAR_(data%id_cpom_bdown) = cpom_breakdown*secs_per_day
      ENDIF
 
      ! BOD5 is computed as the amount of oxygen consumed over a 5-day period (mgO2/L)
