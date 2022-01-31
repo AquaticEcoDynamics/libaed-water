@@ -1308,8 +1308,8 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
               _DIAG_VAR_(data%id_vvel(phy_i)) = vvel * secs_per_day
       ! set sedimentation flux (mmmol/m2) for later use/reporting
       _DIAG_VAR_(data%id_Psed_phy) =   &
-              _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
-      _DIAG_VAR_(data%id_PhySed(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))
+              _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i)) * secs_per_day
+      _DIAG_VAR_(data%id_PhySed(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i)) * secs_per_day
     ENDDO
 END SUBROUTINE aed_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
