@@ -533,7 +533,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
 ! Routine to set initial state of SEDFLUX variables                            !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_sedflux_data_t),INTENT(in) :: data
+   CLASS (aed_sedflux_data_t),INTENT(inout) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !
@@ -634,8 +634,8 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 !
-   IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
-      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
+!   IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &  !MH INTENT issues this is temporary
+!      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 
 !zone = INT(_STATE_VAR_S_(data%id_zones))
 

@@ -52,7 +52,7 @@ MODULE aed_common
 
    !#---------------------------------------------------------------------------
 
-   PUBLIC aed_define_model, aed_delete, aed_print_version, aed_requested_zones
+   PUBLIC aed_model_factory, aed_delete, aed_print_version, aed_requested_zones
 
    !#---------------------------------------------------------------------------
 
@@ -149,7 +149,7 @@ END FUNCTION scan_name
 
 
 !###############################################################################
-SUBROUTINE aed_define_model(modeldef, namlst)
+SUBROUTINE aed_model_factory(modeldef, namlst)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: modeldef
@@ -171,6 +171,9 @@ SUBROUTINE aed_define_model(modeldef, namlst)
    IF (.NOT. ASSOCIATED(model)) model => aed_new_dev_model(modelname)
 
    IF ( ASSOCIATED(model) ) THEN
+      n_aed_models = n_aed_models + 1
+      model%aed_model_id = n_aed_models
+
       IF ( IAND(flags, DO_ZONES) /= 0 ) &
          model%aed_model_zone_avg = .TRUE.
       IF ( IAND(flags, NO_ZONES) /= 0 ) &
@@ -178,13 +181,20 @@ SUBROUTINE aed_define_model(modeldef, namlst)
 
       CALL aed_build_model(model, namlst, .TRUE.)
 
+      ! report the outcome of special tokens/flags that were set
+      IF(model%aed_model_zone_avg) THEN
+        print *,'          ******************************* '
+        print *,'          module ', TRIM(modelname),' : configured for zone_averaging '
+        print *,'          ******************************* '
+      ENDIF
+
       IF ( .NOT. ASSOCIATED(model_list) ) model_list => model
       IF ( ASSOCIATED(last_model) ) last_model%next => model
       last_model => model
    ELSE
       print *,'*** Unknown module ', TRIM(modelname)
    ENDIF
-END SUBROUTINE aed_define_model
+END SUBROUTINE aed_model_factory
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -207,33 +217,62 @@ LOGICAL FUNCTION aed_requested_zones(n_aed_vars)
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
-   TYPE(aed_variable_t),POINTER :: tvar
+   TYPE  (aed_variable_t)  ,POINTER :: tvar
    INTEGER :: i, j
    LOGICAL :: res = .FALSE., err = .FALSE.
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+
       IF ( model%aed_model_zone_avg ) THEN
+         ! This model is set to be a averaged model; check & ensure zavg = true
          res = .TRUE.
          j = 0
          DO i=1, n_aed_vars
             IF ( aed_get_var(i, tvar) ) THEN
+
+              IF(tvar%extern) CYCLE  ! external (environment) not currently able to be updated from zones
+
                IF ( tvar%model%aed_model_id .EQ. model%aed_model_id ) THEN
-                  IF ( tvar%diag ) THEN
-                     j = j + 1
-                     IF ( tvar%zavg ) err = .TRUE.
+
+                  ! sheet variables in a zone averaged model must have zavg=T
+                  IF ( .NOT. tvar%extern .AND. tvar%sheet ) THEN
+                    ! non-environent variable sheets can be averaged
+                    j = j + 1
+                    tvar%zavg = .TRUE. ; tvar%zavg_req = .FALSE.
+                    print *,'        zone averaged variable: ',TRIM(tvar%name)
+                  ELSE
+                    ! averageing requests for env or non-sheets are not possible
+                    IF ( tvar%zavg ) err = .TRUE.
+                    tvar%zavg = .FALSE. ; tvar%zavg_req = .FALSE.
                   ENDIF
-                  IF ( .NOT. tvar%extern ) THEN
-                     IF ( .NOT. tvar%sheet ) err = .TRUE.
+
+                ELSE
+
+                  ! this model requested zone averaged updates from others
+                  IF ( tvar%zavg_req ) THEN
+                    IF ( .NOT. tvar%extern .AND. tvar%sheet ) THEN
+                      ! non-environent variable sheets can be averaged
+                      j = j + 1
+                      tvar%zavg = .TRUE. ; tvar%zavg_req = .FALSE.
+                      print *,'        zone averaged variable: ',TRIM(tvar%name)//'   (linked by',model%aed_model_id,TRIM(model%aed_model_name),')'  !MH glitch here is if order is out then wrong linked model appears
+                    ELSE
+                      ! averageing requests for env or non-sheets are not possible
+                      err = .TRUE.
+                      tvar%zavg = .FALSE. ; tvar%zavg_req = .FALSE.
+                    ENDIF
                   ENDIF
-                  tvar%zavg = .TRUE.
                ENDIF
+
             ENDIF
          ENDDO
       ENDIF
+
       model => model%next
    ENDDO
+
    aed_requested_zones = res
+
 END FUNCTION aed_requested_zones
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

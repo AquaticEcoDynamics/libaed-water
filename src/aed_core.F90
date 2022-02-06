@@ -53,6 +53,7 @@ MODULE aed_core
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC model_list, last_model
+   PUBLIC n_aed_models
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_prefix_list_t
@@ -105,7 +106,8 @@ MODULE aed_core
       AED_REAL          :: mobility
       AED_REAL          :: light_extinction
       LOGICAL           :: sheet, diag, extern, found
-      LOGICAL           :: top, bot, zavg, const
+      LOGICAL           :: top, bot, const
+      LOGICAL           :: zavg, zavg_req
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -126,6 +128,7 @@ MODULE aed_core
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    INTEGER :: cur_mod_base = 0
+   INTEGER :: n_aed_models = 0
    INTEGER :: n_aed_vars = 0, a_vars = 0
    INTEGER :: n_vars = 0, n_sheet_vars = 0
    INTEGER :: n_diags = 0, n_sheet_diags = 0
@@ -213,9 +216,13 @@ SUBROUTINE display_var(var, idx)
    line = TRIM(line) // '             '
 
    IF ( var%sheet ) THEN
-      line = line(1:40) // ' 2D'
+     IF ( ASSOCIATED(var%model) .AND. var%model%aed_model_zone_avg ) THEN
+      line = line(1:40) // ' SZ '
+     ELSE
+      line = line(1:40) // ' 2D '
+     ENDIF
    ELSE
-      line = line(1:40) // ' 3D'
+      line = line(1:40) // ' 3D '
    ENDIF
 
    req => var%req
@@ -240,6 +247,9 @@ SUBROUTINE display_var(var, idx)
          ENDIF
       ENDDO
    ENDIF
+   IF ( var%zavg_req .and. .NOT. var%model%aed_model_zone_avg) THEN
+      line = TRIM(line) // "     (zavg req)"
+   ENDIF
 
    print *, TRIM(line)
 END SUBROUTINE display_var
@@ -260,6 +270,9 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+
+   !MH move this to a file, aed_config.log
+
    print*
    print*,' ---------------------- AED Variables Summary ----------------------'
    print*,'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
@@ -368,6 +381,7 @@ SUBROUTINE extend_allocated_variables(pcount)
    all_vars(a_vars+1:a_vars+count)%top = .false.
    all_vars(a_vars+1:a_vars+count)%bot = .false.
    all_vars(a_vars+1:a_vars+count)%zavg = .true.
+   all_vars(a_vars+1:a_vars+count)%zavg_req = .false.
    all_vars(a_vars+1:a_vars+count)%const = .false.
 
    a_vars = a_vars + count
@@ -473,6 +487,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%extern = .false.
       all_vars(ret)%found = .false.
       all_vars(ret)%zavg = .false.
+      all_vars(ret)%zavg_req = .false.
       all_vars(ret)%top = .false.
       all_vars(ret)%bot = .false.
    ENDIF
@@ -583,6 +598,7 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
 !-------------------------------------------------------------------------------
 !BEGIN
    ret = aed_create_variable(name, longname, units, .false.)
+
    n_sheet_diags = n_sheet_diags + 1
 
    all_vars(ret)%sheet = .true.
@@ -599,8 +615,10 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
 
    IF ( PRESENT(zavg) ) THEN
       all_vars(ret)%zavg = zavg
+      all_vars(ret)%zavg_req = .FALSE.
    ELSE
-      all_vars(ret)%zavg = .TRUE.
+      all_vars(ret)%zavg = .FALSE.
+      all_vars(ret)%zavg_req = .FALSE.
    ENDIF
 
    ret = n_aed_vars
@@ -688,22 +706,26 @@ END FUNCTION aed_locate_variable
 
 
 !###############################################################################
-FUNCTION aed_locate_sheet_variable(name) RESULT(ret)
+FUNCTION aed_locate_sheet_variable(name,update_from_zone) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
+   LOGICAL, OPTIONAL       :: update_from_zone  ! requesting module using zones
 !
 !LOCALS
    INTEGER :: ret
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
+   IF ( TRIM(name) == '' ) THEN ; ret = 0 ; RETURN ; ENDIF
 
    ret = aed_create_variable(name, '', '', .true.)
 
    IF ( ret /= 0 ) THEN
      IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
+   ENDIF
+   IF ( ret /= 0 .AND. PRESENT(update_from_zone)) THEN
+     all_vars(ret)%zavg_req = .true.
    ENDIF
 !  IF ( ret /= 0 ) THEN
 !    print*,"SHEET_VAR ",TRIM(name)," LOCATED at ",ret
@@ -839,7 +861,7 @@ END SUBROUTINE aed_initialize
 !###############################################################################
 SUBROUTINE aed_initialize_benthic(data,column, layer_idx)
 !-------------------------------------------------------------------------------
-   CLASS (aed_model_data_t),INTENT(in) :: data
+   CLASS (aed_model_data_t),INTENT(inout) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !-------------------------------------------------------------------------------
