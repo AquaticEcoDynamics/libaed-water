@@ -141,6 +141,17 @@ MODULE aed_core
 
    LOGICAL :: host_has_cell_vel = .false.
 
+#ifdef f2003
+   USE, intrinsic :: iso_fortran_env, ONLY : stdin=>input_unit, &
+                                             stdout=>output_unit, &
+                                             stderr=>error_unit
+#else
+#  define stdin  5
+#  define stdout 6
+#  define stderr 0
+#endif
+   INTEGER :: log = stderr
+
    !#---------------------------------------------------------------------------
 
    CLASS(aed_model_data_t), POINTER :: model_list => null()
@@ -211,7 +222,7 @@ SUBROUTINE display_var(var, idx)
       line = line(1:20) // ' ' // var%model%aed_model_name
    ELSE
       line = line(1:20) // ' ???'
-!     print*,'Requested variable ', TRIM(var%name), ' not defined.'
+!     print log,'Requested variable ', TRIM(var%name), ' not defined.'
    ENDIF
    line = TRIM(line) // '             '
 
@@ -239,7 +250,7 @@ SUBROUTINE display_var(var, idx)
       DO WHILE ( ASSOCIATED(req%next) )
          req => req%next
          IF (LEN_TRIM(line) >= 75 .AND. ASSOCIATED(req%next)) THEN
-             print*, TRIM(line),","
+             write(log, *) TRIM(line),","
              line(1:51)=' '
              line = line(1:51) // req%aed_model_prefix
          ELSE
@@ -251,7 +262,7 @@ SUBROUTINE display_var(var, idx)
       line = TRIM(line) // "     (zavg req)"
    ENDIF
 
-   print *, TRIM(line)
+   write(log, *) TRIM(line)
 END SUBROUTINE display_var
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -270,20 +281,17 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
-   !MH move this to a file, aed_config.log
-
-   print*
-   print*,' ---------------------- AED Variables Summary ----------------------'
-   print*,'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
-   print*
-   print*,'ENVIRONMENT:'
+   write(log, *)
+   write(log, *) ' ---------------------- AED Variables Summary ----------------------'
+   write(log, *) 'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
+   write(log, *)
+   write(log, *) 'ENVIRONMENT:'
    DO i=1,n_aed_vars
       IF ( all_vars(i)%extern ) CALL display_var(all_vars(i), i)
    ENDDO
 
-   print*
-   print*,'STATE:'
+   write(log, *)
+   write(log, *) 'STATE:'
    n_vars = 0 ; n_sheet_vars = 0
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. .NOT. all_vars(i)%diag ) THEN
@@ -293,8 +301,8 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
       ENDIF
    ENDDO
 
-   print*
-   print*,'DIAGNOSTIC:'
+   write(log, *)
+   write(log, *) 'DIAGNOSTIC:'
    n_diags = 0 ; n_sheet_diags = 0;
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. all_vars(i)%diag ) THEN
@@ -303,9 +311,9 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
          ELSE ; n_diags = n_diags + 1 ; ENDIF
       ENDIF
    ENDDO
-   print*
-   print*,' -------------------------------------------------------------------'
-   print*
+   write(log, *)
+   write(log, *) ' -------------------------------------------------------------------'
+   write(log, *)
 
    n_v = n_vars;  n_sv = n_sheet_vars
    n_d = n_diags; n_sd = n_sheet_diags

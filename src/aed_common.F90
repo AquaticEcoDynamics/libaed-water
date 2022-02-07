@@ -52,7 +52,7 @@ MODULE aed_common
 
    !#---------------------------------------------------------------------------
 
-   PUBLIC aed_model_factory, aed_delete, aed_print_version, aed_requested_zones
+   PUBLIC aed_define_model, aed_delete, aed_print_version, aed_requested_zones
 
    !#---------------------------------------------------------------------------
 
@@ -149,7 +149,7 @@ END FUNCTION scan_name
 
 
 !###############################################################################
-SUBROUTINE aed_model_factory(modeldef, namlst)
+SUBROUTINE aed_define_model(modeldef, namlst)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: modeldef
@@ -194,7 +194,7 @@ SUBROUTINE aed_model_factory(modeldef, namlst)
    ELSE
       print *,'*** Unknown module ', TRIM(modelname)
    ENDIF
-END SUBROUTINE aed_model_factory
+END SUBROUTINE aed_define_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
