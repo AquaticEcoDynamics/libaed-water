@@ -84,7 +84,7 @@ MODULE aed_phytoplankton
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP
       INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_BCP, id_d_mpbv
-      INTEGER :: id_NUP, id_NUP2, id_PUP, id_CUP
+      INTEGER :: id_NUP, id_NUP2, id_NUPN2, id_PUP, id_CUP
 
       !# Model parameters
       INTEGER  :: num_phytos
@@ -643,6 +643,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
 
    data%id_NUP = aed_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
    data%id_NUP2= aed_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
+   data%id_NUPN2= aed_define_diag_variable('NUP_n2','mmol/m**3/d','nitrogen (N2) uptake')
    data%id_PUP = aed_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
@@ -1114,6 +1115,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
    _DIAG_VAR_(data%id_NUP) =  sum(-nuptake(:,1))*secs_per_day
    _DIAG_VAR_(data%id_NUP2)=  sum(-nuptake(:,2))*secs_per_day
+   _DIAG_VAR_(data%id_NUPN2)=  sum(-nuptake(:,in2))*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(-puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(-cuptake)*secs_per_day
 
