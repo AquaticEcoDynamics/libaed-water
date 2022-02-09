@@ -1115,7 +1115,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
    _DIAG_VAR_(data%id_NUP) =  sum(-nuptake(:,1))*secs_per_day
    _DIAG_VAR_(data%id_NUP2)=  sum(-nuptake(:,2))*secs_per_day
-   _DIAG_VAR_(data%id_NUPN2)=  sum(-nuptake(:,in2))*secs_per_day
+   _DIAG_VAR_(data%id_NUPN2)=  sum(nuptake(:,in2))*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(-puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(-cuptake)*secs_per_day
 
