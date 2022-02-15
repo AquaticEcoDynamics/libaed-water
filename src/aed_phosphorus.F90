@@ -68,13 +68,14 @@ MODULE aed_phosphorus
       !# Variable identifiers
       INTEGER  :: id_frp, id_frpads, id_oxy,  id_tss, id_pH
       INTEGER  :: id_Fsed_frp
-      INTEGER  :: id_E_temp, id_E_rain, id_tssext
+      INTEGER  :: id_E_temp, id_E_salt, id_E_rain, id_tssext
       INTEGER  :: id_sed_frp, id_frpads_vvel, id_atm_dep
 
       !# Model parameters
-      AED_REAL :: Fsed_frp,Ksed_frp,theta_sed_frp      ! Benthic
-      AED_REAL :: atm_pip_dd, atm_frp_conc             ! Deposition
-      AED_REAL :: Kpo4p,Kadsratio,Qmax, w_po4ads       ! Adsorption
+      AED_REAL :: Fsed_frp,Ksed_frp,theta_sed_frp             ! Benthic
+      AED_REAL :: atm_pip_dd, atm_frp_conc                    ! Deposition
+      AED_REAL :: Kpo4p, Kadsratio, Qmax, theta_Kpo4, K_sal   ! Adsoprtion
+      AED_REAL :: w_po4ads                                    ! Sedimentation
       LOGICAL  :: simDryDeposition,simWetDeposition
       LOGICAL  :: ben_use_oxy,ben_use_aedsed
       INTEGER  :: PO4AdsorptionModel
@@ -137,6 +138,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    INTEGER           :: PO4AdsorptionModel = 1
    LOGICAL           :: ads_use_pH   = .FALSE.
    AED_REAL          :: Kpo4p        = 1.05
+   AED_REAL          :: theta_Kpo4   = 1.02
+   AED_REAL          :: K_sal        = 1000
    AED_REAL          :: Kadsratio    = 1.05
    AED_REAL          :: Qmax         = 1.05
    AED_REAL          :: w_po4ads     = zero_
@@ -155,12 +158,13 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_phosphorus/
 
-   NAMELIST /aed_phosphorus/ frp_initial,frp_min,frp_max,                     &
+   NAMELIST /aed_phosphorus/ frp_initial,frp_min,frp_max,                      &
                             Fsed_frp,Ksed_frp,theta_sed_frp,Fsed_frp_variable, &
                             phosphorus_reactant_variable,                      &
                             simPO4Adsorption,ads_use_external_tss,             &
                             po4sorption_target_variable, PO4AdsorptionModel,   &
-                            ads_use_pH,Kpo4p,Kadsratio,Qmax,w_po4ads,pH_variable, &
+                            Kpo4p,theta_Kpo4,K_sal,Kadsratio,Qmax,             &
+                            ads_use_pH,pH_variable, w_po4ads,                  &
                             simDryDeposition, simWetDeposition,                &
                             atm_pip_dd, atm_frp_conc, diag_level
 !
@@ -183,6 +187,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    data%PO4AdsorptionModel   = PO4AdsorptionModel
    data%ads_use_pH           = ads_use_pH
    data%Kpo4p                = Kpo4p
+   data%theta_Kpo4           = theta_Kpo4
+   data%K_sal                = K_sal
    data%Kadsratio            = Kadsratio
    data%Qmax                 = Qmax
    data%w_po4ads             = w_po4ads/secs_per_day
@@ -190,7 +196,6 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    data%atm_frp_conc         = MAX(zero_,atm_frp_conc)
    data%simDryDeposition     = simDryDeposition
    data%simWetDeposition     = simWetDeposition
-
 
    ! Register main state variable
    data%id_frp = aed_define_variable( 'frp', 'mmol/m**3', 'phosphorus',     &
@@ -249,6 +254,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
 
    ! Register environmental dependencies
    data%id_E_temp = aed_locate_global('temperature')
+   data%id_E_salt = aed_locate_global('salinity')
    IF( simWetDeposition ) data%id_E_rain = aed_locate_sheet_global('rain')
 
 END SUBROUTINE aed_define_phosphorus
@@ -268,13 +274,13 @@ SUBROUTINE aed_equilibrate_phosphorus(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, tss
+   AED_REAL :: temp, tss, salt
 
    ! State
    AED_REAL :: frp,frpads,pH
 
    ! Temporary variables
-   AED_REAL :: PO4dis, PO4par, PO4tot
+   AED_REAL :: PO4dis, PO4par, PO4tot, Kpo4p
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -284,6 +290,7 @@ SUBROUTINE aed_equilibrate_phosphorus(data,column,layer_idx)
 
    ! Retrieve current environmental conditions for the cell.
    temp = _STATE_VAR_(data%id_E_temp)    ! local temperature
+   salt = _STATE_VAR_(data%id_E_salt)    ! local salinity
    IF(data%ads_use_external_tss) THEN
      tss = _STATE_VAR_(data%id_tssext) ! externally supplied total susp solids
    END IF
@@ -294,13 +301,18 @@ SUBROUTINE aed_equilibrate_phosphorus(data,column,layer_idx)
    IF (.NOT.data%ads_use_external_tss) &
       tss = _STATE_VAR_(data%id_tss)         ! local total susp solids
 
+
+   ! Adjust local sorption coefficients for temperature or salinity  (PO4AdsorptionModel = 1 only)
+   Kpo4p = data%Kpo4p * Kpo4p_fT_fSal(data%theta_Kpo4, data%K_sal, salt, temp)
+
+   ! Compute sorption
    IF(data%ads_use_pH) THEN
      pH = _STATE_VAR_(data%id_pH)
 
      CALL PO4AdsorptionFraction(data%PO4AdsorptionModel,              &  ! Dependencies
                                  frp+frpads,                          &
                                  tss,                                 &
-                                 data%Kpo4p,data%Kadsratio,data%Qmax, &
+                                 Kpo4p,data%Kadsratio,data%Qmax,      &
                                  PO4dis,PO4par,                       &  ! Returning variables
                                  thepH=pH)
 
@@ -308,10 +320,11 @@ SUBROUTINE aed_equilibrate_phosphorus(data,column,layer_idx)
      CALL PO4AdsorptionFraction(data%PO4AdsorptionModel,              &  ! Dependecies
                                  frp+frpads,                          &
                                  tss,                                 &
-                                 data%Kpo4p,data%Kadsratio,data%Qmax, &
+                                 Kpo4p,data%Kadsratio,data%Qmax,      &
                                  PO4dis,PO4par)                          ! Returning variables
    ENDIF
 
+   ! Set back to core variables
    _STATE_VAR_(data%id_frp)    = PO4dis    ! Dissolved PO4 (FRP)
    _STATE_VAR_(data%id_frpads) = PO4par    ! Adsorped PO4  (PIP)
 
@@ -350,7 +363,7 @@ SUBROUTINE aed_calculate_surface_phosphorus(data,column,layer_idx)
   !# Atmosphere loading of DIP to the water, due to dry or wet deposition
   IF( data%simDryDeposition ) THEN
     !-----------------------------------------------
-    ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+    ! Set surface exchange value (mmmol/m2/s) for AED ODE solution.
    IF (data%simPO4Adsorption) & !# id_frpads is not set unless simPO4Adsorption is true
     _FLUX_VAR_T_(data%id_frpads) = data%atm_pip_dd
   ENDIF
@@ -361,7 +374,7 @@ SUBROUTINE aed_calculate_surface_phosphorus(data,column,layer_idx)
     rain = _STATE_VAR_S_(data%id_E_rain) / secs_per_day   ! Rain (m/s)
 
     !-----------------------------------------------
-    ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+    ! Set surface exchange value (mmmol/m2/s) for AED ODE solution.
     _FLUX_VAR_T_(data%id_frp) = _FLUX_VAR_T_(data%id_frp) &
                               + rain * data%atm_frp_conc
   ENDIF
@@ -470,6 +483,40 @@ SUBROUTINE aed_mobility_phosphorus(data,column,layer_idx,mobility)
    ENDIF
 
 END SUBROUTINE aed_mobility_phosphorus
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION Kpo4p_fT_fSal(theta_Kpo4, K_sal, sal, temp)
+!-------------------------------------------------------------------------------
+! Michaelis-Menten formulation for P-adsorption sensitivity to Sal & T
+! Ref: Zhang and Huang 2011, in Floriday bay, suggesting increasing P-adsorption
+! capability with increasing temperature and decreasing salinity
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+AED_REAL,INTENT(in) :: theta_Kpo4 ! theta for P-adsorp on limitation, default = 1.02
+AED_REAL,INTENT(in) :: K_sal ! half-saturation of salinity, default = 60
+AED_REAL,INTENT(in) :: temp
+AED_REAL,INTENT(in) :: sal
+AED_REAL,PARAMETER  :: Topt = 45. ! optimum temperature for P-adsorp, default = 45 as the ref showed increasing P-adsorp with temperature
+
+AED_REAL :: fT, fSal
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+fT = (theta_Kpo4**(temp-Topt))
+
+IF(K_sal==zero_)THEN
+fSal = one_
+ELSE
+fSal = K_sal/(K_sal+sal)
+ENDIF
+
+Kpo4p_fT_fSal = fT * fSal
+
+END FUNCTION Kpo4p_fT_fSal
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

@@ -78,12 +78,16 @@ MODULE aed_nitrogen
       AED_REAL :: theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit
       AED_REAL :: Fsed_amm,Fsed_nit,Fsed_n2o,Fsed_no2,Ksed_amm,Ksed_nit,Ksed_n2o
       AED_REAL :: atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox
+      AED_REAL :: K_sal,S0
       AED_REAL :: atm_n2o
 
       LOGICAL  :: use_oxy, use_ph
       LOGICAL  :: use_sed_model_amm,use_sed_model_nit,use_sed_model_n2o,use_sed_model_no2
-      LOGICAL  :: simNitrfpH,simNitrfLight,simDryDeposition,simWetDeposition
+      LOGICAL  :: simNitrfpH,simNitrfLight,simNitrfSal
+      LOGICAL  :: simDryDeposition,simWetDeposition
+
       INTEGER  :: oxy_lim, simN2O, n2o_piston_model, Fsed_nit_model
+      INTEGER  :: sal_model
 
      CONTAINS
          PROCEDURE :: define            => aed_define_nitrogen
@@ -138,6 +142,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    AED_REAL          :: Rdnra         =   0.0
    AED_REAL          :: Knitrif       = 150.0
    AED_REAL          :: Kdenit        = 150.0
+   AED_REAL          :: K_sal         =  20.0
+   AED_REAL          :: S0            =  40.0
    AED_REAL          :: Kanmx_nit     = 150.0
    AED_REAL          :: Kanmx_amm     = 150.0
    AED_REAL          :: Kdnra_oxy     = 150.0
@@ -170,6 +176,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    INTEGER           :: Fsed_nit_model = 1
 
    LOGICAL           :: simNitrfpH = .false.
+   LOGICAL           :: simNitrfSal = .false.
    LOGICAL           :: simNitrfLight = .false.
    LOGICAL           :: simDryDeposition = .false.
    LOGICAL           :: simWetDeposition = .false.
@@ -199,7 +206,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 Fsed_amm_variable,Fsed_nit_variable,Fsed_n2o_variable,Fsed_no2_variable,&
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
                 Ranammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
-                simNitrfpH, simNitrfLight, simDryDeposition, simWetDeposition, &
+                simNitrfpH, simNitrfLight, simNitrfSal, K_sal, S0,             &
+                simDryDeposition, simWetDeposition, &
                 atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model, &
                 diag_level
 !
@@ -217,6 +225,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    ! Note: all rates must be provided in values per day in the nml,
    ! and are converted for internal use as values per second.
    data%simNitrfpH       = simNitrfpH
+   data%simNitrfSal      = simNitrfSal   ;  IF(simNitrfSal) data%sal_model = 1
    data%simNitrfLight    = simNitrfLight
    data%simN2O           = simN2O
    data%oxy_lim          = oxy_lim
@@ -229,6 +238,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%Rdnra            = Rdnra/secs_per_day
    data%Knitrif          = Knitrif
    data%Kdenit           = Kdenit
+   data%K_sal            = K_sal
+   data%S0               = S0
    data%Kanmx_nit        = Kanmx_nit
    data%Kanmx_amm        = Kanmx_amm
    data%Kdnra_oxy        = Kdnra_oxy
@@ -358,7 +369,7 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
 !
 !LOCALS
    AED_REAL           :: amm,nit,n2o,no2   ! State variables
-   AED_REAL           :: oxy,temp,pH       ! Dependant variables
+   AED_REAL           :: oxy,temp,pH,salt  ! Dependant variables
 
    AED_REAL           :: nitrification,denitrification,anammox,dnra
    AED_REAL           :: denit_n2o_prod,denit_n2o_cons,nit_n2o_prod
@@ -385,6 +396,7 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
    !-----------------------------------------------
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_temp)  ! temperature
+   salt = _STATE_VAR_(data%id_salt)  ! salinity
 
    !-----------------------------------------------
    ! Set current (local) state variable values.
@@ -445,7 +457,8 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
 
      !# Nitrification
      nitrification = amm * NitrfO2Function(data%use_oxy,data%Rnitrif,data%Knitrif,data%theta_nitrif,oxy,temp)
-     IF( data%simNitrfpH ) nitrification = nitrification * NitrfpHFunction(pH)
+     IF( data%simNitrfpH )  nitrification = nitrification * NitrfpHFunction(pH)
+     IF( data%simNitrfSal ) nitrification = nitrification * NitrfSalFunction(data%sal_model, data%K_sal, data%S0, salt)
     !IF( data%simNitrfLight ) nitrification = nitrification* NitrfLightFunction(I) ! Capone Pg 238 add one day
 
      !# De-nitrification
@@ -453,6 +466,8 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
                                     data%use_oxy,data%oxy_lim,                 &
                                     data%Kdenit,data%theta_denit,Kno3,         &
                                     oxy,temp,nit)
+
+     IF( data%simNitrfSal ) denitrification = denitrification * NitrfSalFunction(data%sal_model, data%K_sal, data%S0, salt)
 
      !# Leakign of N2O, using the Babbin model
      IF( data%simN2O == 1 ) THEN
@@ -594,7 +609,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
     rain = _STATE_VAR_S_(data%id_E_rain) / secs_per_day   ! Rain (m/s)
 
     !-----------------------------------------------
-    ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+    ! Set surface exchange value (mmmol/m2/s) for AED ODE solution.
     _FLUX_VAR_T_(data%id_nox) = _FLUX_VAR_T_(data%id_nox) &
                               + rain * data%atm_din_conc * data%f_dindep_nox
     _FLUX_VAR_T_(data%id_amm) = _FLUX_VAR_T_(data%id_amm) &
@@ -632,7 +647,7 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    AED_REAL :: amm_flux, nit_flux, n2o_flux, no2_flux
    AED_REAL :: Fsed_amm, Fsed_nit, Fsed_n2o, Fsed_no2
    AED_REAL :: fTa, fTo, fNO3
-   
+
    AED_REAL,PARAMETER :: Kno3 = 5.0      !Denit NO3 half-sat
 !
 !------------------------------------------------------------------------------+
@@ -670,13 +685,13 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
       if(data%Fsed_nit_model == 1) THEN
          nit_flux = Fsed_nit *           oxy/(data%Ksed_nit+oxy) * fTo
       ELSE
-         nit = _STATE_VAR_(data%id_nox)  
+         nit = _STATE_VAR_(data%id_nox)
          IF(Kno3==zero_)THEN
            fNO3 = one_
          ELSE
            fNO3 = nit/(Kno3+nit)
          ENDIF
-         nit_flux = Fsed_nit * data%Ksed_nit/(data%Ksed_nit+oxy) * fTo * fNO3 
+         nit_flux = Fsed_nit * data%Ksed_nit/(data%Ksed_nit+oxy) * fTo * fNO3
       ENDIF
 
       IF( data%simN2O>0 ) n2o_flux = Fsed_n2o * data%Ksed_n2o/(data%Ksed_n2o+oxy) * fTa
@@ -849,9 +864,48 @@ END FUNCTION NitrfpHFunction
    AED_REAL :: limitation
    !-- Local
 
-     limitation = one_   ! TO BE COMPLETED - SEE CAPONE 2008
+   limitation = one_   ! TO BE COMPLETED - SEE CAPONE 2008
 
  END FUNCTION NitrfLightFunction
+!------------------------------------------------------------------------------!
+
+
+!###############################################################################
+FUNCTION NitrfSalFunction(sal_model,K_sal,S0,salinity) RESULT(fSal)
+!-------------------------------------------------------------------------------
+! Salinity dependency of nitrification/denitrification
+! based on review of hypersalinity on N cycling, major refs: Mosley et al. 2020;
+! Isaji et al. 2019; Enrich-Pratt et al. 2009
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER, INTENT(in) :: sal_model  ! 0: no effect; 1: Michaelis Menten function, default = 0
+   AED_REAL,INTENT(in) :: K_sal     ! half-saturation coefficient, default = 20
+   AED_REAL,INTENT(in) :: S0        ! salinity threshold, default = 40
+   AED_REAL,INTENT(in) :: salinity  ! salinity
+!
+!LOCALS
+   AED_REAL :: fSal                 ! Returns the salinity function
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   fSal = 1.0 !## initialized to be 1
+
+   IF (sal_model == 0) THEN ! no effect
+     fSal = 1.0
+   ELSEIF (sal_model == 1) THEN
+     !# f(S) = 1 at S<=S0, f(S) = K_sal/(K_sal+S-S0) at S>S0
+     IF ( salinity>S0 ) THEN
+       fSal = K_sal / (K_sal + (salinity - S0) )
+     ELSE
+       fSal = 1.0
+     ENDIF
+   ELSE
+     PRINT *,'STOP: Unsupported sal_model flag for nitrogen module'
+   ENDIF
+
+   IF( fSal < zero_ ) fSal = zero_
+
+END FUNCTION NitrfSalFunction
 !------------------------------------------------------------------------------!
 
 
