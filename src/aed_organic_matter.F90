@@ -92,11 +92,11 @@ MODULE aed_organic_matter
       INTEGER  :: id_pon_miner,  id_don_miner
       INTEGER  :: id_pop_miner,  id_dop_miner
       INTEGER  :: id_poc_miner,  id_doc_miner
-      INTEGER  :: id_swi_pon,    id_swi_don
-      INTEGER  :: id_swi_pop,    id_swi_dop
-      INTEGER  :: id_swi_poc,    id_swi_doc
+      INTEGER  :: id_swi_pon,    id_swi_don,     id_swi_pon_r
+      INTEGER  :: id_swi_pop,    id_swi_dop,     id_swi_pop_r
+      INTEGER  :: id_swi_poc,    id_swi_doc,     id_swi_poc_r
       INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner
-      INTEGER  :: id_sed_toc,    id_sed_ton,     id_sed_top
+      INTEGER  :: id_sed_toc,    id_sed_ton,     id_sed_top,     id_sedomfr
       INTEGER  :: id_l_resus,    id_denit,       id_anaerobic
       INTEGER  :: id_pom_vvel,   id_cpom_vvel
       INTEGER  :: id_bod,        id_cdom
@@ -579,6 +579,9 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    !-- resuspension link variable
    IF ( resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
       data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link)) ! ('TRC_resus')
+      IF ( resuspension>1 ) THEN
+        data%id_sedomfr  = aed_define_sheet_diag_variable('sed_om_frac','w/w',  'Sediment OM fraction')
+      ENDIF
    ELSE
       data%id_l_resus = 0
       data%resuspension = 0
@@ -627,6 +630,9 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      data%id_swi_don  = aed_define_sheet_diag_variable('swi_don','mmol/m**2/d',  'Net DON flux @ the SWI')
      data%id_swi_pop  = aed_define_sheet_diag_variable('swi_pop','mmol/m**2/d',  'Net POP flux @ the SWI')
      data%id_swi_dop  = aed_define_sheet_diag_variable('swi_dop','mmol/m**2/d',  'Net DOP flux @ the SWI')
+     data%id_swi_poc_r= aed_define_sheet_diag_variable('poc_resus','mmol/m**2/d','POC resuspenion rate')
+     data%id_swi_pon_r= aed_define_sheet_diag_variable('pon_resus','mmol/m**2/d','PON resuspenion rate')
+     data%id_swi_pop_r= aed_define_sheet_diag_variable('pop_resus','mmol/m**2/d','POP resuspenion rate')
      data%id_poc_miner= aed_define_diag_variable('poc_hydrol','mmol/m**3/d','POC hydrolosis')
      data%id_doc_miner= aed_define_diag_variable('doc_miner' ,'mmol/m**3/d','DOC mineralisation')
      data%id_pon_miner= aed_define_diag_variable('pon_hydrol','mmol/m**3/d','PON hydrolosis')
@@ -1020,6 +1026,7 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    AED_REAL :: Fsed_pon,Fsed_don
    AED_REAL :: Fsed_pop,Fsed_dop
    AED_REAL :: fT, fDO, fDOM
+   AED_REAL :: sedomfr = 0.01
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -1072,24 +1079,31 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
      Fsed_dop = data%Fsed_dop * fDO * fT * fDOM
    ENDIF
 
-   ! Set flux rate of particulate organic matter pools
+   ! Set resuspension flux rate of particulate organic matter pools
+
+   IF( data%resuspension == 1 ) sedomfr = data%sedimentOMfrac
+   IF( data%resuspension == 2 ) sedomfr = _DIAG_VAR_S_(data%id_sedomfr)
+
    IF (data%use_Fsed_link_poc) THEN
      Fsed_poc = _STATE_VAR_S_(data%id_Fsed_poc)
    ELSE ! Compute directly
-     Fsed_poc = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsc *(bottom_stress - data%tau_0) / data%tau_r
-     IF( data%resuspension>0 ) Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsc
+     Fsed_poc = zero_  !data%Fsed_pom * sedimentOMfrac * data%Xsc *(bottom_stress - data%tau_0) / data%tau_r
+     IF( data%resuspension > 0 ) &
+       Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsc * 1e3/12  ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
    ENDIF
    IF (data%use_Fsed_link_pon) THEN
      Fsed_pon = _STATE_VAR_S_(data%id_Fsed_pon)
    ELSE ! Compute directly
      Fsed_pon = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsn *(bottom_stress - data%tau_0) / data%tau_r
-     IF( data%resuspension>0 ) Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsn
+     IF( data%resuspension > 0 ) &
+       Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsn * 1e3/14  ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
    ENDIF
    IF (data%use_Fsed_link_pop) THEN
      Fsed_pop = _STATE_VAR_S_(data%id_Fsed_pop)
    ELSE ! Compute directly
      Fsed_pop = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsp *(bottom_stress - data%tau_0) / data%tau_r
-     IF( data%resuspension>0 ) Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * data%sedimentOMfrac * data%Xsp
+     IF( data%resuspension > 0 ) &
+       Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsp * 1e3/30.91  ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
    ENDIF
 
    ! Set bottom fluxes for the pelagic variables, note this doesnt consdier
@@ -1130,6 +1144,10 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
      _DIAG_VAR_S_(data%id_swi_don) = secs_per_day*(Fsed_don)            ! dissolved flux
      _DIAG_VAR_S_(data%id_swi_pop) = secs_per_day*(Fsed_pop + Psed_pop) ! resus & settling
      _DIAG_VAR_S_(data%id_swi_dop) = secs_per_day*(Fsed_dop)            ! dissolved flux
+
+     _DIAG_VAR_S_(data%id_swi_poc_r) = secs_per_day*(Fsed_poc)          ! resus only
+     _DIAG_VAR_S_(data%id_swi_pon_r) = secs_per_day*(Fsed_pon)          ! resus only
+     _DIAG_VAR_S_(data%id_swi_pop_r) = secs_per_day*(Fsed_pop)          ! resus only
    ENDIF
 
    ! Set source & sink terms for the sediment pools (change per surface area per second)
