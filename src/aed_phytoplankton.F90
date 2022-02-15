@@ -62,7 +62,6 @@ MODULE aed_phytoplankton
 
    PUBLIC aed_phytoplankton_data_t
 
-
    TYPE,extends(aed_model_data_t) :: aed_phytoplankton_data_t
       !# Variable identifiers
       INTEGER,ALLOCATABLE :: id_p(:)
@@ -72,8 +71,12 @@ MODULE aed_phytoplankton
       INTEGER,ALLOCATABLE :: id_NtoP(:)
       INTEGER,ALLOCATABLE :: id_vvel(:)
       INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), &
-                             id_fPho(:), id_fSil(:), id_fSal(:), &
-                             id_PhyCUP(:), id_PhyNCP(:), id_PhySed(:)
+                             id_fPho(:), id_fSil(:), id_fSal(:)
+
+      INTEGER,ALLOCATABLE :: id_PhyGPPc(:),id_PhyRSPc(:),id_PhyEXCc(:),id_PhyMORc(:),id_PhySEDc(:)
+      INTEGER,ALLOCATABLE :: id_PhyGPPn(:),id_PhyRSPn(:),id_PhyEXCn(:),id_PhyMORn(:),id_PhySEDn(:)
+      INTEGER,ALLOCATABLE :: id_PhyGPPp(:),id_PhyRSPp(:),id_PhyEXCp(:),id_PhyMORp(:),id_PhySEDp(:)
+
       INTEGER :: id_Pexctarget,id_Pmorttarget,id_Pupttarget(1:2)
       INTEGER :: id_Nexctarget,id_Nmorttarget,id_Nupttarget(1:4)
       INTEGER :: id_Cexctarget,id_Cmorttarget,id_Cupttarget
@@ -83,7 +86,7 @@ MODULE aed_phytoplankton
       INTEGER :: id_tem, id_sal, id_dz, id_dens
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP
-      INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_BCP, id_d_mpbv
+      INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_BCP, id_d_mpbv, id_d_res
       INTEGER :: id_NUP, id_NUP2, id_PUP, id_CUP
 
       !# Model parameters
@@ -270,13 +273,27 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        ALLOCATE(data%id_fSil(count)) ; data%id_fSil(:) = 0
        ALLOCATE(data%id_fSal(count)) ; data%id_fSal(:) = 0
        ALLOCATE(data%id_vvel(count)) ; data%id_vvel(:) = 0
-       ALLOCATE(data%id_PhyCUP(count)) ; data%id_PhyCUP(:) = 0
-       ALLOCATE(data%id_PhyNCP(count)) ; data%id_PhyNCP(:) = 0
-       ALLOCATE(data%id_PhySed(count)) ; data%id_PhySed(:) = 0
+       ALLOCATE(data%id_PhyGPPc(count)) ; data%id_PhyGPPc(:) = 0
+       ALLOCATE(data%id_PhyRSPc(count)) ; data%id_PhyRSPc(:) = 0
+       ALLOCATE(data%id_PhyEXCc(count)) ; data%id_PhyEXCc(:) = 0
+       ALLOCATE(data%id_PhyMORc(count)) ; data%id_PhyMORc(:) = 0
+       ALLOCATE(data%id_PhySEDc(count)) ; data%id_PhySEDc(:) = 0
+       ALLOCATE(data%id_PhyGPPn(count)) ; data%id_PhyGPPn(:) = 0
+       ALLOCATE(data%id_PhyRSPn(count)) ; data%id_PhyRSPn(:) = 0
+       ALLOCATE(data%id_PhyEXCn(count)) ; data%id_PhyEXCn(:) = 0
+       ALLOCATE(data%id_PhyMORn(count)) ; data%id_PhyMORn(:) = 0
+       ALLOCATE(data%id_PhySEDn(count)) ; data%id_PhySEDn(:) = 0
+       ALLOCATE(data%id_PhyGPPp(count)) ; data%id_PhyGPPp(:) = 0
+       ALLOCATE(data%id_PhyRSPp(count)) ; data%id_PhyRSPp(:) = 0
+       ALLOCATE(data%id_PhyEXCp(count)) ; data%id_PhyEXCp(:) = 0
+       ALLOCATE(data%id_PhyMORp(count)) ; data%id_PhyMORp(:) = 0
+       ALLOCATE(data%id_PhySEDp(count)) ; data%id_PhySEDp(:) = 0
     ENDIF
 
     DO i=1,count
-       ! Assign parameters from database to simulated groups
+       ! Assign parameters from database to chosen simulated groups
+       ! Note:  all rates are provided in values per day,
+       !        and are converted in here to values per second.
        data%phytos(i)%p_name       = pd(list(i))%p_name
        data%phytos(i)%p0           = pd(list(i))%p0
        data%phytos(i)%w_p          = pd(list(i))%w_p/secs_per_day
@@ -326,7 +343,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%Si_0         = pd(list(i))%Si_0
        data%phytos(i)%K_Si         = pd(list(i))%K_Si
        data%phytos(i)%X_sicon      = pd(list(i))%X_sicon
-
+       ! Hardocoded parameter values
        data%phytos(i)%c1           = 0.1240/60.   ! From Chung et al (2014)
        data%phytos(i)%c3           = 0.0230/60.   !  "
        data%phytos(i)%f1           = 0.675        ! Ross and Sharples (2007)
@@ -334,18 +351,18 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%d_phy        = 1e-5
 
        ! Register group as a state variable
-       data%id_p(i) = aed_define_variable(                                    &
+       data%id_p(i) = aed_define_variable(                                     &
                               TRIM(data%phytos(i)%p_name),                     &
                               'mmol/m**3',                                     &
                               'phytoplankton '//TRIM(data%phytos(i)%p_name),   &
                               pd(list(i))%p_initial,                           &
                               minimum=pd(list(i))%p0,                          &
-                              maximum=1e4,                          &
+                              maximum=1e4,                                     &
                               mobility = data%phytos(i)%w_p)
 
        ! Register rho (density) group as a state variable, if required
        IF (data%phytos(i)%settling == _MOB_STOKES_) THEN
-          data%id_rho(i) = aed_define_variable(                               &
+          data%id_rho(i) = aed_define_variable(                                &
                               TRIM(data%phytos(i)%p_name)//'_rho',             &
                               'kg/m**3',                                       &
                         'phytoplankton '//TRIM(data%phytos(i)%p_name)//'_rho', &
@@ -363,7 +380,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
             minNut = data%phytos(i)%p0*data%phytos(i)%X_nmin
           ENDIF
           ! Register IN group as a state variable
-          data%id_in(i) = aed_define_variable(                     &
+          data%id_in(i) = aed_define_variable(                                 &
                               TRIM(data%phytos(i)%p_name)//'_IN',              &
                               'mmol/m**3',                                     &
                          'phytoplankton '//TRIM(data%phytos(i)%p_name)//'_IN', &
@@ -386,7 +403,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
             minNut = data%phytos(i)%p0*data%phytos(i)%X_pmin
           ENDIF
           ! Register IP group as a state variable
-          data%id_ip(i) = aed_define_variable(                     &
+          data%id_ip(i) = aed_define_variable(                                 &
                               TRIM(data%phytos(i)%p_name)//'_IP',              &
                               'mmol/m**3',                                     &
                          'phytoplankton '//TRIM(data%phytos(i)%p_name)//'_IP', &
@@ -398,15 +415,29 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        ! Group specific diagnostic variables
        data%id_NtoP(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_NtoP','-', 'internal n:p ratio')
        IF ( diag_level >= 10 ) THEN
+          ! Growth controls
           data%id_fI(i)   = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fI', '-', 'fI (0-1)')
           data%id_fNit(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fNit', '-', 'fNit (0-1)')
           data%id_fPho(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fPho', '-', 'fPho (0-1)')
           data%id_fSil(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSil', '-', 'fSil (0-1)')
           data%id_fT(i)   = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fT', '-', 'fT (>0)')
           data%id_fSal(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSal', '-', 'fSal (>1)')
-          data%id_PhyCUP(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_GPP', 'mmol/m**3/d', 'group primary production')
-          data%id_PhyNCP(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_NCP', 'mmol/m**3/d', 'group net production')
-          data%id_PhySed(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_SED', 'mmol/m**2/d', 'group sedimentation')
+          ! Mass flux tracking
+          data%id_PhyGPPc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_GPP_c', 'mmol/m**3/d', 'group primary production')
+          data%id_PhyRSPc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_RSP_c', 'mmol/m**3/d', 'group respiration')
+          data%id_PhyEXCc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_EXC_c', 'mmol/m**3/d', 'group excretion/exudation')
+          data%id_PhyMORc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_MOR_c', 'mmol/m**3/d', 'group mortality')
+          data%id_PhySEDc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_SED_c', 'mmol/m**2/d', 'group sedimentation')
+          data%id_PhyGPPn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_GPP_n', 'mmol/m**3/d', 'group primary production')
+          data%id_PhyRSPn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_RSP_n', 'mmol/m**3/d', 'group respiration')
+          data%id_PhyEXCn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_EXC_n', 'mmol/m**3/d', 'group excretion/exudation')
+          data%id_PhyMORn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_MOR_n', 'mmol/m**3/d', 'group mortality')
+          data%id_PhySEDn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_SED_n', 'mmol/m**2/d', 'group sedimentation')
+          data%id_PhyGPPp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_GPP_p', 'mmol/m**3/d', 'group primary production')
+          data%id_PhyRSPp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_RSP_p', 'mmol/m**3/d', 'group respiration')
+          data%id_PhyEXCp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_EXC_p', 'mmol/m**3/d', 'group excretion/exudation')
+          data%id_PhyMORp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_MOR_p', 'mmol/m**3/d', 'group mortality')
+          data%id_PhySEDp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_SED_p', 'mmol/m**2/d', 'group sedimentation')
           ! Register vertical velocity diagnostic, where relevant
           IF (data%phytos(i)%settling == _MOB_STOKES_ .OR. &
                                    data%phytos(i)%settling == _MOB_MOTILE_) THEN
@@ -522,9 +553,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
      ENDDO
    ENDIF
 
-   ! Store species parameter values in our own derived type
-   ! Note: all rates are provided in values per day,
-   !     and are converted in here to values per second.
+   ! Store species parameter values in our own derived type, and register species
    CALL aed_phytoplankton_load_params(data,dbase,num_phytos,the_phytos,settling,resuspension)
 
    CALL aed_bio_temp_function( data%num_phytos,                                &
@@ -546,7 +575,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
                                                 minimum=0.001)
    ENDIF
 
-   ! Register link to nutrient pools, if variable names are provided in namelist.
+   ! Register link to nutrient pools, if variable names are provided in namelist
    data%do_Pexc = p_excretion_target_variable .NE. ''
    IF (data%do_Pexc) THEN
      data%id_Pexctarget = aed_locate_variable(p_excretion_target_variable)
@@ -624,10 +653,11 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
      data%id_Siupttarget = aed_locate_variable( si_uptake_target_variable)
    ENDIF
 
-   !-- sedimentation link variable
+   !-- Create sedimentation and resuspension diagnostic variables
    data%id_Psed_phy = aed_define_diag_variable('Psed_phy','mmol/m**2/s','PHY sedimentation')
+   data%id_d_res = aed_define_sheet_diag_variable('resus','mmol/m**2/d', 'PHY resuspension')
 
-   !-- resuspension link variable
+   !-- Check for resuspension link variable
    IF ( .NOT.resus_link .EQ. '' ) THEN
       data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link))
    ELSE
@@ -635,37 +665,40 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
       data%resuspension = 0.
    ENDIF
 
-   ! Register diagnostic variables
+   ! Register general/community level diagnostic variables
+   data%id_TCHLA = aed_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
+   data%id_TIN = aed_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
+   data%id_TIP = aed_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
+
    data%id_GPP = aed_define_diag_variable('GPP','mmol/m**3/d',  'gross primary production')
    data%id_NCP = aed_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
-   IF ( diag_level >= 10 ) data%id_PPR = aed_define_diag_variable('PPR','-','phytoplankton p/r ratio (gross)')
-   IF ( diag_level >= 10 ) data%id_NPR = aed_define_diag_variable('NPR','-','phytoplankton p/r ratio (net)')
 
    data%id_NUP = aed_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
    data%id_NUP2= aed_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
    data%id_PUP = aed_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
-   IF ( diag_level >= 10 ) data%id_dPAR = aed_define_diag_variable('PAR','W/m**2', 'photosynthetically active radiation')
-   data%id_TCHLA = aed_define_diag_variable('TCHLA','ug/L', 'total chlorophyll-a')
-   IF ( diag_level >= 10 ) data%id_TPHY = aed_define_diag_variable('TPHYS','mmol/m**3', 'total phytoplankton')
-   data%id_TIN = aed_define_diag_variable('IN','mmol/m**3', 'total phy nitrogen')
-   data%id_TIP = aed_define_diag_variable('IP','mmol/m**3', 'total phy phosphorus')
+   IF ( diag_level >= 10 ) data%id_dPAR = aed_define_diag_variable('PAR'  ,'W/m**2'   ,'photosynthetically active radiation')
+   IF ( diag_level >= 10 ) data%id_TPHY = aed_define_diag_variable('TPHYS','mmol/m**3','total phytoplankton')
+   IF ( diag_level >= 10 ) data%id_PPR  = aed_define_diag_variable('PPR'  ,'-'        ,'phytoplankton p/r ratio (gross)')
+   IF ( diag_level >= 10 ) data%id_NPR  = aed_define_diag_variable('NPR'  ,'-'        ,'phytoplankton p/r ratio (net)')
+
+   ! Register benthic phyto diagnostic variables
    IF(do_mpb>0) THEN
-     data%id_d_MPB = aed_define_sheet_diag_variable('MPB','mmol/m**2', 'microphytobenthos density')
-     data%id_d_BPP = aed_define_sheet_diag_variable('BPP','mmol/m**2/d', 'benthic gross productivity')
-     data%id_d_BCP = aed_define_sheet_diag_variable('BCP','mmol/m**2/d', 'benthic net productivity')
-     data%id_d_mpbv= aed_define_sheet_diag_variable('MPBV','mmol/m**2/d', 'mpb vertical exchange')
+     data%id_d_MPB = aed_define_sheet_diag_variable('MPB' ,'mmol/m**2'  ,'microphytobenthos density')
+     data%id_d_BPP = aed_define_sheet_diag_variable('BPP' ,'mmol/m**2/d','benthic gross productivity')
+     data%id_d_BCP = aed_define_sheet_diag_variable('BCP' ,'mmol/m**2/d','benthic net productivity')
+     data%id_d_mpbv= aed_define_sheet_diag_variable('MPBV','mmol/m**2/d','mpb vertical exchange')
    ENDIF
 
    ! Register environmental dependencies
-   data%id_tem = aed_locate_global('temperature')
-   data%id_sal = aed_locate_global('salinity')
-   data%id_par = aed_locate_global('par')
-   data%id_I_0 = aed_locate_sheet_global('par_sf')
-   data%id_dz = aed_locate_global('layer_ht')
-   data%id_extc = aed_locate_global('extc_coef')
-   data%id_dens = aed_locate_global('density')
+   data%id_tem     = aed_locate_global('temperature')
+   data%id_sal     = aed_locate_global('salinity')
+   data%id_par     = aed_locate_global('par')
+   data%id_I_0     = aed_locate_sheet_global('par_sf')
+   data%id_dz      = aed_locate_global('layer_ht')
+   data%id_extc    = aed_locate_global('extc_coef')
+   data%id_dens    = aed_locate_global('density')
    data%id_sedzone = aed_locate_sheet_global('sed_zone')
 
 END SUBROUTINE aed_define_phytoplankton
@@ -903,20 +936,19 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       _DIAG_VAR_(data%id_NtoP(phy_i)) =  INi/IPi
 
       IF ( diag_level >= 10 ) THEN
+         ! Growth controls
          _DIAG_VAR_(data%id_fT(phy_i))   =  fT
          _DIAG_VAR_(data%id_fI(phy_i))   =  fI
          _DIAG_VAR_(data%id_fNit(phy_i)) =  fNit
          _DIAG_VAR_(data%id_fPho(phy_i)) =  fPho
          _DIAG_VAR_(data%id_fSil(phy_i)) =  fSil
          _DIAG_VAR_(data%id_fSal(phy_i)) =  fSal
-         _DIAG_VAR_(data%id_PhyCUP(phy_i)) =  cuptake(phy_i) * secs_per_day
-         _DIAG_VAR_(data%id_PhyNCP(phy_i)) =  (-cuptake(phy_i) - respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
       ENDIF
    END DO
 
 
    !---------------------------------------------------------------------------+
-   ! Check uptake values for availability to prevent -ve numbers
+   ! Check uptake values for availability to prevent -ve numbers, and report
 
    ! pup   - p available
    ! no3up - no3 available
@@ -968,6 +1000,25 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       ENDIF
    ENDIF
 
+   DO phy_i=1,data%num_phytos
+     IF ( diag_level >= 10 ) THEN
+          ! Carbon fluxes
+          _DIAG_VAR_(data%id_PhyGPPc(phy_i)) =  cuptake(phy_i) * secs_per_day
+          _DIAG_VAR_(data%id_PhyRSPc(phy_i)) = ( -respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
+          _DIAG_VAR_(data%id_PhyEXCc(phy_i)) = cexcretion(phy_i) * secs_per_day
+          _DIAG_VAR_(data%id_PhyMORc(phy_i)) = cmortality(phy_i) * secs_per_day
+          ! Nitrogen fluxes
+          _DIAG_VAR_(data%id_PhyGPPn(phy_i)) =  sum(nuptake(phy_i,:)) * secs_per_day
+          _DIAG_VAR_(data%id_PhyRSPn(phy_i)) = ( -respiration(phy_i)*data%phytos(phy_i)%k_fres*INi) * secs_per_day
+          _DIAG_VAR_(data%id_PhyEXCn(phy_i)) = nexcretion(phy_i) * secs_per_day
+          _DIAG_VAR_(data%id_PhyMORn(phy_i)) = nmortality(phy_i) * secs_per_day
+          ! Phosphorus fluxes
+          _DIAG_VAR_(data%id_PhyGPPp(phy_i)) =  puptake(phy_i,1) * secs_per_day
+          _DIAG_VAR_(data%id_PhyRSPp(phy_i)) = ( -respiration(phy_i)*data%phytos(phy_i)%k_fres*IPi) * secs_per_day
+          _DIAG_VAR_(data%id_PhyEXCp(phy_i)) = pexcretion(phy_i) * secs_per_day
+          _DIAG_VAR_(data%id_PhyMORp(phy_i)) = pmortality(phy_i) * secs_per_day
+     ENDIF
+   ENDDO
    !---------------------------------------------------------------------------+
    ! SET TEMPORAL DERIVATIVES FOR ODE SOLVER
    net_cuptake = zero_
@@ -1141,30 +1192,21 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
 !LOCALS
    INTEGER  :: phy_i
    AED_REAL :: phy,mpb,temp,extc,par,dz,Io,fI,matz        ! State
-   AED_REAL :: Fsed_phy,Psed_phy,mpb_flux,mpb_prod,mpb_resp
+   AED_REAL :: Fsed_phy,Psed_phy,mpb_flux,mpb_prod,mpb_resp,resus,phy_sed_frac
 !
 !------------------------------------------------------------------------------+
 !BEGIN
-   ! Loop through pelagic plankton groups (CURRENTLY DISABLED)
-   !DO phy_i=1,data%num_phytos
-   !    ! Retrieve current (local) state variable values.
-   !    phy = _STATE_VAR_(data%id_p(phy_i))! phytoplankton
-   !    phy_flux = zero_  ! no groups currently accumulate biomass in the sediment
-   !    ! Set bottom fluxes for the pelagic (change per surface area per second)
-   !    !_FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + phy_flux
-   !    !_FLUX_VAR_B_(data%id_p(phy_i)) = _FLUX_VAR_B_(data%id_p(phy_i)) - phy_flux
-   !ENDDO
 
-   ! Process microphytobenthos (MPB)
+   !-- Process microphytobenthos (MPB) - sedimented phytoplankton
    IF ( data%do_mpb>0 ) THEN
      ! Get local conditions
-     matz = _STATE_VAR_S_(data%id_sedzone) ! local benthic type
-     mpb  = _STATE_VAR_S_(data%id_mpb)     ! local mpb density
-     temp = _STATE_VAR_(data%id_tem)       ! local temperature
-     extc = _STATE_VAR_(data%id_extc)      ! cell extinction
-     dz   = _STATE_VAR_(data%id_dz)        ! cell depth
-     par  = _STATE_VAR_(data%id_par)       ! local photosynt. active radiation
-     Io   = _STATE_VAR_S_(data%id_I_0)     ! surface short wave radiation
+     matz = _STATE_VAR_S_(data%id_sedzone)  ! local benthic type
+     mpb  = _STATE_VAR_S_(data%id_mpb)      ! local mpb density
+     Io   = _STATE_VAR_S_(data%id_I_0)      ! surface short wave radiation
+     temp = _STATE_VAR_(data%id_tem)        ! local temperature
+     extc = _STATE_VAR_(data%id_extc)       ! cell extinction
+     par  = _STATE_VAR_(data%id_par)        ! local photosynt. active radiation
+     dz   = _STATE_VAR_(data%id_dz)         ! cell depth
 
      ! Get sedimentation flux (mmmol/m2/s) loss into the benthos (diagnostic was set in mobility)
      Psed_phy = _DIAG_VAR_(data%id_Psed_phy)
@@ -1175,40 +1217,80 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      mpb_resp = (data%R_mpbr*(data%theta_mpb_resp**(temp-20.)))           !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
      mpb_flux = (mpb_prod-mpb_resp)*mpb
 
-     ! Update the MPB biomass, and O2/CO2 fluxes (mmol/m2/day)
-     _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux + Psed_phy
+     ! Update the MPB biomass, include net production and add sedimented phytos (mmolC/m2/s)
+     _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux + (-Psed_phy)
+
+     ! log this uptake into the bulk community GPP/NCP diagnostics (mmolC/m3/d)
+     _DIAG_VAR_(data%id_GPP) =  _DIAG_VAR_(data%id_GPP) + (mpb_prod/dz) * mpb * secs_per_day
+     _DIAG_VAR_(data%id_NCP) =  _DIAG_VAR_(data%id_NCP) + (mpb_flux/dz) * secs_per_day
+
+     ! Update flux terms for other O2, CO2 and nutrient fluxes (mmolO2/m2/s)
      IF (data%do_DOuptake) THEN
         _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
      ENDIF
      IF (data%do_Cuptake) THEN
         _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
+        ! log this uptake into the bulk community C uptake diagnostic
+        _DIAG_VAR_(data%id_CUP) = _DIAG_VAR_(data%id_CUP) - (mpb_flux/dz) * secs_per_day
      ENDIF
      ! A quick and dirty nutrient uptake by MPB; needs cleaning to account for limitation and excretion of DOM
      IF (data%do_Nuptake) THEN
+        ! increment flux from bottom cell nutrient amount (mmol N/m2/s)
         _FLUX_VAR_(data%id_Nupttarget(1)) = &
                            _FLUX_VAR_(data%id_Nupttarget(1)) - mpb_flux * (16./106.) *0.5
         _FLUX_VAR_(data%id_Nupttarget(2)) = &
                            _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
+        ! log this uptake into the bulk community N uptake diagnostic (mmol N/m3/d)
+        _DIAG_VAR_(data%id_NUP) = _DIAG_VAR_(data%id_NUP) - (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
+        _DIAG_VAR_(data%id_NUP2)= _DIAG_VAR_(data%id_NUP2)- (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
      ENDIF
      IF (data%do_Puptake) THEN
+        ! increment flux from bottom cell nutrient (po4) amount (mmol P/m2/s)
         _FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
+        ! log this uptake into the bulk community P uptake diagnostic (mmol P/m3/d)
+        _DIAG_VAR_(data%id_PUP) = _DIAG_VAR_(data%id_PUP) - mpb_flux * (1./106.) * secs_per_day
      ENDIF
 
-     ! Resuspension (a simple assumption here)
+     ! Now compute resuspension of mpb and distribute into the phytoplankton groups
      Fsed_phy = zero_
      IF ( data%n_zones > 0 ) THEN
-        IF( in_zone_set(matz,data%active_zones) .AND. data%id_l_resus > 0 ) THEN
-           Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * data%resuspension(1)
-        ENDIF
-     ENDIF
-     _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy
-     _FLUX_VAR_(data%id_p(1)) = _FLUX_VAR_(data%id_p(1)) + Fsed_phy
+       IF( in_zone_set(matz,data%active_zones) .AND. data%id_l_resus > 0 ) THEN
 
-     ! Update the diagnostic variables
+         phy_sed_frac = SUM(data%resuspension(1:data%num_phytos))
+         Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * phy_sed_frac
+
+         _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy
+
+         IF( phy_sed_frac > zero_ ) THEN
+          DO phy_i=1,data%num_phytos
+           ! spread the resuspended phytoplantkon mass between the groups based
+           ! on the relative sed fractions provided by user in "resuspension(:)"
+           ! note, this is incremented into the SED diag for the group in this
+           ! bottom layer
+           resus = Fsed_phy * (data%resuspension(phy_i) / phy_sed_frac)
+
+           _FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + resus
+           _DIAG_VAR_(data%id_PhySEDc(phy_i)) = _DIAG_VAR_(data%id_PhySEDc(phy_i)) + resus * secs_per_day ! check if incrementing here is rigth order (after mobility)
+
+           IF(data%phytos(phy_i)%simINDynamics>0) THEN
+             _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + resus * (16./106.)
+             _DIAG_VAR_(data%id_PhySEDn(phy_i)) = _DIAG_VAR_(data%id_PhySEDn(phy_i)) + resus * (16./106.) * secs_per_day
+           ENDIF
+           IF(data%phytos(phy_i)%simIPDynamics>0) THEN
+             _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + resus * (1./106.)
+            _DIAG_VAR_(data%id_PhySEDp(phy_i)) = _DIAG_VAR_(data%id_PhySEDp(phy_i)) + resus * (1./106.) * secs_per_day
+           ENDIF
+          ENDDO
+         ENDIF
+       ENDIF
+     ENDIF
+
+     ! Update the diagnostic variables (mmol C/m2/d)
      _DIAG_VAR_S_(data%id_d_mpb) = mpb
-     _DIAG_VAR_S_(data%id_d_bpp) =(mpb_prod) * mpb * secs_per_day
-     _DIAG_VAR_S_(data%id_d_bcp) = mpb_flux * secs_per_day
-     _DIAG_VAR_S_(data%id_d_mpbv)=(Psed_phy - Fsed_phy) * secs_per_day
+     _DIAG_VAR_S_(data%id_d_bpp) =      (mpb_prod) * mpb * secs_per_day
+     _DIAG_VAR_S_(data%id_d_bcp) =              mpb_flux * secs_per_day
+     _DIAG_VAR_S_(data%id_d_mpbv)=(-Psed_phy - Fsed_phy) * secs_per_day
+     _DIAG_VAR_S_(data%id_d_res) =            (Fsed_phy) * secs_per_day
    ENDIF
 END SUBROUTINE aed_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1302,14 +1384,29 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
             vvel =  zero_
 
       END SELECT
-      ! set global mobility array
+      ! set global mobility array for phytoplankton group; first do carbon
       mobility(data%id_p(phy_i)) = vvel
+      IF( data%id_rho(phy_i)>0 ) mobility(data%id_rho(phy_i)) = vvel
       IF( diag_level >= 10  .AND. data%id_vvel(phy_i)>0) &
-              _DIAG_VAR_(data%id_vvel(phy_i)) = vvel * secs_per_day
-      ! set sedimentation flux (mmmol/m2) for later use/reporting
-      _DIAG_VAR_(data%id_Psed_phy) =   &
-              _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
-      _DIAG_VAR_(data%id_PhySed(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))
+              _DIAG_VAR_(data%id_vvel(phy_i)) = vvel * secs_per_day  !m/day
+      ! record carbon sedimentation flux (mmol C /m2 /day)
+      _DIAG_VAR_(data%id_PhySEDc(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* secs_per_day
+
+      ! set global mobility array for phytoplankton IN pool, and record flux
+      IF(data%phytos(phy_i)%simINDynamics>0) THEN
+         mobility(data%id_in(phy_i)) = vvel
+         _DIAG_VAR_(data%id_PhySEDn(phy_i)) = vvel*_STATE_VAR_(data%id_in(phy_i))* secs_per_day
+      ENDIF
+      ! set global mobility array for phytoplankton IP pool, and record flux
+      IF(data%phytos(phy_i)%simIPDynamics>0) THEN
+         mobility(data%id_ip(phy_i)) = vvel
+         _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_ip(phy_i))* secs_per_day
+      ENDIF
+
+       ! cumulate the community sedimentation flux (mmmol/m2/s) for later use
+       _DIAG_VAR_(data%id_Psed_phy) =   &
+               _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
+
     ENDDO
 END SUBROUTINE aed_mobility_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
