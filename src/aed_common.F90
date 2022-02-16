@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -231,39 +231,40 @@ LOGICAL FUNCTION aed_requested_zones(n_aed_vars)
          DO i=1, n_aed_vars
             IF ( aed_get_var(i, tvar) ) THEN
 
-              IF(tvar%extern) CYCLE  ! external (environment) not currently able to be updated from zones
+               IF (tvar%extern) CYCLE  ! external (environment) not currently able to be updated from zones
 
                IF ( tvar%model%aed_model_id .EQ. model%aed_model_id ) THEN
-
                   ! sheet variables in a zone averaged model must have zavg=T
-                  IF ( .NOT. tvar%extern .AND. tvar%sheet ) THEN
+                  IF ( tvar%sheet ) THEN
                     ! non-environent variable sheets can be averaged
                     j = j + 1
-                    tvar%zavg = .TRUE. ; tvar%zavg_req = .FALSE.
+                    tvar%zavg = .TRUE.
                     print *,'        zone averaged variable: ',TRIM(tvar%name)
                   ELSE
                     ! averageing requests for env or non-sheets are not possible
                     IF ( tvar%zavg ) err = .TRUE.
-                    tvar%zavg = .FALSE. ; tvar%zavg_req = .FALSE.
+                    tvar%zavg = .FALSE.
                   ENDIF
 
-                ELSE
+               ELSE
 
                   ! this model requested zone averaged updates from others
                   IF ( tvar%zavg_req ) THEN
-                    IF ( .NOT. tvar%extern .AND. tvar%sheet ) THEN
-                      ! non-environent variable sheets can be averaged
-                      j = j + 1
-                      tvar%zavg = .TRUE. ; tvar%zavg_req = .FALSE.
-                      print *,'        zone averaged variable: ',TRIM(tvar%name)//'   (linked by',model%aed_model_id,TRIM(model%aed_model_name),')'  !MH glitch here is if order is out then wrong linked model appears
-                    ELSE
-                      ! averageing requests for env or non-sheets are not possible
-                      err = .TRUE.
-                      tvar%zavg = .FALSE. ; tvar%zavg_req = .FALSE.
-                    ENDIF
+                     IF ( tvar%sheet ) THEN
+                        ! non-environent variable sheets can be averaged
+                        j = j + 1
+                        tvar%zavg = .TRUE.
+                        print *,'        zone averaged variable: ', &
+                                 TRIM(tvar%name)//'   (linked by',model%aed_model_id,TRIM(model%aed_model_name),')'
+                                         !MH glitch here is if order is out then wrong linked model appears
+                     ELSE
+                        ! averageing requests for env or non-sheets are not possible
+                        err = .TRUE.
+                        tvar%zavg = .FALSE.
+                     ENDIF
                   ENDIF
                ENDIF
-
+               tvar%zavg_req = .FALSE.
             ENDIF
          ENDDO
       ENDIF

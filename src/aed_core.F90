@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -871,7 +871,7 @@ END SUBROUTINE aed_initialize
 !###############################################################################
 SUBROUTINE aed_initialize_benthic(data,column, layer_idx)
 !-------------------------------------------------------------------------------
-   CLASS (aed_model_data_t),INTENT(inout) :: data
+   CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !-------------------------------------------------------------------------------

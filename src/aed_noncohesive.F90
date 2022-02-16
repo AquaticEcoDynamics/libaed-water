@@ -279,7 +279,7 @@ SUBROUTINE aed_initialize_benthic_noncohesive(data, column, layer_idx)
 ! Routine to set initial state of NCS variables (in the sediment)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CLASS (aed_noncohesive_data_t),INTENT(inout) :: data
+   CLASS (aed_noncohesive_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
 !
