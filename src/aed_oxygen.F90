@@ -219,7 +219,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%altitude = altitude
 
    ! Register state variables
-   data%id_oxy = aed_define_variable('oxy','mmol/m**3','oxygen',   &
+   data%id_oxy = aed_define_variable('oxy','mmol/m3','oxygen',     &
                                     oxy_initial,minimum=oxy_min,maximum=oxy_max)
 
    ! Register the link to external variables
@@ -231,16 +231,16 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                      'sat', '%', 'oxygen saturation')
 
      data%id_sed_oxy = aed_define_sheet_diag_variable(             &
-                     'sed_oxy', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
+                     'sed_oxy', 'mmol/m2/d', 'O2 exchange across sed/water interface')
 
      data%id_atm_oxy_exch = aed_define_sheet_diag_variable(        &
-                     'atm_oxy_flux', 'mmol/m**2/d', 'O2 exchange across atm/water interface')
+                     'atm_oxy_flux', 'mmol/m2/d', 'O2 exchange across atm/water interface')
     IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
-                     'sed_oxy_pel', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
+                     'sed_oxy_flux3d', 'mmol/m3/d', 'O2 exchange across sed/water interface')
 
      data%id_atm_oxy_exch3d = aed_define_diag_variable(      &
-                     'atm_oxy_exch3d', 'mmol/m**3/d', 'Oxygen exchange across atm/water interface')
+                     'atm_oxy_flux3d', 'mmol/m3/d', 'O2 exchange across atm/water interface')
     ENDIF
    ENDIF
 
@@ -381,7 +381,7 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp !, layer_ht
+   AED_REAL :: temp, dz
 
    ! State
    AED_REAL :: oxy
@@ -429,7 +429,11 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
 
    ! Also store sediment flux as diagnostic variable.
    IF (diag_level>0)   _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
-   IF (diag_level>9) _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
+   IF (diag_level>9) THEN
+     dz = _STATE_VAR_(data%id_lht)
+     _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day / dz
+   ENDIF
+
 
 END SUBROUTINE aed_calculate_benthic_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
