@@ -10,12 +10,12 @@
 !#                                                                             #
 !#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -55,10 +55,12 @@
 !
 MODULE aed_sedflux
 !------------------------------------------------------------------------------+
-! The AED module sediment is not truely a model in itself, rather it provides  |
-! sediment flux values in a unified way to simply the interface to other models|
+! The AED module sediment is not truely a model in itself, rather it provides
+! sediment flux values in a unified way to simply the interface to other models
+! that will be either using or setting flux values
 !------------------------------------------------------------------------------+
    USE aed_core
+   USE aed_util, ONLY : in_zone_set
 
    IMPLICIT NONE
 
@@ -77,6 +79,7 @@ MODULE aed_sedflux
 
       !# Model parameters
       INTEGER  :: sed_modl, n_zones
+      AED_REAL,ALLOCATABLE :: active_zones(:)
       AED_REAL :: Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp, &
                   Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, &
                   Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_n2o, &
@@ -115,7 +118,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
    INTEGER,INTENT(in)                        :: namlst
 !
 !LOCALS
-   INTEGER  :: status
+   INTEGER  :: status,i
 
 !  %% NAMELIST   %%  /aed_sed_const2d/
 !  %% Last Checked 20/08/2021
@@ -125,6 +128,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0-100
                                                !% Match to GLM or TUFLOW-FV sediment/material zones
+   INTEGER  :: active_zones(_MAX_ZONES_)       ! Material zones to be activated
    AED_REAL :: Fsed_oxy(_MAX_ZONES_)  = MISVAL !% sediment oxygen flux in each sediment zone
                                                !% $$mmol/,m^{-2}/s$$
                                                !% float
@@ -223,18 +227,31 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
 !  %% END NAMELIST   %%  /aed_sed_const2d/
 
-   NAMELIST /aed_sed_const2d/ n_zones, &
+   NAMELIST /aed_sed_const2d/ n_zones, active_zones,                           &
                               Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp,&
                               Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, Fsed_n2o,&
-                              Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4, Fsed_feii, Fsed_ch4_ebb
+                              Fsed_poc, Fsed_doc, Fsed_dic, Fsed_ch4,          &
+                              Fsed_feii, Fsed_ch4_ebb
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ! In case user doesnt provide active zones, then set to increment normally
+   DO i=1,_MAX_ZONES_
+     active_zones(i) = i
+   ENDDO
+
    ! Read the namelist
    read(namlst,nml=aed_sed_const2d,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist aed_sed_const2d'
+   IF (status /= 0) STOP 'ERROR reading namelist for &aed_sed_const2d'
 
    data%n_zones = n_zones
+   IF(n_zones>0) THEN
+     ALLOCATE(data%active_zones(n_zones))
+     DO i=1,n_zones
+      data%active_zones(i) = active_zones(i)
+     ENDDO
+   ENDIF
+
    IF (Fsed_oxy(1) .NE. MISVAL ) THEN
       ALLOCATE(data%Fsed_oxy_P(n_zones)) ; data%Fsed_oxy_P(1:n_zones) = Fsed_oxy(1:n_zones)/secs_per_day
    ENDIF
@@ -363,11 +380,11 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_sedflux initialization"
+   print *,"        aed_sedflux configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_sedflux,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist aed_sedflux'
+   IF (status /= 0) STOP 'ERROR reading namelist for &aed_sedflux'
 
    CALL str_tolower(sedflux_model)
 
@@ -376,7 +393,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       data%sed_modl = SED_CONSTANT
 
       read(namlst,nml=aed_sed_constant,iostat=status)
-      IF (status /= 0) STOP 'ERROR reading namelist aed_sed_constant'
+      IF (status /= 0) STOP 'ERROR reading namelist for &aed_sed_constant'
 
       ! Store parameter values in our own derived type
       ! NB: all rates must be provided in values per day,
@@ -452,52 +469,52 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
    IF ( Fsed_oxy .GT. MISVAL ) &
-      data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol/m**2',   &
+      data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol/m2/s',   &
                                           'flux rate of oxygen across the swi')
    IF ( Fsed_dic .GT. MISVAL ) &
-      data%id_Fsed_dic = aed_define_sheet_diag_variable('Fsed_dic','mmol/m**2',   &
+      data%id_Fsed_dic = aed_define_sheet_diag_variable('Fsed_dic','mmol/m2/s',   &
                                           'flux rate of dic across the swi')
    IF ( Fsed_ch4 .GT. MISVAL ) &
-      data%id_Fsed_ch4 = aed_define_sheet_diag_variable('Fsed_ch4','mmol/m**2',   &
+      data%id_Fsed_ch4 = aed_define_sheet_diag_variable('Fsed_ch4','mmol/m2/s',   &
                                           'flux rate of ch4 across the swi')
    IF ( Fsed_ch4_ebb .GT. MISVAL ) &
-      data%id_Fsed_ch4_ebb = aed_define_sheet_diag_variable('Fsed_ch4_ebb','mmol/m**2',   &
+      data%id_Fsed_ch4_ebb = aed_define_sheet_diag_variable('Fsed_ch4_ebb','mmol/m2/s',   &
                                           'flux rate of ch4 bubbles across the swi')
    IF ( Fsed_rsi .GT. MISVAL ) &
-      data%id_Fsed_rsi = aed_define_sheet_diag_variable('Fsed_rsi','mmol/m**2',   &
+      data%id_Fsed_rsi = aed_define_sheet_diag_variable('Fsed_rsi','mmol/m2/s',   &
                                           'flux rate of rsi across the swi')
    IF ( Fsed_amm .GT. MISVAL ) &
-      data%id_Fsed_amm = aed_define_sheet_diag_variable('Fsed_amm','mmol/m**2',   &
+      data%id_Fsed_amm = aed_define_sheet_diag_variable('Fsed_amm','mmol/m2/s',   &
                                           'flux rate of amm across the swi')
    IF ( Fsed_nit .GT. MISVAL ) &
-      data%id_Fsed_nit = aed_define_sheet_diag_variable('Fsed_nit','mmol/m**2',   &
+      data%id_Fsed_nit = aed_define_sheet_diag_variable('Fsed_nit','mmol/m2/s',   &
                                           'flux rate of nit across the swi')
    IF ( Fsed_n2o .GT. MISVAL ) &
-      data%id_Fsed_n2o = aed_define_sheet_diag_variable('Fsed_n2o','mmol/m**2',   &
+      data%id_Fsed_n2o = aed_define_sheet_diag_variable('Fsed_n2o','mmol/m2/s',   &
                                           'flux rate of n2o across the swi')
    IF ( Fsed_frp .GT. MISVAL ) &
-      data%id_Fsed_frp = aed_define_sheet_diag_variable('Fsed_frp','mmol/m**2',   &
+      data%id_Fsed_frp = aed_define_sheet_diag_variable('Fsed_frp','mmol/m2/s',   &
                                           'flux rate of frp across the swi')
    IF ( Fsed_poc .GT. MISVAL ) &
-      data%id_Fsed_poc = aed_define_sheet_diag_variable('Fsed_poc','mmol/m**2',   &
+      data%id_Fsed_poc = aed_define_sheet_diag_variable('Fsed_poc','mmol/m2/s',   &
                                           'sedimentation rate of poc')
    IF ( Fsed_doc .GT. MISVAL ) &
-      data%id_Fsed_doc = aed_define_sheet_diag_variable('Fsed_doc','mmol/m**2',   &
+      data%id_Fsed_doc = aed_define_sheet_diag_variable('Fsed_doc','mmol/m2/s',   &
                                           'flux rate of doc across the swi')
    IF ( Fsed_pon .GT. MISVAL ) &
-      data%id_Fsed_pon = aed_define_sheet_diag_variable('Fsed_pon','mmol/m**2',   &
+      data%id_Fsed_pon = aed_define_sheet_diag_variable('Fsed_pon','mmol/m2/s',   &
                                           'sedimentation rate of pon')
    IF ( Fsed_don .GT. MISVAL ) &
-      data%id_Fsed_don = aed_define_sheet_diag_variable('Fsed_don','mmol/m**2',   &
+      data%id_Fsed_don = aed_define_sheet_diag_variable('Fsed_don','mmol/m2/s',   &
                                           'flux rate of don across the swi')
    IF ( Fsed_pop .GT. MISVAL ) &
-      data%id_Fsed_pop = aed_define_sheet_diag_variable('Fsed_pop','mmol/m**2',   &
+      data%id_Fsed_pop = aed_define_sheet_diag_variable('Fsed_pop','mmol/m2/s',   &
                                           'sedimentation rate of pop')
    IF ( Fsed_dop .GT. MISVAL ) &
-      data%id_Fsed_dop = aed_define_sheet_diag_variable('Fsed_dop','mmol/m**2',   &
+      data%id_Fsed_dop = aed_define_sheet_diag_variable('Fsed_dop','mmol/m2/s',   &
                                           'flux rate of dop across the swi')
    IF ( Fsed_feii .GT. MISVAL ) &
-      data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol/m**2', &
+      data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol/m2/s', &
                                           'flux rate of feii across the swi')
 
    IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
@@ -538,7 +555,8 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   INTEGER  :: zone
+   INTEGER  :: zone,i
+   AED_REAL :: sedz
    ! Temporary variables
    AED_REAL :: Fsed_oxy = 0., Fsed_rsi = 0.
    AED_REAL :: Fsed_amm = 0., Fsed_nit = 0.
@@ -577,7 +595,15 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
        !# select the material zone for this cell
        !# set sediment values accordingly
        !# This sets the value to the values in &aed_sed_const2d
-       zone = INT(_STATE_VAR_S_(data%id_zones))
+
+       !zone = INT(_STATE_VAR_S_(data%id_zones))                     !MH upgrade this for active zones
+       sedz = _STATE_VAR_S_(data%id_zones)
+       IF ( .NOT. in_zone_set(sedz, data%active_zones) ) RETURN
+
+       zone = 0
+       DO i = 1,data%n_zones
+          IF(data%active_zones(i) == sedz ) zone = i
+       ENDDO
 
        IF ( zone .LE. 0 .OR. zone .GT. data%n_zones ) zone = 1
 
@@ -633,14 +659,11 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
 !   INTEGER :: zone
 !
 !-------------------------------------------------------------------------------
-!
-!   IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &  !MH INTENT issues this is temporary
+
+!    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &  !MH INTENT issues this comment out is temporary
 !      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 
-!zone = INT(_STATE_VAR_S_(data%id_zones))
-
-   !_DIAG_VAR_(data%id_Fsed_oxy_pel) =   _DIAG_VAR_S_(data%id_Fsed_oxy)* secs_per_day
-!print*,"sedflux oxy in zone ",zone," := ", _DIAG_VAR_S_(data%id_Fsed_oxy)
+!    print*,"sedflux oxy in zone ",zone," := ", _DIAG_VAR_S_(data%id_Fsed_oxy)
 END SUBROUTINE aed_calculate_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

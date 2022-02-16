@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -46,7 +45,7 @@
 
 MODULE aed_silica
 !-------------------------------------------------------------------------------
-! Nitrogen module contains equations for nitrification and deitrification
+! Silica module contains basic equations for uptake and release
 !-------------------------------------------------------------------------------
    USE aed_core
 
@@ -94,7 +93,7 @@ SUBROUTINE aed_define_silica(data, namlst)
 !-------------------------------------------------------------------------------
 ! Initialise the AED model
 !  Here, the aed namelist is read and the variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in)                      :: namlst
@@ -127,11 +126,11 @@ SUBROUTINE aed_define_silica(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_silica initialization"
+   print *,"        aed_silica configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_silica,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_silica'
+   IF (status /= 0) STOP 'Error reading namelist for &aed_silica'
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
@@ -142,7 +141,7 @@ SUBROUTINE aed_define_silica(data, namlst)
    data%use_oxy = silica_reactant_variable .NE. '' !This means oxygen module switched on
 
    ! Register state variables
-   data%id_rsi = aed_define_variable('rsi','mmol/m**3', 'silica',     &
+   data%id_rsi = aed_define_variable('rsi','mmol/m3', 'silica',     &
                                     rsi_initial,minimum=rsi_min,maximum=rsi_max)
 
    ! Register external state variable dependencies
@@ -204,7 +203,7 @@ SUBROUTINE aed_calculate_benthic_silica(data,column,layer_idx)
    AED_REAL :: rsi,oxy
 
    ! Temporary variables
-   AED_REAL :: rsi_flux, Fsed_rsi
+   AED_REAL :: rsi_flux, Fsed_rsi, fT, fDO
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -213,22 +212,31 @@ SUBROUTINE aed_calculate_benthic_silica(data,column,layer_idx)
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
     ! Retrieve current (local) state variable values.
-   rsi = _STATE_VAR_(data%id_rsi)! silica
+   rsi = _STATE_VAR_(data%id_rsi)   ! silica
 
-   IF (data%use_sed_model) THEN
-       Fsed_rsi = _STATE_VAR_S_(data%id_Fsed_rsi)
-   ELSE
-       Fsed_rsi = data%Fsed_rsi
-   ENDIF
-
+   ! Compute the sediment flux dependent on overlying oxygen & temperature
+   fT = data%theta_sed_rsi**(temp-20.0)
    IF (data%use_oxy) THEN
       ! Sediment flux dependent on oxygen and temperature
-       oxy = _STATE_VAR_(data%id_oxy)
-       rsi_flux = Fsed_rsi * data%Ksed_rsi/(data%Ksed_rsi+oxy) * (data%theta_sed_rsi**(temp-20.0))
+      oxy = _STATE_VAR_(data%id_oxy)
+      fDO = data%Ksed_rsi/(data%Ksed_rsi+oxy)
    ELSE
-      ! Sediment flux dependent on temperature only.
-       rsi_flux = Fsed_rsi * (data%theta_sed_rsi**(temp-20.0))
+      ! Sediment flux dependent on temperature only
+      fDO = one_
    ENDIF
+
+   ! Set the flux dependent on if and how it is linked
+   IF (data%use_sed_model) THEN
+     ! Linked to aed_sedflux, check if its constant or dynamically set
+     IF ( aed_is_const_var(data%id_Fsed_rsi) ) THEN
+        Fsed_rsi = _DIAG_VAR_S_(data%id_Fsed_rsi) * MIN(3.,fDO * fT)
+     ELSE
+        Fsed_rsi = _DIAG_VAR_S_(data%id_Fsed_rsi)
+     ENDIF
+   ELSE
+     Fsed_rsi = data%Fsed_rsi * MIN(3.,fDO * fT)
+   ENDIF
+   rsi_flux = Fsed_rsi
 
    ! Set bottom fluxes for the pelagic (change per surface area per second)
    _FLUX_VAR_(data%id_rsi) = _FLUX_VAR_(data%id_rsi) + (rsi_flux)
@@ -238,7 +246,7 @@ SUBROUTINE aed_calculate_benthic_silica(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_rsi) = _FLUX_VAR_B_(data%id_ben_rsi) + (-rsi_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   _DIAG_VAR_S_(data%id_sed_rsi) = rsi_flux*secs_per_day
+   _DIAG_VAR_S_(data%id_sed_rsi) = rsi_flux * secs_per_day
 
 
 END SUBROUTINE aed_calculate_benthic_silica

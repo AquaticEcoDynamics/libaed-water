@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
 !#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -234,17 +233,20 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    LOGICAL                   :: simPhotolysis = .FALSE.
 
    !-- Particle settling parameters
-   INTEGER                   :: settling      = 0
-   AED_REAL                  :: w_pom         = zero_
-   AED_REAL                  :: d_pom         = zero_
-   AED_REAL                  :: rho_pom       = zero_
-   AED_REAL                  :: w_cpom        = zero_
-   AED_REAL                  :: d_cpom        = zero_
-   AED_REAL                  :: rho_cpom      = zero_
-   CHARACTER(len=64)         :: Psed_poc_variable=''
-   CHARACTER(len=64)         :: Psed_pon_variable=''
-   CHARACTER(len=64)         :: Psed_pop_variable=''
-   CHARACTER(len=64)         :: Psed_cpom_variable=''
+   INTEGER                   ::           settling = 0
+   AED_REAL                  ::              w_pom = zero_
+   AED_REAL                  ::              d_pom = zero_
+   AED_REAL                  ::            rho_pom = zero_
+   AED_REAL                  ::             w_cpom = zero_
+   AED_REAL                  ::             d_cpom = zero_
+   AED_REAL                  ::           rho_cpom = zero_
+   CHARACTER(len=64)         ::  Psed_poc_variable = ''
+   CHARACTER(len=64)         ::  Psed_pon_variable = ''
+   CHARACTER(len=64)         ::  Psed_pop_variable = ''
+   CHARACTER(len=64)         :: Psed_cpom_variable = ''
+   CHARACTER(len=64)         ::  pom_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64)         :: cpom_particle_link = ''  !   For FV API 2.0 (To be implemented)
+
 
    !-- Sediment interaction parameters (basic model)
    INTEGER                   :: resuspension     = 0
@@ -299,6 +301,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
                       settling,w_pom,d_pom,rho_pom,w_cpom,d_cpom,rho_cpom,     &
                       Psed_poc_variable, Psed_pon_variable,                    &
                       Psed_pop_variable,Psed_cpom_variable,                    &
+                      pom_particle_link,cpom_particle_link,                    &
                       resuspension, resus_link,                                &
                       sedimentOMfrac,sedimentBulkDens,sedimentDepth,           &
                       Xsc,Xsn,Xsp,                                             &

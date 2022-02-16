@@ -8,14 +8,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2017 - 2021 -  The University of Western Australia               #
+!#  Copyright 2017 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   AED2+ is free software: you can redistribute it and/or modify             #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   AED2+ is distributed in the hope that it will be useful,                  #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -36,6 +36,10 @@
 !#       process based model of microbial pollution in aquatic systems.        #
 !#       Water Resources Research, 44(7).                                      #
 !#                                                                             #
+!# Madani, M., Seth, R., Valipour, R., Leon, L.F. and Hipsey, M.R., 2022.      #
+!#       Modelling of nearshore microbial water quality at confluence of a     #
+!#       local tributary in Lake St. Clair. Journal of Great Lakes Research.   #
+!#                                                                             #
 !###############################################################################
 
 #include "aed.h"
@@ -43,7 +47,7 @@
 
 MODULE aed_pathogens
 !-------------------------------------------------------------------------------
-!  aed_pathogens --- pathogen biogeochemical model
+!  aed_pathogens --- pathogen contaminant model (eg coliforms, protozoa)
 !-------------------------------------------------------------------------------
    USE aed_core
    USE aed_util
@@ -173,6 +177,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    INTEGER  :: resuspension
    LOGICAL  :: sim_sedorgs = .FALSE.
    CHARACTER(len=64)  :: oxy_variable = ''
+   CHARACTER(len=64)  :: path_particle_link=''            !   For FV API 2.0 (To be implemented)
    CHARACTER(4) :: trac_name
    CHARACTER(len=128) :: dbase='aed_pathogen_pars.nml'
 
@@ -185,10 +190,16 @@ SUBROUTINE aed_define_pathogens(data, namlst)
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_pathogens/
 
-   NAMELIST /aed_pathogens/ num_pathogens, the_pathogens, resuspension, &
-            num_ss, ss_set, ss_tau, ss_ke, sim_sedorgs, oxy_variable,    &
-            epsilon, tau_0, tau_0_min, Ktau_0, dbase, extra_diag, att_ts,&
-            diag_level
+   NAMELIST /aed_pathogens/  num_pathogens, the_pathogens, dbase,           &
+                          !  reccomended (optional)
+                             oxy_variable, resuspension, sim_sedorgs,       &
+                             num_ss, ss_set, ss_tau, ss_ke,                 &
+                             epsilon, tau_0, tau_0_min, Ktau_0, att_ts,     &
+                          ! legacy
+                             extra_diag, diag_level,                        &
+                          ! advanced
+                             path_particle_link
+
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_pathogens initialization"

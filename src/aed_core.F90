@@ -108,6 +108,7 @@ MODULE aed_core
       LOGICAL           :: sheet, diag, extern, found
       LOGICAL           :: top, bot, const
       LOGICAL           :: zavg, zavg_req
+      INTEGER           :: particle_link
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -498,6 +499,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%zavg_req = .false.
       all_vars(ret)%top = .false.
       all_vars(ret)%bot = .false.
+      all_vars(ret)%particle_link = 0
    ENDIF
    IF ( ASSOCIATED(aed_cur_prefix) ) THEN
       CALL extend_requested(all_vars(ret), aed_cur_prefix)

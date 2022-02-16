@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -55,7 +54,7 @@ MODULE aed_carbon
 !
 ! The AED module carbon contains equations that describe exchange of
 ! dissolved inorganic carbon across the air/water interface and sediment flux,
-! and simulation of methane.
+! and (optional) simulation of methane.
 !-------------------------------------------------------------------------------
    USE aed_core
 
@@ -199,7 +198,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_carbon initialization"
+   print *,"        aed_carbon configuration"
 
    !# Set defaults
    data%simDIC        = .false.
@@ -210,7 +209,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    !# Read the namelist
    read(namlst,nml=aed_carbon,iostat=status)
    IF (status /= 0) THEN
-      print *,'Error reading namelist aed_carbon'
+      print *,'Error reading namelist for &aed_carbon'
       STOP
    ENDIF
 

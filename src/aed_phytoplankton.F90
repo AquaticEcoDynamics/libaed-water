@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -472,6 +471,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    INTEGER            :: settling(MAX_PHYTO_TYPES)     = _MOB_CONST_
    AED_REAL           :: resuspension(MAX_PHYTO_TYPES) = 0.
    CHARACTER(len=64)  :: resus_link='NCS_resus'
+   CHARACTER(len=64)  :: phyto_particle_link=''            !   For FV API 2.0 (To be implemented)
    CHARACTER(len=64)  :: p_excretion_target_variable='OGM_dop'
    CHARACTER(len=64)  :: p_mortality_target_variable='OGM_pop'
    CHARACTER(len=64)  :: p1_uptake_target_variable='PHS_frp'
@@ -526,14 +526,15 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
                     dbase, zerolimitfudgefactor, extra_debug, extra_diag,      &
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
                     resus_link, n_zones, active_zones, diag_level,             &
-                    theta_mpb_growth,theta_mpb_resp
+                    theta_mpb_growth,theta_mpb_resp,                           &
+                    phyto_particle_link
 !-----------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_phytoplankton initialization"
+   print *,"        aed_phytoplankton configuration"
 
    ! Read the namelist, and set module parameters
    read(namlst,nml=aed_phytoplankton,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_phytoplankton'
+   IF (status /= 0) STOP 'Error reading namelist for &aed_phytoplankton'
    dtlim = zerolimitfudgefactor
    IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
    IF ( extra_diag ) diag_level = 10

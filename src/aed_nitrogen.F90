@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -117,8 +116,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 !------------------------------------------------------------------------------+
 ! Initialise the AED model
 !
-!  Here, the aed namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  Here, the aed namelist is read and the variables exported
+!  by the model are registered with AED
 !------------------------------------------------------------------------------+
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
@@ -213,12 +212,12 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 !
 !------------------------------------------------------------------------------+
 !BEGIN
-   print *,"        aed_nitrogen initialization"
+   print *,"        aed_nitrogen configuration"
 
    !---------------------------------------------------------------------------+
    ! Read the namelist
    read(namlst,nml=aed_nitrogen,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_nitrogen'
+   IF (status /= 0) STOP 'Error reading namelist for &aed_nitrogen'
 
    !---------------------------------------------------------------------------+
    ! Store config options and parameter values in module's own derived type
@@ -659,7 +658,6 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    ! Retrieve local environmental conditions for this bottom water layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
-
    !-----------------------------------------------
    ! Set the maximum flux (@20C) to use in this cell, either constant or linked
    Fsed_amm = data%Fsed_amm
@@ -677,13 +675,14 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    fTo = data%theta_sed_nit**(temp-20.0)
 
    !-----------------------------------------------
-   ! Compute actual flux based on oxygen and temperature
-   IF (data%use_oxy) THEN
+   ! Compute flux based on oxygen and temperature and nitrate
+   IF ( aed_is_const_var(data%id_Fsed_amm) ) THEN
+    IF (data%use_oxy) THEN
       ! Sediment flux dependent on oxygen and temperature
       oxy = _STATE_VAR_(data%id_oxy)
       amm_flux = Fsed_amm * data%Ksed_amm/(data%Ksed_amm+oxy) * fTa
-      if(data%Fsed_nit_model == 1) THEN
-         nit_flux = Fsed_nit *           oxy/(data%Ksed_nit+oxy) * fTo
+      IF(data%Fsed_nit_model == 1) THEN
+         nit_flux = Fsed_nit *        oxy/(data%Ksed_nit+oxy) * fTo
       ELSE
          nit = _STATE_VAR_(data%id_nox)
          IF(Kno3==zero_)THEN
@@ -695,24 +694,32 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
       ENDIF
 
       IF( data%simN2O>0 ) n2o_flux = Fsed_n2o * data%Ksed_n2o/(data%Ksed_n2o+oxy) * fTa
-   ELSE
+    ELSE
       ! Sediment flux dependent on temperature only
       amm_flux = Fsed_amm * fTa
       nit_flux = Fsed_nit * fTo
+    ENDIF
+
+   ELSE
+     ! Fsed_nit is getting set by the DYNAMIC sediment model, so no adjustments
+     amm_flux = Fsed_amm
+     nit_flux = Fsed_nit
+     IF( data%simN2O>0 ) n2o_flux = Fsed_n2o
    ENDIF
 
    !-----------------------------------------------
-   ! Set bottom fluxes for the pelagic (change per surface area per second)
-   ! Transfer sediment flux value to AED2.
+   ! Set bottom fluxes for the pelagic (mmol N/m2/sec)
    _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + amm_flux
    _FLUX_VAR_(data%id_nox) = _FLUX_VAR_(data%id_nox) + nit_flux
-   IF( data%simN2O>0 ) _FLUX_VAR_(data%id_n2o)=_FLUX_VAR_(data%id_n2o) + n2o_flux
+   IF( data%simN2O>0 )&
+    _FLUX_VAR_(data%id_n2o)= _FLUX_VAR_(data%id_n2o) + n2o_flux
 
    ! Needs NO2
-   IF( data%simN2O>1 ) _FLUX_VAR_(data%id_no2)=_FLUX_VAR_(data%id_no2) + no2_flux
+   IF( data%simN2O>1 ) &
+    _FLUX_VAR_(data%id_no2)= _FLUX_VAR_(data%id_no2) + no2_flux
 
    !-----------------------------------------------
-   ! Store sediment flux as diagnostic variable.
+   ! Store sediment flux as diagnostic variable (mmol N/m2/day)
    _DIAG_VAR_S_(data%id_sed_amm) = amm_flux*secs_per_day
    _DIAG_VAR_S_(data%id_sed_nit) = nit_flux*secs_per_day
    IF( data%simN2O>0 ) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux*secs_per_day

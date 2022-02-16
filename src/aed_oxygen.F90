@@ -235,7 +235,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 
      data%id_atm_oxy_exch = aed_define_sheet_diag_variable(        &
                      'atm_oxy_flux', 'mmol/m**2/d', 'O2 exchange across atm/water interface')
-    IF (diag_level>10) THEN
+    IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
                      'sed_oxy_pel', 'mmol/m**2/d', 'O2 exchange across sed/water interface')
 
@@ -326,7 +326,7 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    ENDIF
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
-   IF (diag_level>10) &
+   IF (diag_level>9) &
      _DIAG_VAR_(data%id_atm_oxy_exch3d) = oxy_atm_flux * secs_per_day / _STATE_VAR_(data%id_lht)
 
 END SUBROUTINE aed_calculate_surface_oxygen
@@ -387,7 +387,7 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    AED_REAL :: oxy
 
    ! Temporary variables
-   AED_REAL :: oxy_flux, Fsed_oxy
+   AED_REAL :: oxy_flux, Fsed_oxy, fT, fDO
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -398,18 +398,29 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    ! Retrieve current (local) state variable values.
    oxy = _STATE_VAR_(data%id_oxy)! oxygen
 
-   IF (data%use_sed_model) THEN
-       Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy)
-   ELSE
-       Fsed_oxy = data%Fsed_oxy
-   ENDIF
-
    ! Compute the sediment flux dependent on overlying oxygen & temperature
-   oxy_flux = Fsed_oxy * MIN(3.,oxy/(data%Ksed_oxy+oxy) * (data%theta_sed_oxy**(temp-20.0)))
-!print*, "Oxy oxy ben = ", oxy, "oxy_flux ", oxy_flux
+   fT = data%theta_sed_oxy**(temp-20.0)
+   fDO = oxy/(data%Ksed_oxy+oxy)
+
+   IF (data%use_sed_model) THEN
+     ! Linked to aed_sedflux, check if its constant or dynamically set
+     IF ( aed_is_const_var(data%id_Fsed_oxy) ) THEN
+        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy) * MIN(3.,fDO * fT)
+     ELSE
+        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy)
+     ENDIF
+   ELSE
+     Fsed_oxy = data%Fsed_oxy * MIN(3.,fDO * fT)
+   ENDIF
+  !IF (data%use_sed_model) THEN
+  !    Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy)
+  !ELSE
+  !    Fsed_oxy = data%Fsed_oxy
+  !ENDIF
+
+   oxy_flux = Fsed_oxy
 
    ! Set bottom fluxes for the pelagic (change per surface area per second)
-   ! Transfer sediment flux value to AED2
    _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + (oxy_flux)
 
    ! Set sink and source terms for the benthos (change per surface area per second)
@@ -417,8 +428,8 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_oxy) = _FLUX_VAR_B_(data%id_ben_oxy) + (-oxy_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   IF (diag_level>0) _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
-   IF (diag_level>10) _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
+   IF (diag_level>0)   _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
+   IF (diag_level>9) _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day
 
 END SUBROUTINE aed_calculate_benthic_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

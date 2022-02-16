@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018 - 2021 - The University of Western Australia                #
+!#  Copyright 2018 - 2022 - The University of Western Australia                #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -150,6 +149,11 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    AED_REAL          :: sed_porosity    = 0.3
    AED_REAL          :: sed_initial     = zero_
    CHARACTER(len=64) :: macrophyte_link_var = ''
+   CHARACTER(len=64) :: ss1_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64) :: ss2_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64) :: ss3_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64) :: ss4_particle_link = ''  !   For FV API 2.0 (To be implemented)
+
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
@@ -158,11 +162,17 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_noncohesive/
 
-   NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss,                         &
+   NAMELIST /aed_noncohesive/ num_ss,                                       &
+                            ! core
+                              decay, Ke_ss,                                 &
                               settling, w_ss, rho_ss, d_ss,                 &
                               resuspension, epsilon, tau_0, tau_r, Ktau_0,  &
                               macrophyte_link_var, Fsed, fs,                &
-                              simSedimentMass, ss_initial, sed_porosity, diag_level
+                              simSedimentMass, ss_initial, sed_porosity,    &
+                              diag_level,                                   &
+                            ! optional/advanced
+                              ss1_particle_link, ss2_particle_link,         &
+                              ss3_particle_link, ss4_particle_link
 !
 !-------------------------------------------------------------------------------
 !BEGIN
