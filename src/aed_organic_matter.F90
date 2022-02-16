@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -95,7 +95,7 @@ MODULE aed_organic_matter
       INTEGER  :: id_swi_pon,    id_swi_don,     id_swi_pon_r
       INTEGER  :: id_swi_pop,    id_swi_dop,     id_swi_pop_r
       INTEGER  :: id_swi_poc,    id_swi_doc,     id_swi_poc_r
-      INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner
+      INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner,  id_cpom_bdown
       INTEGER  :: id_sed_toc,    id_sed_ton,     id_sed_top,     id_sedomfr
       INTEGER  :: id_l_resus,    id_denit,       id_anaerobic
       INTEGER  :: id_pom_vvel,   id_cpom_vvel
@@ -597,55 +597,45 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    ENDIF
 
    ! Register diagnostic variables
-   data%id_swi_poc    = 0
-   data%id_swi_doc    = 0
-   data%id_swi_pon    = 0
-   data%id_swi_don    = 0
-   data%id_swi_pop    = 0
-   data%id_swi_dop    = 0
-   data%id_poc_miner  = 0
-   data%id_doc_miner  = 0
-   data%id_pon_miner  = 0
-   data%id_don_miner  = 0
-   data%id_pop_miner  = 0
-   data%id_dop_miner  = 0
-   data%id_denit      = 0
-   data%id_bod        = 0
-   data%id_photolysis = 0
-   data%id_docr_miner = 0
-   data%id_donr_miner = 0
-   data%id_dopr_miner = 0
+   data%id_swi_poc    = 0 ; data%id_swi_doc    = 0 ; data%id_swi_pon    = 0
+   data%id_swi_don    = 0 ; data%id_swi_pop    = 0 ; data%id_swi_dop    = 0
+   data%id_poc_miner  = 0 ; data%id_doc_miner  = 0 ; data%id_pon_miner  = 0
+   data%id_don_miner  = 0 ; data%id_pop_miner  = 0 ; data%id_dop_miner  = 0
+   data%id_denit      = 0 ; data%id_bod        = 0 ; data%id_photolysis = 0
+   data%id_docr_miner = 0 ; data%id_donr_miner = 0 ; data%id_dopr_miner = 0
+   data%id_cpom_bdown = 0
 
     IF ( diag_level>0 ) THEN
-      data%id_cdom = aed_define_diag_variable('CDOM','/m',  'Chromophoric DOM (CDOM)')
-      data%id_sed_toc  = aed_define_sheet_diag_variable('sed_toc','mmol/m**2',  'Sediment TOC mass')
-      data%id_sed_ton  = aed_define_sheet_diag_variable('sed_ton','mmol/m**2',  'Sediment TON mass')
-      data%id_sed_top  = aed_define_sheet_diag_variable('sed_top','mmol/m**2',  'Sediment TOP mass')
+      data%id_cdom    = aed_define_diag_variable(      'CDOM'     ,'/m'         ,'Chromophoric DOM')
+      data%id_sed_toc = aed_define_sheet_diag_variable('sed_toc'  ,'mmol/m**2'  ,'Sediment TOC mass')
+      data%id_sed_ton = aed_define_sheet_diag_variable('sed_ton'  ,'mmol/m**2'  ,'Sediment TON mass')
+      data%id_sed_top = aed_define_sheet_diag_variable('sed_top'  ,'mmol/m**2'  ,'Sediment TOP mass')
     ENDIF
 
    IF ( diag_level>1 ) THEN
-     data%id_swi_poc  = aed_define_sheet_diag_variable('swi_poc','mmol/m**2/d',  'Net POC flux @ the SWI')
-     data%id_swi_doc  = aed_define_sheet_diag_variable('swi_doc','mmol/m**2/d',  'Net DOC flux @ the SWI')
-     data%id_swi_pon  = aed_define_sheet_diag_variable('swi_pon','mmol/m**2/d',  'Net PON flux @ the SWI')
-     data%id_swi_don  = aed_define_sheet_diag_variable('swi_don','mmol/m**2/d',  'Net DON flux @ the SWI')
-     data%id_swi_pop  = aed_define_sheet_diag_variable('swi_pop','mmol/m**2/d',  'Net POP flux @ the SWI')
-     data%id_swi_dop  = aed_define_sheet_diag_variable('swi_dop','mmol/m**2/d',  'Net DOP flux @ the SWI')
+     data%id_swi_poc  = aed_define_sheet_diag_variable('swi_poc'  ,'mmol/m**2/d','Net POC flux @ the SWI')
+     data%id_swi_doc  = aed_define_sheet_diag_variable('swi_doc'  ,'mmol/m**2/d','Net DOC flux @ the SWI')
+     data%id_swi_pon  = aed_define_sheet_diag_variable('swi_pon'  ,'mmol/m**2/d','Net PON flux @ the SWI')
+     data%id_swi_don  = aed_define_sheet_diag_variable('swi_don'  ,'mmol/m**2/d','Net DON flux @ the SWI')
+     data%id_swi_pop  = aed_define_sheet_diag_variable('swi_pop'  ,'mmol/m**2/d','Net POP flux @ the SWI')
+     data%id_swi_dop  = aed_define_sheet_diag_variable('swi_dop'  ,'mmol/m**2/d','Net DOP flux @ the SWI')
      data%id_swi_poc_r= aed_define_sheet_diag_variable('poc_resus','mmol/m**2/d','POC resuspenion rate')
      data%id_swi_pon_r= aed_define_sheet_diag_variable('pon_resus','mmol/m**2/d','PON resuspenion rate')
      data%id_swi_pop_r= aed_define_sheet_diag_variable('pop_resus','mmol/m**2/d','POP resuspenion rate')
-     data%id_poc_miner= aed_define_diag_variable('poc_hydrol','mmol/m**3/d','POC hydrolosis')
-     data%id_doc_miner= aed_define_diag_variable('doc_miner' ,'mmol/m**3/d','DOC mineralisation')
-     data%id_pon_miner= aed_define_diag_variable('pon_hydrol','mmol/m**3/d','PON hydrolosis')
-     data%id_don_miner= aed_define_diag_variable('don_miner' ,'mmol/m**3/d','DON mineralisation')
-     data%id_pop_miner= aed_define_diag_variable('pop_hydrol','mmol/m**3/d','POP hydrolysis')
-     data%id_dop_miner= aed_define_diag_variable('dop_miner' ,'mmol/m**3/d','DOP mineralisation')
-     data%id_anaerobic= aed_define_diag_variable('anaerobic' ,'mmol/m**3/d','anaerobic metabolism')
-     data%id_denit    = aed_define_diag_variable('denit'     ,'mmol/m**3/d','denitrification')
+     data%id_poc_miner= aed_define_diag_variable(     'poc_hydrol','mmol/m**3/d','POC hydrolosis')
+     data%id_pon_miner= aed_define_diag_variable(     'pon_hydrol','mmol/m**3/d','PON hydrolosis')
+     data%id_pop_miner= aed_define_diag_variable(     'pop_hydrol','mmol/m**3/d','POP hydrolysis')
+     data%id_doc_miner= aed_define_diag_variable(     'doc_miner' ,'mmol/m**3/d','DOC mineralisation')
+     data%id_don_miner= aed_define_diag_variable(     'don_miner' ,'mmol/m**3/d','DON mineralisation')
+     data%id_dop_miner= aed_define_diag_variable(     'dop_miner' ,'mmol/m**3/d','DOP mineralisation')
+     data%id_anaerobic= aed_define_diag_variable(     'anaerobic' ,'mmol/m**3/d','anaerobic metabolism')
+     data%id_denit    = aed_define_diag_variable(     'denit'     ,'mmol/m**3/d','denitrification')
 
      IF (simRPools) THEN
         data%id_docr_miner = aed_define_diag_variable('docr_miner','mmol/m**3/d','DOCR mineralisation')
         data%id_donr_miner = aed_define_diag_variable('donr_miner','mmol/m**3/d','DONR mineralisation')
         data%id_dopr_miner = aed_define_diag_variable('dopr_miner','mmol/m**3/d','DOPR mineralisation')
+        data%id_cpom_bdown = aed_define_diag_variable('cpom_bdown','mmol/m**3/d','CPOM breakdown')
      ENDIF
 
      data%id_bod = aed_define_diag_variable('BOD5','mg O2/L',  'Biochemical Oxygen Demand (BOD)')
@@ -979,6 +969,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
        _DIAG_VAR_(data%id_docr_miner) = docr_mineralisation*secs_per_day
        _DIAG_VAR_(data%id_donr_miner) = donr_mineralisation*secs_per_day
        _DIAG_VAR_(data%id_dopr_miner) = dopr_mineralisation*secs_per_day
+       _DIAG_VAR_(data%id_cpom_bdown) = cpom_breakdown*secs_per_day
      ENDIF
 
      ! BOD5 is computed as the amount of oxygen consumed over a 5-day period (mgO2/L)

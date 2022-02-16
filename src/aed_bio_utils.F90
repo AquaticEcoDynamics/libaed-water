@@ -450,8 +450,9 @@ END FUNCTION findMin
 FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !-------------------------------------------------------------------------------
 ! Salinity tolerance of phytoplankton
-! CAEDYM Implmentation based on Griffin et al 2001; Robson and Hamilton, 2004,
-! and Lassiter option also
+!
+! CAEDYM Implmentation based on Griffin et al (2001) and Robson and Hamilton
+! (2004), plus Lassiter option also added from Zhu et al (2017).
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
@@ -460,36 +461,60 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !
 !LOCALS
    AED_REAL :: fSal ! Returns the salinity function
-   AED_REAL :: tmp1,tmp2,tmp3, fSa,fSb,fSc,fSo
+   AED_REAL :: tmp1,tmp2,tmp3,fSa,fSb,fSc,fSo
+   INTEGER  :: sal_model
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   fSal = zero_  !## CAB [-Wmaybe-uninitialized]
 
-   IF (phytos(group)%salTol == 0) THEN
-      fSal = 1.0
-   ELSEIF (phytos(group)%salTol == 1) THEN
+   ! User can set salTol as negative (growth supressison) or positive
+   ! (respiration enhancement). The equations are the same but will range from
+   ! 0-1 for supression and >1 for enhancment. Users must ensure S_bep is set
+   ! accordingly - Generally, S_bep>1 for salTol>0 and vice versa.
+   sal_model = ABS(phytos(group)%salTol)
+
+   IF (sal_model == 0) THEN
+      fSal = one_
+
+   ELSEIF (sal_model == 1) THEN
       !# f(S) = 1 at S=S_opt, f(S) = S_bep at S=S_maxsp.
-      tmp1 = (phytos(group)%S_bep-1.0) / ((phytos(group)%S_maxsp - phytos(group)%S_opt)**2.0)
-      tmp2 = (phytos(group)%S_bep-1.0) * 2.0*phytos(group)%S_opt / &
-            ((phytos(group)%S_maxsp-phytos(group)%S_opt)**2.0)
-      tmp3 = (phytos(group)%S_bep-1.0) * phytos(group)%S_opt*phytos(group)%S_opt / &
-            ((phytos(group)%S_maxsp-phytos(group)%S_opt)**2.0) + 1.0
+
+      IF (phytos(group)%salTol<0 .and. phytos(group)%S_bep>1) &
+        PRINT *,'WARNING: salTol flag for phyto group: ',group,' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
+
+      ! change fSal above Sopt for increasing stress on freshwater species
       IF (salinity>phytos(group)%S_opt) THEN
-         fSal = tmp1*(salinity**2.0)-tmp2*salinity+tmp3
-      ELSE
-         fSal = 1.0
-      ENDIF
-   ELSEIF (phytos(group)%salTol == 2) THEN
-      !# f(S) = 1 at S>=S_opt, f(S) = S_bep at S=0.
-      IF (salinity<phytos(group)%S_opt) THEN
-         fSal = (phytos(group)%S_bep-1.0) * (salinity**2.0)/(phytos(group)%S_opt**2.0) -  &
-                      2.0*(phytos(group)%S_bep-1.0)*salinity/phytos(group)%S_opt+phytos(group)%S_bep
+        tmp1 = (phytos(group)%S_bep-1.0) / ((phytos(group)%S_maxsp - phytos(group)%S_opt)**2.0)
+        tmp2 = (phytos(group)%S_bep-1.0) * 2.0*phytos(group)%S_opt / &
+              ((phytos(group)%S_maxsp-phytos(group)%S_opt)**2.0)
+        tmp3 = (phytos(group)%S_bep-1.0) * phytos(group)%S_opt*phytos(group)%S_opt / &
+              ((phytos(group)%S_maxsp-phytos(group)%S_opt)**2.0) + 1.0
+
+        fSal = tmp1*(salinity**2.0) - tmp2*salinity + tmp3
       ELSE
         fSal = 1.0
       ENDIF
-   ELSEIF (phytos(group)%salTol == 3) THEN
+
+   ELSEIF (sal_model == 2) THEN
+      !# f(S) = 1 at S>=S_opt, f(S) = S_bep at S=0.
+
+      IF (phytos(group)%salTol<0 .and. phytos(group)%S_bep>1) &
+        PRINT *,'WARNING: salTol flag for phyto group: ',group,' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
+
+      IF (salinity<phytos(group)%S_opt) THEN
+         fSal = (phytos(group)%S_bep-1.0) * (salinity**2.0)/(phytos(group)%S_opt**2.0)   &
+                - 2.0*(phytos(group)%S_bep-1.0)*salinity/phytos(group)%S_opt &
+                + phytos(group)%S_bep
+      ELSE
+        fSal = 1.0
+      ENDIF
+
+   ELSEIF (sal_model == 3) THEN
       ! f(S) = 1 at S=S_opt, f(S) = S_bep at S=0 and 2*S_opt.
+
+      IF (phytos(group)%salTol<0 .and. phytos(group)%S_bep>1) &
+        PRINT *,'WARNING: salTol flag for phyto group: ',group,' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
+
       IF (salinity < phytos(group)%S_opt) THEN
          fSal = (phytos(group)%S_bep-1.0)*(salinity**2.0)/(phytos(group)%S_opt**2.0)-  &
                       2.0*(phytos(group)%S_bep-1.0)*salinity/phytos(group)%S_opt+phytos(group)%S_bep
@@ -500,10 +525,12 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
              2 * (phytos(group)%S_bep - one_) * (phytos(group)%S_maxsp + phytos(group)%S_opt - salinity)  &
              / phytos(group)%S_opt + phytos(group)%S_bep
       ENDIF
-      IF ( (salinity >= phytos(group)%S_opt) .AND. (salinity <= phytos(group)%S_maxsp) ) fSal = 1
+      IF ((salinity >=  phytos(group)%S_opt) .AND. (salinity <= phytos(group)%S_maxsp) ) fSal = 1
       IF ( salinity >= (phytos(group)%S_maxsp + phytos(group)%S_opt) ) fSal = phytos(group)%S_bep
-    ELSEIF (phytos(group)%salTol == 4) THEN
-       ! Lassiter
+
+    ELSEIF (sal_model == 4) THEN
+       ! Lassiter.
+       ! This is used to control growth on species that like brackish water
        fSa = phytos(group)%S_bep
        fSb = 1.
        fSc = phytos(group)%S_maxsp
@@ -514,12 +541,14 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
        ELSE
          fSal = fSb*EXP(fSa*(salinity-fSo))*((fSc-salinity)/(fSc-fSo))**(fSa*(fSc-fSo))
        ENDIF
+
+       ! check if its used as resipration enhancement or growth supression
+       IF (phytos(group)%salTol>0 ) fSal = (one_-fSal) + one_
+
    ELSE
-      PRINT *,'STOP: Unsupported salTol flag for group: ',group,'=', phytos(group)%salTol
+      fSal = one_
+      PRINT *,'WARNING: Unsupported salTol flag for phyto group: ',group,'=', phytos(group)%salTol
    ENDIF
-
-
-
 
    IF( fSal < zero_ ) fSal = zero_
 

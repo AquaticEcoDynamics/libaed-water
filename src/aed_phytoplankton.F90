@@ -884,11 +884,13 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       ! Respiration and general metabolic loss
       respiration(phy_i) = bio_respiration(data%phytos(phy_i)%R_resp,data%phytos(phy_i)%theta_resp,temp)
 
-      ! Salinity stress effect on respiration (or growth)
+      ! Salinity stress effect on respiration or growth
       fSal =  phyto_salinity(data%phytos,phy_i,salinity)
-      IF( data%phytos(phy_i)%salTol >= 4) THEN
-        primprod(phy_i) = primprod(phy_i) * fSal   ! growth limtation rather than mortality enhancement
+      IF( data%phytos(phy_i)%salTol < 0) THEN
+        ! salTol is set for growth supression
+        primprod(phy_i) = primprod(phy_i) * fSal
       ELSE
+        ! salTol is set for respiration/mortality enhancement
         respiration(phy_i) = respiration(phy_i) * fSal
       ENDIF
 

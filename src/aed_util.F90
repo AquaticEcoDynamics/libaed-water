@@ -836,6 +836,7 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
      PO4dis = one_ / (one_+Kpo4p*ParticleConc) * PO4tot
 
 
+
    ELSEIF(PO4AdsorptionModel == 2) THEN
      !-----------------------------------------------------
      ! This is the model for PO4 sorption from Chao et al. 2010:
