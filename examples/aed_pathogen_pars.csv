@@ -1,0 +1,41 @@
+p_name, 'crypto', 'ecoli', 'totalcoli',[COMMENT],string, pathogen name
+coef_grwth_uMAX, 0, 3, 2.4,[COMMENT],real, Max growth rate at 20C
+coef_grwth_Tmin, 4, 4, 4,[COMMENT],real, Tmin and Tmax, f(T)
+coef_grwth_Tmax, 35, 35, 35,[COMMENT],real, Tmin and Tmax, f(T)
+coef_grwth_T1, 0.008, 0.008, 0.008,[COMMENT],real, coef_grwth_T1  and  coef_grwth_T2
+coef_grwth_T2, 0.1, 0.1, 0.1,[COMMENT],real, coef_grwth_T1  and  coef_grwth_T2
+coef_grwth_Kdoc, 0, 0.3, 0.3,[COMMENT],real, Half-saturation for growth, coef_grwth_Kdoc
+coef_grwth_ic, 1.0E-9, 1.0E-9, 1.0E-9,[COMMENT],real, coef_grwth_ic
+coef_mort_kd20, 0.03, 0.48, 0.34,[COMMENT],real, Mortality rate (Dark death rate) @ 20C and 0 psu
+coef_mort_theta, 1.08, 1.08, 1.11,[COMMENT],real, Temperature multiplier for mortality: coef_mort_theta
+coef_mort_c_SM, 0, 2.0E-10, 2.0E-7,[COMMENT],real, Salinity effect on mortality
+coef_mort_alpha, 0, 6.1, 4.2,[COMMENT],real, Salinity effect on mortality
+coef_mort_beta, 0, 0.25, 0.25,[COMMENT],real, Salinity effect on mortality
+coef_mort_c_PHM, 0, 50, 50,[COMMENT],real, pH effect on mortality
+coef_mort_K_PHM, 0, 6, 6,[COMMENT],real, pH effect on mortality
+coef_mort_delta_M, 0, 4, 4,[COMMENT],real, pH effect on mortality
+coef_mort_fdoc, 0, 0.5, 0.5,[COMMENT],real, Fraction of mortality back to doc
+coef_light_kb_vis, 0, 0.097, 0.097,[COMMENT],real, Light inactivation
+coef_light_kb_uva, 0, 1.16, 1.16,[COMMENT],real, Light inactivation
+coef_light_kb_uvb, 0, 36.4, 36.4,[COMMENT],real, Light inactivation
+coef_light_cSb_vis, 0.0067, 0.0067, 0.0067,[COMMENT],real, Salinity effect on light inactivation
+coef_light_cSb_uva, 0.0067, 0.0067, 0.0067,[COMMENT],real, Salinity effect on light inactivation
+coef_light_cSb_uvb, 0.0067, 0.0067, 0.0067,[COMMENT],real, Salinity effect on light inactivation
+coef_light_kDOb_vis, 0.5, 0.5, 0.5,[COMMENT],real, DO effect on light
+coef_light_kDOb_uva, 0.5, 0.5, 0.5,[COMMENT],real, DO effect on light
+coef_light_kDOb_uvb, 0.5, 0.5, 0.5,[COMMENT],real, DO effect on light
+coef_light_cpHb_vis, 10, 10, 10,[COMMENT],real, pH effect on light inactivation
+coef_light_cpHb_uva, 10, 10, 10,[COMMENT],real, pH effect on light inactivation
+coef_light_cpHb_uvb, 10, 10, 10,[COMMENT],real, pH effect on light inactivation
+coef_light_KpHb_vis, 5, 5, 5,[COMMENT],real, pH effect on light inactivation
+coef_light_KpHb_uva, 5, 5, 5,[COMMENT],real, pH effect on light inactivation
+coef_light_KpHb_uvb, 5, 5, 5,[COMMENT],real, pH effect on light inactivation
+coef_light_delb_vis, 3, 3, 3,[COMMENT],real, exponent for pH effect on light inactivation
+coef_light_delb_uva, 3, 3, 3,[COMMENT],real, exponent for pH effect on light inactivation
+coef_light_delb_uvb, 3, 3, 3,[COMMENT],real, exponent for pH effect on light inactivation
+coef_pred_kp20, 0, 0.2, 0.2,[COMMENT],real, Loss rate due to predation and temp multiplier
+coef_pred_theta_P, 1, 1.04, 1.04,[COMMENT],real, Loss rate due to predation and temp multiplier
+coef_sett_fa, 0, 0.94, 0.81,[COMMENT],real, Attached fraction in water column
+coef_sett_w_path, -2.5E-6, -5.0E-7, -5.0E-7,[COMMENT],real, Sedimentation velocity (m/d) at 20C (-ve means down) for NON-ATTACHED orgs
+coef_resus_epsilonP, 0.01, 0.01, 0.01,[COMMENT],real, Pathogen resuspension rate
+coef_resus_tauP_0, 0.01, 0.01, 0.01,[COMMENT],real, Critical shear stress for organism resuspension
