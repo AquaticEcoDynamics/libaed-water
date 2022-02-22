@@ -660,8 +660,8 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 
-!    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &  !MH INTENT issues this comment out is temporary
-!      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
+    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &  !MH INTENT issues this comment out is temporary
+      CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 
 !    print*,"sedflux oxy in zone ",zone," := ", _DIAG_VAR_S_(data%id_Fsed_oxy)
 END SUBROUTINE aed_calculate_benthic_sedflux
