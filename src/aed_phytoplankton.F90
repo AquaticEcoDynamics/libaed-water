@@ -1415,11 +1415,15 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
       IF(data%phytos(phy_i)%simINDynamics>0) THEN
          mobility(data%id_in(phy_i)) = vvel
          _DIAG_VAR_(data%id_PhySEDn(phy_i)) = vvel*_STATE_VAR_(data%id_in(phy_i))* secs_per_day
+      ELSE
+         _DIAG_VAR_(data%id_PhySEDn(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* data%phytos(phy_i)%X_ncon* secs_per_day
       ENDIF
       ! set global mobility array for phytoplankton IP pool, and record flux
       IF(data%phytos(phy_i)%simIPDynamics>0) THEN
          mobility(data%id_ip(phy_i)) = vvel
          _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_ip(phy_i))* secs_per_day
+      ELSE
+         _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* data%phytos(phy_i)%X_pcon* secs_per_day
       ENDIF
 
        ! cumulate the community sedimentation flux (mmmol/m2/s) for later use
