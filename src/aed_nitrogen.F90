@@ -493,9 +493,9 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
 
      !-----------------------------------------------
      ! Set temporal derivatives
-     _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) - nitrification - anammox + dnra
+     _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) - nitrification - anammox * (1.0/2.32) * amm + dnra
      _FLUX_VAR_(data%id_nox) = _FLUX_VAR_(data%id_nox) &
-                             + nitrification - denitrification - anammox - dnra
+                             + nitrification - denitrification - anammox * (1.32/2.32) * nit - dnra
      IF( data%simN2O==1 ) &
        _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o)  &
                              +  (denit_n2o_prod - denit_n2o_cons + nit_n2o_prod)
@@ -508,7 +508,7 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
      ! Export diagnostic variables
      _DIAG_VAR_(data%id_nitrf)   = nitrification * secs_per_day
      _DIAG_VAR_(data%id_denit)   = denitrification * secs_per_day
-     _DIAG_VAR_(data%id_anammox) = anammox * secs_per_day
+     _DIAG_VAR_(data%id_anammox) = anammox * ((amm + 1.32 * nit)/2.32) * secs_per_day
      _DIAG_VAR_(data%id_dnra)    = dnra * secs_per_day
      IF( data%simN2O==1 ) THEN
        _DIAG_VAR_(data%id_n2op) = (denit_n2o_prod + nit_n2o_prod) * secs_per_day
