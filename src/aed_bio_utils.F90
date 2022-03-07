@@ -280,7 +280,7 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
       uptake(idon) = 0.0                   !MH to fix  (idon == 3)
    ENDIF
    IF (phytos(group)%simNFixation /= 0 .AND. do_N2uptake) THEN
-      uptake(iN2) = a_nfix                 ! iN2 == 4
+      uptake(iN2) = -a_nfix                 ! iN2 == 4
    ENDIF
 
 
