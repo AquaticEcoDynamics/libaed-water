@@ -336,6 +336,8 @@ FUNCTION phyto_fN(phytos, group, IN, din, don) RESULT(fN)
    ENDIF
 
    IF ( fN < zero_ ) fN = zero_
+   IF ( fN > 1.000 ) fN = 1.000
+      
 END FUNCTION phyto_fN
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -366,7 +368,8 @@ FUNCTION phyto_fP(phytos, group, IP, frp) RESULT(fP)
                           (phytos(group)%X_pmax-phytos(group)%X_pmin)
    ENDIF
 
-   IF( fP<zero_ ) fP=zero_
+   IF( fP < zero_ ) fP = zero_ 
+   IF( fP > 1.000 ) fP = 1.000 
 
 END FUNCTION phyto_fP
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
