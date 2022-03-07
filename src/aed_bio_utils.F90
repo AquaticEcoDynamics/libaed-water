@@ -169,7 +169,7 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
 
       theX_pcon = IP
       tmpary1   = phytos(group)%R_puptake * fT * phy
-      tmpary2   = MAX(one_e_neg5, phytos(group)%X_pmax - (IP / phy))
+      tmpary2   = MAX(zero_, phytos(group)%X_pmax - (IP / phy))
       tmpary1   = tmpary1 * tmpary2 / (phytos(group)%X_pmax-phytos(group)%X_pmin)
       uptake(1) =-tmpary1 * phyto_fP(phytos,group,frp=pup)      ! FRP
       uptake(2) = zero_                                         ! DOP
@@ -243,7 +243,7 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
 
       theX_ncon = IN
       tmpary1   = phytos(group)%R_nuptake * fT * phy
-      tmpary2   = MAX(phytos(group)%X_nmax - (IN / phy),one_e_neg5)
+      tmpary2   = MAX(phytos(group)%X_nmax - (IN / phy),zero_)
       tmpary1   = tmpary1 * tmpary2 / (phytos(group)%X_nmax-phytos(group)%X_nmin)
       uptake(1) = tmpary1 * phyto_fN(phytos,group,din=no3up+nh4up)
       uptake(1) = -uptake(1)
