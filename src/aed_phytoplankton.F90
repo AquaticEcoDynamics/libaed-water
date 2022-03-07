@@ -1063,6 +1063,9 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          available = MAX(zero_, INi - data%phytos(phy_i)%X_nmin*phy)
          IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
          _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + (flux)
+      ELSE
+         ! Assumed constant IN
+         INi = phy*data%phytos(phy_i)%X_ncon
       ENDIF
 
       !------------------------------------------------------------------------+
@@ -1075,6 +1078,9 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          available = MAX(zero_, IPi - data%phytos(phy_i)%X_pmin*phy)
          IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
          _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + (flux)
+      ELSE
+         ! Assumed constant IP
+         IPi = phy*data%phytos(phy_i)%X_pcon    
       ENDIF
 
       !------------------------------------------------------------------------+
