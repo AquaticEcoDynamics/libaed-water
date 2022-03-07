@@ -1020,6 +1020,9 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
 
    DO phy_i=1,data%num_phytos
      IF ( diag_level >= 10 ) THEN
+          phy = _STATE_VAR_(data%id_p(phy_i))
+          IF (data%phytos(phy_i)%simINDynamics /= 0) THEN; INi = _STATE_VAR_(data%id_in(phy_i)); ELSE; INi = phy*data%phytos(phy_i)%X_ncon; END IF
+          IF (data%phytos(phy_i)%simIPDynamics /= 0) THEN; IPi = _STATE_VAR_(data%id_ip(phy_i)); ELSE; IPi = phy*data%phytos(phy_i)%X_pcon; END IF
           ! Carbon fluxes
           _DIAG_VAR_(data%id_PhyGPPc(phy_i)) =  cuptake(phy_i) * secs_per_day
           _DIAG_VAR_(data%id_PhyRSPc(phy_i)) = ( -respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
