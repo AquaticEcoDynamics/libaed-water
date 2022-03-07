@@ -279,7 +279,8 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    IF (phytos(group)%simDONUptake /= 0) THEN
       uptake(idon) = 0.0                   !MH to fix  (idon == 3)
    ENDIF
-   IF (phytos(group)%simNFixation /= 0 .AND. do_N2uptake) THEN
+!   IF (phytos(group)%simNFixation /= 0 .AND. do_N2uptake) THEN
+   IF (phytos(group)%simNFixation /= 0) THEN
       uptake(iN2) = -a_nfix                 ! iN2 == 4
    ENDIF
 
@@ -337,7 +338,7 @@ FUNCTION phyto_fN(phytos, group, IN, din, don) RESULT(fN)
 
    IF ( fN < zero_ ) fN = zero_
    IF ( fN > 1.000 ) fN = 1.000
-      
+
 END FUNCTION phyto_fN
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -368,8 +369,8 @@ FUNCTION phyto_fP(phytos, group, IP, frp) RESULT(fP)
                           (phytos(group)%X_pmax-phytos(group)%X_pmin)
    ENDIF
 
-   IF( fP < zero_ ) fP = zero_ 
-   IF( fP > 1.000 ) fP = 1.000 
+   IF( fP < zero_ ) fP = zero_
+   IF( fP > 1.000 ) fP = 1.000
 
 END FUNCTION phyto_fP
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

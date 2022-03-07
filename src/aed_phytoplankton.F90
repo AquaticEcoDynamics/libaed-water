@@ -84,9 +84,9 @@ MODULE aed_phytoplankton
       INTEGER :: id_par, id_I_0, id_extc, id_sedzone
       INTEGER :: id_tem, id_sal, id_dz, id_dens
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
-      INTEGER :: id_TPHY, id_TCHLA, id_TIN, id_TIP
+      INTEGER :: id_TPHY,id_TCHLA, id_TIN, id_TIP
       INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_BCP, id_d_mpbv, id_d_res
-      INTEGER :: id_NUP, id_NUP2, id_PUP, id_CUP
+      INTEGER :: id_NUP1,id_NUP2,  id_NUP3,  id_NUP4,  id_PUP,    id_CUP
 
       !# Model parameters
       INTEGER  :: num_phytos
@@ -328,7 +328,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%X_nmin       = pd(list(i))%X_nmin
        data%phytos(i)%X_nmax       = pd(list(i))%X_nmax
        data%phytos(i)%R_nuptake    = pd(list(i))%R_nuptake/secs_per_day
-       data%phytos(i)%k_nfix       = pd(list(i))%k_nfix
+       data%phytos(i)%k_nfix       = pd(list(i))%k_nfix  ! should be between 0 and 1.
        data%phytos(i)%R_nfix       = pd(list(i))%R_nfix/secs_per_day
        data%phytos(i)%simDIPUptake = pd(list(i))%simDIPUptake
        data%phytos(i)%simIPDynamics= pd(list(i))%simIPDynamics
@@ -689,8 +689,9 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    data%id_GPP = aed_define_diag_variable('GPP','mmol/m**3/d',  'gross primary production')
    data%id_NCP = aed_define_diag_variable('NCP','mmol/m**3/d',  'net community production')
 
-   data%id_NUP = aed_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
+   data%id_NUP1= aed_define_diag_variable('NUP_no3','mmol/m**3/d','nitrogen (NO3) uptake')
    data%id_NUP2= aed_define_diag_variable('NUP_nh4','mmol/m**3/d','nitrogen (NH4) uptake')
+   data%id_NUP4= aed_define_diag_variable('NUP_n2' ,'mmol/m**3/d','nitrogen (N2) uptake')
    data%id_PUP = aed_define_diag_variable('PUP','mmol/m**3/d','phosphorous uptake')
    data%id_CUP = aed_define_diag_variable('CUP','mmol/m**3/d','carbon uptake')
 
@@ -1080,7 +1081,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + (flux)
       ELSE
          ! Assumed constant IP
-         IPi = phy*data%phytos(phy_i)%X_pcon    
+         IPi = phy*data%phytos(phy_i)%X_pcon
       ENDIF
 
       !------------------------------------------------------------------------+
@@ -1190,8 +1191,9 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    _DIAG_VAR_(data%id_NCP) =  net_cuptake*secs_per_day
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_PPR) =  -999. !sum(cuptake) / ( sum(cuptake) - net_cuptake)
    IF ( diag_level >= 10 ) _DIAG_VAR_(data%id_NPR) =  -999. !net_cuptake / ( sum(cuptake) - net_cuptake)
-   _DIAG_VAR_(data%id_NUP) =  sum(-nuptake(:,1))*secs_per_day
+   _DIAG_VAR_(data%id_NUP1)=  sum(-nuptake(:,1))*secs_per_day
    _DIAG_VAR_(data%id_NUP2)=  sum(-nuptake(:,2))*secs_per_day
+   _DIAG_VAR_(data%id_NUP4)=  sum(-nuptake(:,in2))*secs_per_day
    _DIAG_VAR_(data%id_PUP) =  sum(-puptake)*secs_per_day
    _DIAG_VAR_(data%id_CUP) =  sum(-cuptake)*secs_per_day
 
@@ -1245,7 +1247,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      mpb_flux = (mpb_prod-mpb_resp)*mpb
 
      ! Update the MPB biomass, include net production and add sedimented phytos (mmolC/m2/s)
-     _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux + (-Psed_phy)
+     _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux + (-Psed_phy/secs_per_day)
 
      ! log this uptake into the bulk community GPP/NCP diagnostics (mmolC/m3/d)
      _DIAG_VAR_(data%id_GPP) =  _DIAG_VAR_(data%id_GPP) + (mpb_prod/dz) * mpb * secs_per_day
@@ -1268,7 +1270,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
         _FLUX_VAR_(data%id_Nupttarget(2)) = &
                            _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
         ! log this uptake into the bulk community N uptake diagnostic (mmol N/m3/d)
-        _DIAG_VAR_(data%id_NUP) = _DIAG_VAR_(data%id_NUP) - (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
+        _DIAG_VAR_(data%id_NUP1)= _DIAG_VAR_(data%id_NUP1)- (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
         _DIAG_VAR_(data%id_NUP2)= _DIAG_VAR_(data%id_NUP2)- (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
      ENDIF
      IF (data%do_Puptake) THEN
@@ -1317,8 +1319,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      _DIAG_VAR_S_(data%id_d_mpb) = mpb
      _DIAG_VAR_S_(data%id_d_bpp) =      (mpb_prod) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_bcp) =              mpb_flux * secs_per_day
-     _DIAG_VAR_S_(data%id_d_mpbv)=(-Psed_phy - Fsed_phy) * secs_per_day
-     _DIAG_VAR_S_(data%id_d_res) =            (Fsed_phy) * secs_per_day
+     _DIAG_VAR_S_(data%id_d_mpbv)= -Psed_phy - (Fsed_phy * secs_per_day)
+     _DIAG_VAR_S_(data%id_d_res) =              Fsed_phy * secs_per_day
    ENDIF
 END SUBROUTINE aed_calculate_benthic_phytoplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1435,9 +1437,9 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
          _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* data%phytos(phy_i)%X_pcon* secs_per_day
       ENDIF
 
-       ! cumulate the community sedimentation flux (mmmol/m2/s) for later use
+       ! cumulate the community sedimentation flux (mmmol/m2/d) for later use
        _DIAG_VAR_(data%id_Psed_phy) =   &
-               _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i))
+               _DIAG_VAR_(data%id_Psed_phy) + vvel*_STATE_VAR_(data%id_p(phy_i)) * secs_per_day
 
     ENDDO
 END SUBROUTINE aed_mobility_phytoplankton
