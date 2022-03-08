@@ -71,7 +71,7 @@ MODULE aed_nitrogen
       INTEGER  :: id_cell_vel
 
       !# Model parameters
-      AED_REAL :: Rnitrif,Rdenit,Ranammox,Rn2o,Rdnra
+      AED_REAL :: Rnitrif,Rdenit,Rn2o,Rdnra,kanammox !,Ranammox
       AED_REAL :: Knitrif,Kdenit,Kanmx_nit,Kanmx_amm,Kdnra_oxy
       AED_REAL :: Kpart_ammox, Kin_deamm, Rno2o2, Rnh4o2, Rnh4no2
       AED_REAL :: theta_nitrif,theta_denit,theta_sed_amm,theta_sed_nit
@@ -137,7 +137,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    AED_REAL          :: Rnitrif       =   0.01
    AED_REAL          :: Rdenit        =   0.01
    AED_REAL          :: Rn2o          =   0.0015
-   AED_REAL          :: Ranammox      =   0.0
+   AED_REAL          :: kanammox      =   0.0
    AED_REAL          :: Rdnra         =   0.0
    AED_REAL          :: Knitrif       = 150.0
    AED_REAL          :: Kdenit        = 150.0
@@ -204,7 +204,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 nitrif_reactant_variable,denit_product_variable,nitrif_ph_variable,&
                 Fsed_amm_variable,Fsed_nit_variable,Fsed_n2o_variable,Fsed_no2_variable,&
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
-                Ranammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
+                kanammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
                 simNitrfpH, simNitrfLight, simNitrfSal, K_sal, S0,             &
                 simDryDeposition, simWetDeposition, &
                 atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model, &
@@ -233,7 +233,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%Rnitrif          = Rnitrif/secs_per_day
    data%Rdenit           = Rdenit/secs_per_day
    data%Rn2o             = Rn2o/secs_per_day
-   data%Ranammox         = Ranammox/secs_per_day
+   data%kanammox         = kanammox/secs_per_day
    data%Rdnra            = Rdnra/secs_per_day
    data%Knitrif          = Knitrif
    data%Kdenit           = Kdenit
@@ -387,7 +387,8 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
    AED_REAL,PARAMETER :: Kno3 = 5.0      !Denit NO3 half-sat
    AED_REAL,PARAMETER :: Xon1 = 1.
    AED_REAL,PARAMETER :: Xon2 = 1.
-   AED_REAL,PARAMETER :: Xon3 = 1.!
+   AED_REAL,PARAMETER :: Xon3 = 1.!oxy_thr
+   AED_REAL :: oxy_thr
 !------------------------------------------------------------------------------+
 !BEGIN
    n2o = zero_ ; no2 = zero_
@@ -479,10 +480,12 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
        !IF(oxy>Knev) nit_n2o_prod = ((aa/oxy)+bb)*remin*Xnc
      ENDIF
 
-     !# Anammox (NO2 + NH4 + CO2 -> N2); assuming nit ~ NO2 for now
+     !# Anammox (NO2 + NH4 + CO2 -> N2)
      anammox = zero_
-     IF( data%use_oxy .AND. oxy < 1e-1*(1e3/32.) ) THEN
-       anammox = data%Ranammox * nit/(data%Kanmx_nit+nit) * amm/(data%Kanmx_amm+amm)
+     oxy_thr = 1e-1*(1e3/32.)
+     IF( data%use_oxy .AND. oxy < oxy_thr ) THEN
+       no2 = nit * (1-oxy/(oxy_thr+oxy))
+       anammox = data%kanammox * no2/(data%Kanmx_nit+no2) * amm/(data%Kanmx_amm+amm) ! mmolN/m3/s
      ENDIF
 
      !## Dissasimilatory nitrate reduction to ammonia (DNRA)
@@ -493,9 +496,9 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
 
      !-----------------------------------------------
      ! Set temporal derivatives
-     _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) - nitrification - anammox + dnra
+     _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) - nitrification - (1/2.32)*anammox + dnra
      _FLUX_VAR_(data%id_nox) = _FLUX_VAR_(data%id_nox) &
-                             + nitrification - denitrification - anammox - dnra
+                             + nitrification - denitrification - (1.32/2.32)*anammox - dnra
      IF( data%simN2O==1 ) &
        _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o)  &
                              +  (denit_n2o_prod - denit_n2o_cons + nit_n2o_prod)
