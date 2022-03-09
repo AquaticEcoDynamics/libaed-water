@@ -1022,8 +1022,10 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    DO phy_i=1,data%num_phytos
      IF ( diag_level >= 10 ) THEN
           phy = _STATE_VAR_(data%id_p(phy_i))
-          IF (data%phytos(phy_i)%simINDynamics /= 0) THEN; INi = _STATE_VAR_(data%id_in(phy_i)); ELSE; INi = phy*data%phytos(phy_i)%X_ncon; END IF
-          IF (data%phytos(phy_i)%simIPDynamics /= 0) THEN; IPi = _STATE_VAR_(data%id_ip(phy_i)); ELSE; IPi = phy*data%phytos(phy_i)%X_pcon; END IF
+          IF (data%phytos(phy_i)%simINDynamics /= 0) THEN; INi = _STATE_VAR_(data%id_in(phy_i))
+          ELSE; INi = phy*data%phytos(phy_i)%X_ncon; END IF
+          IF (data%phytos(phy_i)%simIPDynamics /= 0) THEN; IPi = _STATE_VAR_(data%id_ip(phy_i))
+          ELSE; IPi = phy*data%phytos(phy_i)%X_pcon; END IF
           ! Carbon fluxes
           _DIAG_VAR_(data%id_PhyGPPc(phy_i)) =  cuptake(phy_i) * secs_per_day
           _DIAG_VAR_(data%id_PhyRSPc(phy_i)) = ( -respiration(phy_i)*data%phytos(phy_i)%k_fres*phy) * secs_per_day
@@ -1304,11 +1306,13 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
 
            IF(data%phytos(phy_i)%simINDynamics>0) THEN
              _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + resus * (16./106.)
-             _DIAG_VAR_(data%id_PhySEDn(phy_i)) = _DIAG_VAR_(data%id_PhySEDn(phy_i)) + resus * (16./106.) * secs_per_day
+             _DIAG_VAR_(data%id_PhySEDn(phy_i)) = _DIAG_VAR_(data%id_PhySEDn(phy_i)) + &
+                                                                       resus * (16./106.) * secs_per_day
            ENDIF
            IF(data%phytos(phy_i)%simIPDynamics>0) THEN
              _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + resus * (1./106.)
-            _DIAG_VAR_(data%id_PhySEDp(phy_i)) = _DIAG_VAR_(data%id_PhySEDp(phy_i)) + resus * (1./106.) * secs_per_day
+            _DIAG_VAR_(data%id_PhySEDp(phy_i)) = _DIAG_VAR_(data%id_PhySEDp(phy_i)) + &
+                                                                       resus * (1./106.) * secs_per_day
            ENDIF
           ENDDO
          ENDIF
@@ -1427,14 +1431,16 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
          mobility(data%id_in(phy_i)) = vvel
          _DIAG_VAR_(data%id_PhySEDn(phy_i)) = vvel*_STATE_VAR_(data%id_in(phy_i))* secs_per_day
       ELSE
-         _DIAG_VAR_(data%id_PhySEDn(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* data%phytos(phy_i)%X_ncon* secs_per_day
+         _DIAG_VAR_(data%id_PhySEDn(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* &
+                                                                       data%phytos(phy_i)%X_ncon* secs_per_day
       ENDIF
       ! set global mobility array for phytoplankton IP pool, and record flux
       IF(data%phytos(phy_i)%simIPDynamics>0) THEN
          mobility(data%id_ip(phy_i)) = vvel
          _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_ip(phy_i))* secs_per_day
       ELSE
-         _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* data%phytos(phy_i)%X_pcon* secs_per_day
+         _DIAG_VAR_(data%id_PhySEDp(phy_i)) = vvel*_STATE_VAR_(data%id_p(phy_i))* &
+                                                                       data%phytos(phy_i)%X_pcon* secs_per_day
       ENDIF
 
        ! cumulate the community sedimentation flux (mmmol/m2/d) for later use

@@ -484,7 +484,8 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
       !# f(S) = 1 at S=S_opt, f(S) = S_bep at S=S_maxsp.
 
       IF (phytos(group)%salTol<0 .and. phytos(group)%S_bep>1) &
-        PRINT *,'WARNING: salTol flag for phyto group: ',group,' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
+        PRINT *,'WARNING: salTol flag for phyto group: ',group, &
+                   ' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
 
       ! change fSal above Sopt for increasing stress on freshwater species
       IF (salinity>phytos(group)%S_opt) THEN
@@ -503,7 +504,8 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
       !# f(S) = 1 at S>=S_opt, f(S) = S_bep at S=0.
 
       IF (phytos(group)%salTol<0 .and. phytos(group)%S_bep>1) &
-        PRINT *,'WARNING: salTol flag for phyto group: ',group,' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
+        PRINT *,'WARNING: salTol flag for phyto group: ',group, &
+                      ' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
 
       IF (salinity<phytos(group)%S_opt) THEN
          fSal = (phytos(group)%S_bep-1.0) * (salinity**2.0)/(phytos(group)%S_opt**2.0)   &
@@ -517,7 +519,8 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
       ! f(S) = 1 at S=S_opt, f(S) = S_bep at S=0 and 2*S_opt.
 
       IF (phytos(group)%salTol<0 .and. phytos(group)%S_bep>1) &
-        PRINT *,'WARNING: salTol flag for phyto group: ',group,' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
+        PRINT *,'WARNING: salTol flag for phyto group: ',group, &
+                      ' is set for growth supression, but S_bep is >1: ', phytos(group)%S_bep
 
       IF (salinity < phytos(group)%S_opt) THEN
          fSal = (phytos(group)%S_bep-1.0)*(salinity**2.0)/(phytos(group)%S_opt**2.0)-  &

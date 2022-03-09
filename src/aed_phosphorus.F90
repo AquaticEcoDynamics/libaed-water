@@ -514,7 +514,8 @@ AED_REAL,INTENT(in) :: theta_Kpo4 ! theta for P-adsorp on limitation, default = 
 AED_REAL,INTENT(in) :: K_sal ! half-saturation of salinity, default = 60
 AED_REAL,INTENT(in) :: temp
 AED_REAL,INTENT(in) :: sal
-AED_REAL,PARAMETER  :: Topt = 45. ! optimum temperature for P-adsorp, default = 45 as the ref showed increasing P-adsorp with temperature
+AED_REAL,PARAMETER  :: Topt = 45. ! optimum temperature for P-adsorp, default = 45 as the
+                                  !       ref showed increasing P-adsorp with temperature
 
 AED_REAL :: fT, fSal
 !

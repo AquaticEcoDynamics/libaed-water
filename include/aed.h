@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
 !#   GLM is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -28,15 +28,27 @@
 #ifndef _AED_H_
 #define _AED_H_
 
-#define AED_VERSION  "2.0.4a"
+#define AED_VERSION  "2.0.4b"
 
 #define MAX_MODELS 40
 
-!# aed_phytoplankton constants
+!# aed_phytoplankton and aed_zooplankton constants
 #define MAX_PHYTO_TYPES 256
 #define MAX_ZOOP_TYPES  256
 #define MAX_ZOOP_PREY    10
 #define MAX_PATHO_TYPES 256
+
+!# aed_pesticides constants
+#define MAX_PSTC_TYPES  256
+#define MAX_PSTC_SORB     9
+
+!# aed_bivalve constants
+#define MAX_BVLV_TYPES  256
+#define MAX_BVLV_PREY     9
+
+!# aed_vegetation constants
+#define MAX_VEG_TYPES  256
+#define MAX_VEG_PREY     9
 
 !# for aed_geochemistry
 #define MAX_GC_COMPONENTS 20

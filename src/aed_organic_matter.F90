@@ -1083,21 +1083,24 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    ELSE ! Compute directly
      Fsed_poc = zero_  !data%Fsed_pom * sedimentOMfrac * data%Xsc *(bottom_stress - data%tau_0) / data%tau_r
      IF( data%resuspension > 0 ) &
-       Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsc * 1e3/12  ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
+       Fsed_poc = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsc * 1e3/12
+                                              ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
    ENDIF
    IF (data%use_Fsed_link_pon) THEN
      Fsed_pon = _STATE_VAR_S_(data%id_Fsed_pon)
    ELSE ! Compute directly
      Fsed_pon = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsn *(bottom_stress - data%tau_0) / data%tau_r
      IF( data%resuspension > 0 ) &
-       Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsn * 1e3/14  ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
+       Fsed_pon = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsn * 1e3/14
+                                              ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
    ENDIF
    IF (data%use_Fsed_link_pop) THEN
      Fsed_pop = _STATE_VAR_S_(data%id_Fsed_pop)
    ELSE ! Compute directly
      Fsed_pop = zero_ !data%Fsed_pom * sedimentOMfrac * data%Xsp *(bottom_stress - data%tau_0) / data%tau_r
      IF( data%resuspension > 0 ) &
-       Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsp * 1e3/30.91  ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
+       Fsed_pop = _DIAG_VAR_S_(data%id_l_resus) * sedomfr * data%Xsp * 1e3/30.91
+                                              ! g/m2/s * g/g * gC/g * mmol/mol / g/mol = mmol/m2/s
    ENDIF
 
    ! Set bottom fluxes for the pelagic variables, note this doesnt consdier
