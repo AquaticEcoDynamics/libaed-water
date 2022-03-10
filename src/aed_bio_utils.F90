@@ -471,6 +471,7 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !-------------------------------------------------------------------------------
 !BEGIN
 
+   fSal = 0.
    ! User can set salTol as negative (growth supressison) or positive
    ! (respiration enhancement). The equations are the same but will range from
    ! 0-1 for supression and >1 for enhancment. Users must ensure S_bep is set
