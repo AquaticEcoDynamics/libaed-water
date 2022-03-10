@@ -220,7 +220,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
      data%id_ss_vvel(i) = aed_define_diag_variable(TRIM(ncs_name)//'_vvel','m/s','vertical velocity')
 
      IF ( simSedimentMass ) THEN
-       sed_initial = data%sed_porosity * fs(i) * sed_depth * data%rho_ss(i)
+       sed_initial = data%sed_porosity * fs(i) * sed_depth * (data%rho_ss(i)*1e3)
        data%id_ss_sed(i) = aed_define_sheet_variable(TRIM(ncs_name)//'_sed',&
                                 'g/m**2','sedimented noncohesive particles', &
                                 sed_initial,minimum=zero_)
