@@ -52,15 +52,12 @@ MODULE aed_pesticides
 !
    PUBLIC aed_pesticides_data_t
 !
-   TYPE pest_sorb_t
-      !State variable name for pesticide pest
-      CHARACTER(64) :: pest_sorbent
-      !Sorption factors for pesticide onto sorbents
-      AED_REAL      :: Kpst_sorb
-   END TYPE pest_sorb_t
-
 !-------------------------------------------------------------------------------
 !  %% NAMELIST   %%  pesticide_param_t
+   TYPE pest_sorb_t
+      CHARACTER(64)     :: pest_sorbent ! State variable name for sorbents
+      AED_REAL          :: Kpst_sorb    ! Sorption factors for sorbents
+   END TYPE pest_sorb_t
    TYPE pesticide_param_t
       CHARACTER(64)     :: name
       AED_REAL          :: Rhydrol
@@ -68,17 +65,17 @@ MODULE aed_pesticides
       AED_REAL          :: Ruptake
       AED_REAL          :: theta_hydrol
       AED_REAL          :: K_gpp
+      AED_REAL          :: Fsed_pst
       AED_REAL          :: coef_light_kb_vis, coef_light_kb_uva, coef_light_kb_uvb  !-- Light inactivation
       INTEGER           :: sorption_model
       INTEGER           :: num_sorb
       TYPE(pest_sorb_t) :: sorbents(MAX_PSTC_SORB)
    END TYPE pesticide_param_t
-!  %% END NAMELIST   %%  pesticide_param_t
-
    TYPE,extends(pesticide_param_t) :: pesticide_data_t
       INTEGER  :: id_sorb(MAX_PSTC_SORB)
       INTEGER  :: id_sorbv(MAX_PSTC_SORB)
    END TYPE
+   !  %% END NAMELIST   %%  pesticide_param_t
 
 
    TYPE,extends(aed_model_data_t) :: aed_pesticides_data_t
@@ -91,7 +88,7 @@ MODULE aed_pesticides
       ! Diagnostic IDs for processes
       INTEGER,ALLOCATABLE :: id_atmvolat(:), id_sedflux(:), id_sorption(:),    &
                              id_photolysis(:), id_hydrolysis(:), id_uptake(:), &
-                             id_settling(:), id_resus(:)
+                             id_settling(:), id_resus(:), id_total(:)
 
       INTEGER  :: id_oxy, id_pH,  id_doc, id_tss           ! Dependency ID
       INTEGER  :: id_tem, id_sal, id_gpp                   ! Environmental IDs (3D)
@@ -101,17 +98,17 @@ MODULE aed_pesticides
       INTEGER  :: id_epsilon, id_taub
 
       !# Model parameters
-      INTEGER  :: num_pesticides, num_sorp
+      INTEGER  :: num_pesticides !, num_sorp
       TYPE(pesticide_data_t),DIMENSION(:),ALLOCATABLE :: pesticides
 
-      INTEGER  :: num_ss
       INTEGER  :: pst_piston_model,pst_sorption_model
-      AED_REAL,ALLOCATABLE  :: Fsed_pst(:)
-      AED_REAL,ALLOCATABLE  :: Rhydrol(:),Rphoto(:),Ruptake(:),theta_hydrol(:),K_gpp(:)
-      AED_REAL :: tau_0_min, kTau_0
-      AED_REAL,ALLOCATABLE :: epsilon(:), tau_0(:), tau_r(:), Ke_ss(:)
-      AED_REAL,ALLOCATABLE :: epsilonP(:), tauP_0(:)
-      AED_REAL,DIMENSION(:),ALLOCATABLE :: ss_set, ss_tau, ss_ke
+     !INTEGER  :: num_ss
+     !AED_REAL,ALLOCATABLE  :: Fsed_pst(:)
+     !AED_REAL,ALLOCATABLE  :: Rhydrol(:),Rphoto(:),Ruptake(:),theta_hydrol(:),K_gpp(:)
+     !AED_REAL :: tau_0_min, kTau_0
+     !AED_REAL,ALLOCATABLE :: epsilon(:), tau_0(:), tau_r(:), Ke_ss(:)
+     !AED_REAL,ALLOCATABLE :: epsilonP(:), tauP_0(:)
+     !AED_REAL,DIMENSION(:),ALLOCATABLE :: ss_set, ss_tau, ss_ke
 
       LOGICAL :: simSediment, simResuspension, simSorption, &
                  simVolatilisation, simPhotolysis, simUptake
@@ -195,7 +192,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_pesticides configuration"
-   print *,"          NOTE : UNDER DEVELOPMENT ... STOPPING"
+   print *,"          NOTE : UNDER DEVELOPMENT ... "
 
    !stop "Please disable the pesticide model in your configuration"
 
@@ -222,7 +219,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
    ! Set module values to user provided numbers in the namelist
    data%resuspension = resuspension
 
-   ! Store pesticide specific parameter values in our own derived type
+   ! Store pesticide specific parameter values in module data type
    !   NB: all rates must be provided in values per day,
    !   and are converted here to values per second.
    CALL aed_pesticides_load_params(data, dbase, num_pesticides, the_pesticides)
@@ -237,12 +234,12 @@ SUBROUTINE aed_define_pesticides(data, namlst)
               aed_locate_variable(data%pesticides(pst_i)%sorbents(sorp_i)%pest_sorbent)
           ! Find the sorbent vvel
           data%pesticides(pst_i)%id_sorbv(sorp_i) = &
-              aed_locate_variable(TRIM(data%pesticides(pst_i)%sorbents(sorp_i)%pest_sorbent//'_vvel'))
+              aed_locate_variable(TRIM(data%pesticides(pst_i)%sorbents(sorp_i)%pest_sorbent)//'_vvel')
 
       ENDDO
    ENDDO
 
-   ! Register state dependancies
+   ! Register state dependencies
    data%id_tss=-1 ; data%id_doc=-1 ; data%id_pH=-1 ; data%id_oxy=-1 ; data%id_gpp=-1
    IF (oxy_variable .NE. '') data%id_oxy = aed_locate_variable(oxy_variable)
    IF (gpp_variable .NE. '') data%id_gpp = aed_locate_variable(gpp_variable)
@@ -302,6 +299,7 @@ INTEGER FUNCTION load_csv(dbase, pd)
             CASE ('Ruptake')           ; pd(ccol)%Ruptake           = extract_double(values(ccol))
             CASE ('theta_hydrol')      ; pd(ccol)%theta_hydrol      = extract_double(values(ccol))
             CASE ('K_gpp')             ; pd(ccol)%K_gpp             = extract_double(values(ccol))
+            CASE ('Fsed_pst')          ; pd(ccol)%Fsed_pst          = extract_double(values(ccol))
             CASE ('coef_light_kb_vis') ; pd(ccol)%coef_light_kb_vis = extract_double(values(ccol))
             CASE ('coef_light_kb_uva') ; pd(ccol)%coef_light_kb_uva = extract_double(values(ccol))
             CASE ('coef_light_kb_uvb') ; pd(ccol)%coef_light_kb_uvb = extract_double(values(ccol))
@@ -373,7 +371,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
     data%num_pesticides = count
     ALLOCATE(data%pesticides(count))
     ALLOCATE(data%id_pstd(count))
-    ALLOCATE(data%id_psta(count,data%num_sorp))
+    ALLOCATE(data%id_psta(count,10)) !need to get max num_sorb from pd
     IF (data%simSediment) THEN
        ALLOCATE(data%id_psts(count))
     ENDIF
@@ -387,11 +385,18 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        ALLOCATE(data%id_photolysis(count))
        ALLOCATE(data%id_hydrolysis(count))
        ALLOCATE(data%id_uptake(count))
+       ALLOCATE(data%id_total(count))
     ENDIF
 
     DO i=1,count
        ! Assign parameters from database to simulated groups
        data%pesticides(i) = pd(list(i)+1)
+
+       ! Unit adjustments from read-in parameters
+       data%pesticides(i)%Fsed_pst = data%pesticides(i)%Fsed_pst / secs_per_day
+       data%pesticides(i)%Rhydrol = data%pesticides(i)%Rhydrol / secs_per_day
+       data%pesticides(i)%Rphoto = data%pesticides(i)%Rphoto / secs_per_day
+       data%pesticides(i)%Ruptake = data%pesticides(i)%Ruptake / secs_per_day
 
        ! Register group as a state variable
        data%id_pstd(i) = aed_define_variable(                                  &
@@ -400,7 +405,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
                              min_conc,                                         &
                              minimum=min_conc)
 
-       ! Check if we need to registrer a variable for the attached fraction
+       ! Check if we need to registrer a variable for the sorbed fraction(s)
        IF (data%pesticides(i)%num_sorb > 0) THEN
          pst_name = '0'
          DO ns = 1, data%pesticides(i)%num_sorb
@@ -415,7 +420,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        ENDIF
 
        IF (data%simSediment) THEN
-          data%id_psts(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_s', 'orgs/m2', 'pesticides in sediment')
+          data%id_psts(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_s', 'mmol/m2', 'pesticides in sediment')
           PRINT *,'WARNING: simSediment is not complete'
        ENDIF
 
@@ -429,6 +434,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
          data%id_photolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_pht', 'mmol/m3/day', 'photolysis rate')
          data%id_hydrolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_hyd', 'mmol/m3/day', 'hydrolysis rate')
          data%id_uptake(i)    = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_upt', 'mmol/m3/day', 'uptake rate')
+         data%id_total(i)     = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3', 'total pesticide concentration')
        ENDIF
    ENDDO
 END SUBROUTINE aed_pesticides_load_params
@@ -506,12 +512,12 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   AED_REAL :: pth_f, pth_a, pest_d, pest_a(data%num_sorp)
+   AED_REAL :: pth_f, pth_a, pest_d, pest_a
    AED_REAL :: temp,salinity,oxy,pH,doc
    AED_REAL :: Io,par,uva,uvb
    AED_REAL :: hydrolysis, photolysis, uptake
    AED_REAL :: f_AOC,f_pH,f_DO,phi,lightBW,phstar,att_frac
-   AED_REAL :: f_upt
+   AED_REAL :: f_upt, f_pht
 
    INTEGER  :: pst_i, sorp_i, pst_s
 
@@ -546,15 +552,16 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
       uvb = (par/0.45)*0.003          ! uvb is 0.3% of sw
    ENDIF
 
+
    DO pst_i=1,data%num_pesticides
 
       !-----------------------------------------------------------------
       ! RETREIVE THIS PESTICIDE GROUP
 
       pest_d = _STATE_VAR_(data%id_pstd(pst_i))
-      IF ( data%num_sorp > 0 ) THEN
-        pest_a(pst_s) = _STATE_VAR_(data%id_psta(pst_i,sorp_i))
-      END IF
+    !  IF ( data%num_sorp > 0 ) THEN
+    !    pest_a(pst_s) = _STATE_VAR_(data%id_psta(pst_i,sorp_i))
+    !  END IF
 
       !-----------------------------------------------------------------
       ! COMPUTE PESTICIDE FLUX RATES
@@ -563,14 +570,27 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
       photolysis = zero_
       uptake     = zero_
 
+      _DIAG_VAR_(data%id_hydrolysis(pst_i)) = zero_
+      _DIAG_VAR_(data%id_photolysis(pst_i)) = zero_
+      _DIAG_VAR_(data%id_uptake(pst_i)) = zero_
+      _DIAG_VAR_(data%id_total(pst_i))  = zero_
+
       ! 1. Breakdown under ambient conditions
 
-      hydrolysis = data%Rhydrol(pst_i) * (data%theta_hydrol(pst_i)**(temp-20.0))
+      hydrolysis = data%pesticides(pst_i)%Rhydrol * (data%pesticides(pst_i)%theta_hydrol**(temp-20.0))
 
       ! 2. Sunlight breakdown
 
       IF ( data%simPhotolysis ) THEN
-        photolysis = data%Rphoto(pst_i) ! something about light here
+        f_pht = par / ( par + 500. )
+        photolysis = data%pesticides(pst_i)%coef_light_kb_vis * f_pht
+
+        f_pht = uva / ( uva + 50. )
+        photolysis = photolysis+ data%pesticides(pst_i)%coef_light_kb_uva * f_pht
+
+        f_pht = uvb / ( uvb + 5. )
+        photolysis = photolysis+ data%pesticides(pst_i)%coef_light_kb_uvb * f_pht
+
        !       photolysis = photo(vis,cdom,1) + photo(uva,cdom,2) + photo(uvb,cdom,3)
        !       !# Limit photolysis to 90% of doc pool within 1 hour
        !       IF(photolysis > 0.9*docr/3.6e3) photolysis = 0.9*docr/3.6e3
@@ -579,8 +599,8 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
 
       ! 3. Biological uptake
       IF ( data%simUptake ) THEN
-        f_upt = _DIAG_VAR_(data%id_GPP) / ( _DIAG_VAR_(data%id_GPP) + data%K_gpp(pst_i) )
-        uptake = data%Ruptake(pst_i) * f_upt
+        f_upt = _DIAG_VAR_(data%id_GPP) / ( _DIAG_VAR_(data%id_GPP) + data%pesticides(pst_i)%K_gpp )
+        uptake = data%pesticides(pst_i)%Ruptake * f_upt
       ENDIF
 
 
@@ -591,14 +611,22 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
       _FLUX_VAR_(data%id_pstd(pst_i)) = _FLUX_VAR_(data%id_pstd(pst_i))        &
                                     -  (hydrolysis + photolysis + uptake)*pest_d
 
+      DO sorp_i=1,data%pesticides(pst_i)%num_sorb
+        pest_a = _STATE_VAR_(data%id_psta(pst_i,sorp_i))
+        _FLUX_VAR_(data%id_psta(pst_i,sorp_i)) = _FLUX_VAR_(data%id_psta(pst_i,sorp_i))        &
+                                      -  (hydrolysis + photolysis/2.)*pest_a
+        _DIAG_VAR_(data%id_total(pst_i)) = _DIAG_VAR_(data%id_total(pst_i)) + pest_a
+      ENDDO
+      _DIAG_VAR_(data%id_total(pst_i)) = _DIAG_VAR_(data%id_total(pst_i)) + pest_d
+
 
       !-----------------------------------------------------------------
       ! SET DIAGNOSTICS
-    !  _DIAG_VAR_(data%id_total(pst_i)) =  pth_f + pth_a + pth_d
-      IF ( diag_level >= 10 ) THEN
-    !     _DIAG_VAR_(data%id_growth(pst_i)) =
-    !     _DIAG_VAR_(data%id_sunlight(pst_i)) =
-    !     _DIAG_VAR_(data%id_mortality(pst_i)) =
+
+      IF ( diag_level >= 2 ) THEN
+        _DIAG_VAR_(data%id_hydrolysis(pst_i)) = hydrolysis * (_DIAG_VAR_(data%id_total(pst_i))+pest_d) * secs_per_day
+        _DIAG_VAR_(data%id_photolysis(pst_i)) = photolysis * (_DIAG_VAR_(data%id_total(pst_i))/2.+pest_d) * secs_per_day
+        _DIAG_VAR_(data%id_uptake(pst_i)) = uptake * pest_d * secs_per_day
       ENDIF
 
    ENDDO
@@ -641,7 +669,7 @@ SUBROUTINE aed_calculate_benthic_pesticides(data,column,layer_idx)
 
          pest_sed_d = _STATE_VAR_S_(data%id_psts(pst_i)) ! pesticide (sediment pool)
 
-         diss_flux = data%Fsed_pst(pst_i)
+         diss_flux = data%pesticides(pst_i)%Fsed_pst
 
          ! Org flux to / from the sediment (orgs/m2/s)
   !       _FLUX_VAR_B_(data%id_ps(pst_i)) = _FLUX_VAR_B_(data%id_ps(pst_i)) - diss_flux
@@ -658,7 +686,7 @@ SUBROUTINE aed_calculate_benthic_pesticides(data,column,layer_idx)
    ELSE
       ! No sediment pool is resolved, but we will still predict generic diss flux
       DO pst_i=1,data%num_pesticides
-        diss_flux = data%Fsed_pst(pst_i)
+        diss_flux = data%pesticides(pst_i)%Fsed_pst
 
         ! Flux from the sediment
         _FLUX_VAR_B_(data%id_pstd(pst_i)) = _FLUX_VAR_B_(data%id_pstd(pst_i)) + diss_flux
@@ -690,10 +718,10 @@ SUBROUTINE aed_equilibrate_pesticides(data,column,layer_idx)
    AED_REAL :: temp, tss
 
    ! State
-   AED_REAL :: pest_d_preequil, pest_t, pest_d, pest_s(data%num_sorp)
+   AED_REAL :: pest_d_preequil, pest_t, pest_d, pest_s(10)
 
    ! Temporary variables
-   AED_REAL :: sorbents(data%num_sorp), Kpstp(data%num_sorp)
+   AED_REAL :: sorbents(10), Kpstp(10)
    INTEGER  :: pst_i, sorp_i
 
    AED_REAL, PARAMETER :: dt = 900  ! Needs to be linked to aed_core/common
@@ -714,9 +742,9 @@ SUBROUTINE aed_equilibrate_pesticides(data,column,layer_idx)
 
      ! Find the total pesticide across all forms
      pest_t = _STATE_VAR_(data%id_pstd(pst_i))
-     DO sorp_i=1,data%num_sorp
+     DO sorp_i=1,data%pesticides(pst_i)%num_sorb
 
-       sorbents(sorp_i) = 0.  ! Add linked vars here
+       sorbents(sorp_i) = _STATE_VAR_(data%pesticides(pst_i)%id_sorb(sorp_i))
 
        pest_t = pest_t + _STATE_VAR_(data%id_psta(pst_i,sorp_i))
 
@@ -728,7 +756,7 @@ SUBROUTINE aed_equilibrate_pesticides(data,column,layer_idx)
 
      ! Update core data arrays
      _STATE_VAR_(data%id_pstd(pst_i))    = pest_d              ! Dissolved
-     DO sorp_i=1,data%num_sorp
+     DO sorp_i=1,data%pesticides(pst_i)%num_sorb
       _STATE_VAR_(data%id_psta(pst_i,sorp_i)) = pest_s(sorp_i) ! Adsorped to particle group
      ENDDO
 
@@ -755,7 +783,7 @@ SUBROUTINE aed_mobility_pesticides(data,column,layer_idx,mobility)
 !LOCALS
    INTEGER  :: sorp_i,pst_i
    AED_REAL :: temp
-   AED_REAL :: sorbent_vvel(data%num_sorp)
+   AED_REAL :: sorbent_vvel(10)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -764,10 +792,10 @@ SUBROUTINE aed_mobility_pesticides(data,column,layer_idx,mobility)
    ! Set velocity of sorped pesticides, if simulated.
    DO pst_i=1,data%num_pesticides
 
-     IF ( diag_level >= 2 ) _DIAG_VAR_S_(data%id_settling(pst_i)) = zero_
+     IF ( diag_level >= 2 ) _DIAG_VAR_(data%id_settling(pst_i)) = zero_
 
-     DO sorp_i=1,data%num_sorp
-       sorbent_vvel(sorp_i) = 0. ! INSERT LINKS HERE
+     DO sorp_i=1,data%pesticides(pst_i)%num_sorb
+       sorbent_vvel(sorp_i) = _DIAG_VAR_(data%pesticides(pst_i)%id_sorbv(sorp_i))
        mobility(data%id_psta(pst_i,sorp_i)) = sorbent_vvel(sorp_i)
 
        IF ( diag_level >= 2 ) THEN
@@ -798,12 +826,6 @@ SUBROUTINE aed_light_extinction_pesticides(data,column,layer_idx,extinction)
 !-----------------------------------------------------------------------
 !BEGIN
    RETURN
-   DO ss_i=1,data%num_ss
-      ! Retrieve current (local) state variable values.
-      ss = _STATE_VAR_(data%id_ss(ss_i))
-      ! Self-shading with contribution from this phytoplankton concentration.
-      extinction = extinction + (data%Ke_SS(ss_i)*ss)
-   ENDDO
 END SUBROUTINE aed_light_extinction_pesticides
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
