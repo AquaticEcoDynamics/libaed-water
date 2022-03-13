@@ -343,7 +343,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
                               data%zoops%zoop_name)
 
 
-   !Register link to prey state variables
+   ! Register link to prey state variables
    DO zoop_i = 1,num_zoops
       phy_i = 0
       DO prey_i = 1,data%zoops(zoop_i)%num_prey
