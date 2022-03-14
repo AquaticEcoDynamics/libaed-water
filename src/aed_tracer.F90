@@ -157,7 +157,7 @@ SUBROUTINE aed_define_tracer(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_tracer initialization"
+   print *,"        aed_tracer configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_tracer,iostat=status)
@@ -191,16 +191,16 @@ SUBROUTINE aed_define_tracer(data, namlst)
       DO i=1,num_tracers
          trac_name(3:3) = CHAR(ICHAR('0') + i)
                                              ! divide settling by secs_per_day to convert m/d to m/s
-         data%id_trc(i) = aed_define_variable(TRIM(trac_name),'mmol/m**3','tracer', &
+         data%id_trc(i) = aed_define_variable(TRIM(trac_name),'g/m3','tracer', &
                                               trace_initial,minimum=zero_,maximum=1e3,mobility=(w_ss(i)/secs_per_day))
-         data%id_trc_vvel(i) = aed_define_diag_variable(TRIM(trac_name)//'_vvel','m/s','vertical velocity')
+         data%id_trc_vvel(i) = aed_define_diag_variable(TRIM(trac_name)//'_vvel','m/d','vertical velocity')
       ENDDO
    ENDIF
 
    ! Setup bottom arrays if spatially variable resuspension
    IF ( resuspension == 2 ) THEN
-      data%id_tau_0 =  aed_define_sheet_diag_variable('tau_0','N/m**2', 'dynamic bottom drag')
-      data%id_epsilon =  aed_define_sheet_diag_variable('epsilon','g/m**2/s', 'max resuspension rate')
+      data%id_tau_0 =  aed_define_sheet_diag_variable('tau_0','N/m2', 'dynamic bottom drag')
+      data%id_epsilon =  aed_define_sheet_diag_variable('epsilon','g/m2/s', 'max resuspension rate')
 
       ALLOCATE(data%id_sfss(num_tracers))
 
@@ -223,7 +223,7 @@ SUBROUTINE aed_define_tracer(data, namlst)
 
    ! Retention time
    IF (retention_time) THEN
-      data%id_age = aed_define_variable("age",'sec','tracer',trace_initial,minimum=zero_)
+      data%id_age = aed_define_variable("age",'secs','tracer',trace_initial,minimum=zero_)
    ELSE
       data%id_age = -1
    ENDIF
@@ -237,8 +237,8 @@ SUBROUTINE aed_define_tracer(data, namlst)
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed_locate_sheet_global('taub')
       data%id_E_sedzone = aed_locate_sheet_global('material')
-      data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m**2',  'taub diagnostic')
-      data%id_resus =  aed_define_sheet_diag_variable('resus','g/m**2/s', 'resuspension rate')
+      data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m2',  'taub diagnostic')
+      data%id_resus =  aed_define_sheet_diag_variable('resus','g/m2/s', 'resuspension rate')
    ENDIF
 
 END SUBROUTINE aed_define_tracer
@@ -445,7 +445,7 @@ SUBROUTINE aed_mobility_tracer(data,column,layer_idx,mobility)
       END SELECT
       ! set global mobility array
       mobility(data%id_trc(i)) = vvel
-      _DIAG_VAR_(data%id_trc_vvel(i)) = vvel
+      _DIAG_VAR_(data%id_trc_vvel(i)) = vvel * secs_per_day
    ENDDO
 
 END SUBROUTINE aed_mobility_tracer

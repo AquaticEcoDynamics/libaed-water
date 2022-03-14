@@ -68,8 +68,9 @@ MODULE aed_phosphorus
       !# Variable identifiers
       INTEGER  :: id_frp, id_frpads, id_oxy,  id_tss, id_pH
       INTEGER  :: id_Fsed_frp
-      INTEGER  :: id_E_temp, id_E_salt, id_E_rain, id_tssext
-      INTEGER  :: id_sed_frp, id_frpads_vvel, id_atm_dep
+      INTEGER  :: id_e_temp, id_e_salt, id_e_rain, id_tssext, id_dz
+      INTEGER  :: id_sed_frp, id_frpads_vvel, id_atm_dep, &
+                  id_frpads_set, id_frp_srp, id_frpads_res
 
       !# Model parameters
       AED_REAL :: Fsed_frp,Ksed_frp,theta_sed_frp             ! Benthic
@@ -200,7 +201,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    data%simWetDeposition     = simWetDeposition
 
    ! Register main state variable
-   data%id_frp = aed_define_variable( 'frp', 'mmol/m**3', 'phosphorus',     &
+   data%id_frp = aed_define_variable( 'frp', 'mmol P/m3', 'phosphorus',     &
                                     frp_initial,minimum=frp_min,maximum=frp_max)
 
    ! Register external state variable dependencies (for benthic flux)
@@ -238,25 +239,35 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
        ENDIF
      ENDIF
 
-     data%id_frpads = aed_define_variable('frp_ads','mmol/m**3','adsorbed phosphorus',     &
+     data%id_frpads = aed_define_variable('frp_ads','mmol P/m3','adsorbed phosphate', &
                       zero_,minimum=zero_,mobility=data%w_po4ads)
 
      IF (data%ads_use_pH) THEN
        data%id_pH = aed_locate_variable(pH_variable)
      ENDIF
+
+     ! Check diagnostics specific for adsorbed phosphate
+     data%id_frpads_set = aed_define_diag_variable('frp_ads_set','mmol P/m3/d',&
+                                           'adsobed PO4 sedimentation flux')
+     data%id_frpads_res = aed_define_diag_variable('frp_ads_res','mmol P/m2/d',&
+                                           'adsobed PO4 resuspension flux')
+     data%id_frp_srp = aed_define_diag_variable('frp_srp','mmol P/m3/d',       &
+                                           'PO4 adsorption rate')
+
    ENDIF
 
    ! Register diagnostic variables
-   data%id_sed_frp = aed_define_sheet_diag_variable('sed_frp','mmol/m**2/d', &
+   data%id_sed_frp = aed_define_sheet_diag_variable('frp_dsf','mmol P/m2/d', &
                                          'PO4 exchange across sed/water interface')
    IF( simWetDeposition .OR. simDryDeposition ) THEN
-    data%id_atm_dep = aed_define_sheet_diag_variable('atm_dip_flux','mmol/m**2/d', &
+    data%id_atm_dep = aed_define_sheet_diag_variable('dip_atm','mmol P/m2/d', &
                                          'DIP atmospheric deposition flux')
    ENDIF
 
    ! Register environmental dependencies
-   data%id_E_temp = aed_locate_global('temperature')
-   data%id_E_salt = aed_locate_global('salinity')
+   data%id_e_temp = aed_locate_global('temperature')
+   data%id_e_salt = aed_locate_global('salinity')
+   data%id_dz     = aed_locate_global('layer_ht')
    IF( simWetDeposition ) data%id_E_rain = aed_locate_sheet_global('rain')
 
 END SUBROUTINE aed_define_phosphorus
@@ -441,9 +452,9 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    IF (data%ben_use_aedsed) THEN
      ! Linked to aed_sedflux, check if its constant or dynamically set
      IF ( aed_is_const_var(data%id_Fsed_frp) ) THEN
-        Fsed_frp = _DIAG_VAR_S_(data%id_Fsed_frp) * MIN(3.,fDO * fT)
+        Fsed_frp = _DIAG_VAR_S_(data%id_Fsed_frp) * MIN(3.,fDO * fT) / secs_per_day
      ELSE
-        Fsed_frp = _DIAG_VAR_S_(data%id_Fsed_frp)
+        Fsed_frp = _DIAG_VAR_S_(data%id_Fsed_frp) / secs_per_day
      ENDIF
    ELSE
      Fsed_frp = data%Fsed_frp * MIN(3.,fDO * fT)
@@ -465,6 +476,8 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_frp) = frp_flux * secs_per_day
 
+   _DIAG_VAR_(data%id_frpads_res) = zero_
+
 END SUBROUTINE aed_calculate_benthic_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -481,21 +494,28 @@ SUBROUTINE aed_mobility_phosphorus(data,column,layer_idx,mobility)
    AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
+   AED_REAL :: vvel, dz
 !
+
 !-------------------------------------------------------------------------------
 !BEGIN
-!  id_frpads is not set unless data%simPO4Adsorption is true
+
    IF(.NOT. data%simPO4Adsorption) RETURN
 
-   mobility(data%id_frpads) = zero_
+   vvel = zero_
+   dz = _STATE_VAR_(data%id_dz)
+
 
    IF( data%id_frpads_vvel>0 ) THEN
      ! adopt vertical velocity of host particle
-     mobility(data%id_frpads) = _DIAG_VAR_(data%id_frpads_vvel)
+     vvel = _DIAG_VAR_(data%id_frpads_vvel) / secs_per_day
    ELSE
      ! adopt constant value read in from nml
-     mobility(data%id_frpads) = data%w_po4ads
+     vvel = data%w_po4ads
    ENDIF
+   mobility(data%id_frpads) = vvel
+
+   _DIAG_VAR_(data%id_frpads_set) = (vvel/dz)*_STATE_VAR_(data%id_frpads)*secs_per_day
 
 END SUBROUTINE aed_mobility_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

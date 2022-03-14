@@ -251,7 +251,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    !# Register state variables
    IF (dic_initial>MISVAL) THEN
       data%simDIC = .true.
-      data%id_dic = aed_define_variable('dic','mmol/m**3','dissolved inorganic carbon', &
+      data%id_dic = aed_define_variable('dic','mmol C/m3','dissolved inorganic carbon', &
                                        dic_initial,minimum=zero_)
       data%id_pH = aed_define_variable('pH','-','pH',     &
                                        pH_initial,minimum=zero_)
@@ -259,10 +259,10 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    IF (ch4_initial>MISVAL) THEN
       data%simCH4 = .true.
-      data%id_ch4 = aed_define_variable('ch4','mmol/m**3','methane',    &
+      data%id_ch4 = aed_define_variable('ch4','mmol C/m3','methane',    &
                                      ch4_initial,minimum=zero_)
       IF( data%simCH4ebb ) THEN
-        data%id_ch4_bub = aed_define_variable('ch4_bub','mmol/m**3', &
+        data%id_ch4_bub = aed_define_variable('ch4_bub','mmol C/m3', &
                                      'methane bubbles',zero_,minimum=zero_)
       ENDIF
    ENDIF
@@ -286,28 +286,28 @@ SUBROUTINE aed_define_carbon(data, namlst)
       data%id_Fsed_ch4_ebb = aed_locate_sheet_variable(Fsed_ebb_variable)
 
    !# Register diagnostic variables
-   data%id_pco2 = aed_define_diag_variable('pCO2','atm', 'pCO2')
+   data%id_pco2 = aed_define_diag_variable('pCO2', 'atm', 'pCO2')
    IF (diag_level>0) THEN
-     data%id_sed_dic = aed_define_sheet_diag_variable('sed_dic','mmol/m**2/d', &
+     data%id_sed_dic = aed_define_sheet_diag_variable('sed_dic','mmol C/m2/d', &
                             'CO2 exchange across sed/water interface')
      data%id_atm_co2 = aed_define_sheet_diag_variable('atm_co2_flux',          &
-                            'mmol/m**2/d', 'CO2 exchange across atm/water interface')
+                            'mmol C/m2/d', 'CO2 exchange across atm/water interface')
 
      IF( data%simCH4 ) THEN
-       data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol/m**3/d', 'methane oxidation rate')
-       data%id_sed_ch4 = aed_define_sheet_diag_variable('sed_ch4','mmol/m**2/d', &
+       data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol C/m3/d', 'methane oxidation rate')
+       data%id_sed_ch4 = aed_define_sheet_diag_variable('ch4_dsf','mmol C/m2/d', &
                             'CH4 exchange across sed/water interface')
-       data%id_atm_ch4 = aed_define_sheet_diag_variable('atm_ch4_flux',        &
-                            'mmol/m**2/d', 'CH4 exchange across atm/water interface')
+       data%id_atm_ch4 = aed_define_sheet_diag_variable('ch4_atm',        &
+                            'mmol C/m2/d', 'CH4 exchange across atm/water interface')
        IF( data%simCH4ebb ) THEN
-         data%id_sed_ch4_ebb_3d = aed_define_diag_variable('sed_ch4_ebb_3d','mmol/m**3/d', &
+         data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m3/d', &
                             'CH4 ebullition release rate')
-         data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_df','mmol/m**3/d', &
+         data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_dis','mmol C/m3/d', &
                             'CH4 bubble dissolution rate')
-         data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('sed_ch4_ebb','mmol/m**2/d', &
+         data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_dsf','mmol C/m2/d', &
                             'CH4 ebullition across sed/water interface')
-         data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('atm_ch4_ebb_flux', &
-                            'mmol/m**2/d', 'CH4 ebullition across atm/water interface')
+         data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_atm', &
+                            'mmol C/m2/d', 'CH4 ebullition across atm/water interface')
        ENDIF
      ENDIF
    ENDIF
@@ -656,17 +656,17 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    extc = _STATE_VAR_(data%id_extc) ! local extinction
 
     ! Retrieve current (local) state variable values.
-   dic  = _STATE_VAR_(data%id_dic)! carbon
-   pH   = _STATE_VAR_(data%id_pH)! pH
+   dic  = _STATE_VAR_(data%id_dic) ! carbon
+   pH   = _STATE_VAR_(data%id_pH)  ! pH
 
    IF ( data%use_sed_model_dic ) THEN
-      Fsed_dic = _STATE_VAR_S_(data%id_Fsed_dic)
+      Fsed_dic = _STATE_VAR_S_(data%id_Fsed_dic) / secs_per_day
    ELSE
       Fsed_dic = data%Fsed_dic
    ENDIF
    IF ( data%use_sed_model_ch4 ) THEN
-      Fsed_ch4 = _STATE_VAR_S_(data%id_Fsed_ch4)
-      IF( data%simCH4ebb ) Fsed_ch4_ebb = _STATE_VAR_S_(data%id_Fsed_ch4_ebb)
+      Fsed_ch4 = _STATE_VAR_S_(data%id_Fsed_ch4) / secs_per_day
+      IF( data%simCH4ebb ) Fsed_ch4_ebb = _STATE_VAR_S_(data%id_Fsed_ch4_ebb) / secs_per_day
    ELSE
       Fsed_ch4 = data%Fsed_ch4
       IF( data%simCH4ebb ) Fsed_ch4_ebb = data%Fsed_ch4_ebb
@@ -924,7 +924,6 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
       pCO2 = aed_carbon_co2(data%ionic,temp,dic,pH)*1e-6 / Ko  !(=atm)
 
     ENDIF
-
 
     !# Set pCO2 & pH as returned
     _DIAG_VAR_(data%id_pco2) = pCO2

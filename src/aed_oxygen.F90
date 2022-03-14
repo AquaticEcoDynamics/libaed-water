@@ -202,7 +202,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_oxygen initialization"
+   print *,"        aed_oxygen configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_oxygen,iostat=status)
@@ -219,7 +219,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%altitude = altitude
 
    ! Register state variables
-   data%id_oxy = aed_define_variable('oxy','mmol/m3','oxygen',     &
+   data%id_oxy = aed_define_variable('oxy','mmol O2/m3','oxygen',     &
                                     oxy_initial,minimum=oxy_min,maximum=oxy_max)
 
    ! Register the link to external variables
@@ -228,19 +228,19 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    ! Register diagnostic variables
    IF (diag_level>0) THEN
      data%id_oxy_sat = aed_define_diag_variable(                   &
-                     'sat', '%', 'oxygen saturation')
+                     'sat', '%', 'dissolved oxygen saturation')
 
      data%id_sed_oxy = aed_define_sheet_diag_variable(             &
-                     'sed_oxy', 'mmol/m2/d', 'O2 exchange across sed/water interface')
+                     'oxy_dsf', 'mmol O2/m2/d', 'O2 exchange across sed/water interface')
 
      data%id_atm_oxy_exch = aed_define_sheet_diag_variable(        &
-                     'atm_oxy_flux', 'mmol/m2/d', 'O2 exchange across atm/water interface')
+                     'oxy_atm', 'mmol O2/m2/d', 'O2 exchange across atm/water interface')
     IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
-                     'sed_oxy_flux3d', 'mmol/m3/d', 'O2 exchange across sed/water interface')
+                     'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand')
 
      data%id_atm_oxy_exch3d = aed_define_diag_variable(      &
-                     'atm_oxy_flux3d', 'mmol/m3/d', 'O2 exchange across atm/water interface')
+                     'oxy_atmv', 'mmol O2/m3/d', 'O2 conc. change due to atmospheric flux')
     ENDIF
    ENDIF
 
@@ -396,18 +396,18 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
    ! Retrieve current (local) state variable values.
-   oxy = _STATE_VAR_(data%id_oxy)! oxygen
+   oxy = _STATE_VAR_(data%id_oxy)   ! oxygen
 
    ! Compute the sediment flux dependent on overlying oxygen & temperature
-   fT = data%theta_sed_oxy**(temp-20.0)
+   fT  = data%theta_sed_oxy**(temp-20.0)
    fDO = oxy/(data%Ksed_oxy+oxy)
 
    IF (data%use_sed_model) THEN
      ! Linked to aed_sedflux, check if its constant or dynamically set
      IF ( aed_is_const_var(data%id_Fsed_oxy) ) THEN
-        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy) * MIN(3.,fDO * fT)
+        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy) * MIN(3.,fDO * fT) / secs_per_day
      ELSE
-        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy)
+        Fsed_oxy = _DIAG_VAR_S_(data%id_Fsed_oxy) / secs_per_day
      ENDIF
    ELSE
      Fsed_oxy = data%Fsed_oxy * MIN(3.,fDO * fT)

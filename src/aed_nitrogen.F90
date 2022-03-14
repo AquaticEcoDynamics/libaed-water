@@ -272,9 +272,9 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
    !---------------------------------------------------------------------------+
    ! Register state variables
-   data%id_amm = aed_define_variable('amm','mmol/m**3','ammonium',            &
+   data%id_amm = aed_define_variable('amm','mmol N/m3','ammonium',             &
                                    amm_initial,minimum=n_min, maximum=n_max)
-   data%id_nox = aed_define_variable('nit','mmol/m**3','nitrate',             &
+   data%id_nox = aed_define_variable('nit','mmol N/m3','nitrate',              &
                                    nit_initial,minimum=n_min, maximum=n_max)
 
    IF( simN2O>0 ) THEN
@@ -289,11 +289,11 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
         STOP
       ENDIF
 
-      data%id_n2o = aed_define_variable('n2o','mmol/m**3','nitrous oxide',   &
+      data%id_n2o = aed_define_variable('n2o','mmol N/m3','nitrous oxide',     &
                                   n2o_initial, minimum=n_min, maximum=n_max)
 
      IF( simN2O>1 ) THEN ! Advanced model requires NO2
-       data%id_no2 = aed_define_variable('no2','mmol/m**3','nitrate',         &
+       data%id_no2 = aed_define_variable('no2','mmol N/m3','nitrate',          &
                                    no2_initial, minimum=n_min, maximum=n_max)
      ENDIF
    ENDIF
@@ -323,31 +323,31 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
-   data%id_sed_amm = aed_define_sheet_diag_variable('sed_amm','mmol/m**2/d','ammonium sediment flux')
-   data%id_sed_nit = aed_define_sheet_diag_variable('sed_nit','mmol/m**2/d','nitrate sediment flux')
-   data%id_nitrf   = aed_define_diag_variable('nitrif','mmol/m**3/d','nitrification rate')
-   data%id_denit   = aed_define_diag_variable('denit','mmol/m**3/d','de-nitrification rate')
-   data%id_anammox = aed_define_diag_variable('anammox','mmol/m**3/d','anammox rate')
-   data%id_dnra    = aed_define_diag_variable('dnra','mmol/m**3/d','dnra rate')
+   data%id_sed_amm = aed_define_sheet_diag_variable('amm_dsf','mmol N/m2/d','ammonium sediment flux')
+   data%id_sed_nit = aed_define_sheet_diag_variable('nit_dsf','mmol N/m2/d','nitrate sediment flux')
+   IF( simN2O>0 )data%id_sed_n2o = aed_define_sheet_diag_variable('n2o_dsf','mmol N/m2/d','n2o sediment flux')
+   IF( simN2O>1 )data%id_sed_no2 = aed_define_sheet_diag_variable('no2_dsf','mmol N/m2/d','no2 sediment flux')
+
+   data%id_nitrf   = aed_define_diag_variable('nitrif','mmol N/m3/d','nitrification rate')
+   data%id_denit   = aed_define_diag_variable('denit','mmol N/m3/d','de-nitrification rate')
+   data%id_anammox = aed_define_diag_variable('anammox','mmol N/m3/d','anammox rate')
+   data%id_dnra    = aed_define_diag_variable('dnra','mmol N/m3/d','dnra rate')
+   IF( simN2O>0 )data%id_n2op    = aed_define_diag_variable('n2oprod','mmol N/m3/d','n2o prod rate')
 
    IF( simN2O>0 ) THEN
-    data%id_n2op    = aed_define_diag_variable('n2oprod','mmol/m**3/d','n2o prod rate')
-    data%id_atm_n2o = aed_define_sheet_diag_variable('atm_n2o_flux','mmol/m**2/d','n2o atmospheric flux')
-    data%id_sed_n2o = aed_define_sheet_diag_variable('sed_n2o','mmol/m**2/d','n2o sediment flux')
-    IF( simN2O>1 ) data%id_sed_no2 = aed_define_sheet_diag_variable('sed_no2','mmol/m**2/d','no2 sediment flux')
+    data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux')
    ENDIF
-
    IF( simWetDeposition .OR. simDryDeposition ) THEN
-    data%id_atm_dep = aed_define_sheet_diag_variable('atm_din_flux','mmol/m**2/d','din atmospheric deposition flux')
+    data%id_atm_dep = aed_define_sheet_diag_variable('din_atm','mmol N/m2/d','din atmospheric deposition flux')
    ENDIF
 
    !---------------------------------------------------------------------------+
    ! Register environmental dependencies
    data%id_temp    = aed_locate_global('temperature')
    data%id_salt    = aed_locate_global('salinity')
-   IF( simWetDeposition ) data%id_E_rain  = aed_locate_sheet_global('rain')
+   IF( simWetDeposition ) data%id_e_rain  = aed_locate_sheet_global('rain')
    IF( simN2O>0 )         data%id_wind    = aed_locate_sheet_global('wind_speed')
-   IF( simN2O>0 )         data%id_E_depth = aed_locate_global('layer_ht')
+   IF( simN2O>0 )         data%id_e_depth = aed_locate_global('layer_ht')
    IF( simN2O>0 )         data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
   !IF( simN2O>0 )         data%id_E_tau   = aed_locate_global('taub')    ! tau to be converted to velocity
   !IF( simN2O>0 )         data%id_E_dens  = aed_locate_global('density') ! density needed for tau-vel
@@ -664,13 +664,13 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
    !-----------------------------------------------
    ! Set the maximum flux (@20C) to use in this cell, either constant or linked
    Fsed_amm = data%Fsed_amm
-   IF (data%id_Fsed_amm>0) Fsed_amm = _STATE_VAR_S_(data%id_Fsed_amm)
+   IF (data%id_Fsed_amm>0) Fsed_amm = _STATE_VAR_S_(data%id_Fsed_amm) / secs_per_day
    Fsed_nit = data%Fsed_nit ;
-   IF (data%id_Fsed_nit>0) Fsed_nit = _STATE_VAR_S_(data%id_Fsed_nit)
+   IF (data%id_Fsed_nit>0) Fsed_nit = _STATE_VAR_S_(data%id_Fsed_nit) / secs_per_day
    Fsed_n2o = data%Fsed_n2o ;
-   IF (data%id_Fsed_n2o>0) Fsed_n2o = _STATE_VAR_S_(data%id_Fsed_n2o)
+   IF (data%id_Fsed_n2o>0) Fsed_n2o = _STATE_VAR_S_(data%id_Fsed_n2o) / secs_per_day
    Fsed_no2 = data%Fsed_no2 ;
-   IF (data%id_Fsed_no2>0) Fsed_no2 = _STATE_VAR_S_(data%id_Fsed_no2)
+   IF (data%id_Fsed_no2>0) Fsed_no2 = _STATE_VAR_S_(data%id_Fsed_no2) / secs_per_day
 
    !-----------------------------------------------
    ! Compute temperature scaling

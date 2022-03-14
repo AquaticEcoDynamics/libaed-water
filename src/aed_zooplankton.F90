@@ -318,7 +318,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
                     dbase, simZoopFeedback, diag_level
 !-----------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_zooplankton initialization"
+   print *,"        aed_zooplankton configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_zooplankton,iostat=status)

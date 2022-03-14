@@ -153,7 +153,7 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_habitat_water initialization"
+   print *,"        aed_habitat_water configuration"
    print *,"          WARNING! aed_habitat model is currently under development"
 
    ! Default

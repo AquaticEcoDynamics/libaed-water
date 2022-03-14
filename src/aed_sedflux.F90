@@ -207,13 +207,13 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
-   AED_REAL :: Fsed_ch4_ebb(_MAX_ZONES_)  = MISVAL !% bubble methane flux in each sediment zone
+   AED_REAL :: Fsed_ch4_ebb(_MAX_ZONES_) = MISVAL !% bubble methane flux in each sediment zone
                                                !% $$mmol/,m^{-2}/s$$
                                                !% float
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
-   AED_REAL :: Fsed_feii(_MAX_ZONES_)  = MISVAL !% dissolved reduced iron in each sediment zone
+   AED_REAL :: Fsed_feii(_MAX_ZONES_) = MISVAL !% dissolved reduced iron in each sediment zone
                                                !% $$mmol/,m^{-2}/s$$
                                                !% float
                                                !% 0
@@ -253,52 +253,52 @@ SUBROUTINE load_sed_zone_data(data,namlst)
    ENDIF
 
    IF (Fsed_oxy(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_oxy_P(n_zones)) ; data%Fsed_oxy_P(1:n_zones) = Fsed_oxy(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_oxy_P(n_zones)) ; data%Fsed_oxy_P(1:n_zones) = Fsed_oxy(1:n_zones)
    ENDIF
    IF (Fsed_rsi(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_rsi_P(n_zones)) ; data%Fsed_rsi_P(1:n_zones) = Fsed_rsi(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_rsi_P(n_zones)) ; data%Fsed_rsi_P(1:n_zones) = Fsed_rsi(1:n_zones)
    ENDIF
    IF (Fsed_amm(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_amm_P(n_zones)) ; data%Fsed_amm_P(1:n_zones) = Fsed_amm(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_amm_P(n_zones)) ; data%Fsed_amm_P(1:n_zones) = Fsed_amm(1:n_zones)
    ENDIF
    IF (Fsed_nit(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_nit_P(n_zones)) ; data%Fsed_nit_P(1:n_zones) = Fsed_nit(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_nit_P(n_zones)) ; data%Fsed_nit_P(1:n_zones) = Fsed_nit(1:n_zones)
    ENDIF
    IF (Fsed_frp(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_frp_P(n_zones)) ; data%Fsed_frp_P(1:n_zones) = Fsed_frp(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_frp_P(n_zones)) ; data%Fsed_frp_P(1:n_zones) = Fsed_frp(1:n_zones)
    ENDIF
    IF (Fsed_pon(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_pon_P(n_zones)) ; data%Fsed_pon_P(1:n_zones) = Fsed_pon(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_pon_P(n_zones)) ; data%Fsed_pon_P(1:n_zones) = Fsed_pon(1:n_zones)
    ENDIF
    IF (Fsed_don(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_don_P(n_zones)) ; data%Fsed_don_P(1:n_zones) = Fsed_don(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_don_P(n_zones)) ; data%Fsed_don_P(1:n_zones) = Fsed_don(1:n_zones)
    ENDIF
    IF (Fsed_pop(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_pop_P(n_zones)) ; data%Fsed_pop_P(1:n_zones) = Fsed_pop(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_pop_P(n_zones)) ; data%Fsed_pop_P(1:n_zones) = Fsed_pop(1:n_zones)
    ENDIF
    IF (Fsed_dop(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_dop_P(n_zones)) ; data%Fsed_dop_P(1:n_zones) = Fsed_dop(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_dop_P(n_zones)) ; data%Fsed_dop_P(1:n_zones) = Fsed_dop(1:n_zones)
    ENDIF
    IF (Fsed_poc(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_poc_P(n_zones)) ; data%Fsed_poc_P(1:n_zones) = Fsed_poc(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_poc_P(n_zones)) ; data%Fsed_poc_P(1:n_zones) = Fsed_poc(1:n_zones)
    ENDIF
    IF (Fsed_doc(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_doc_P(n_zones)) ; data%Fsed_doc_P(1:n_zones) = Fsed_doc(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_doc_P(n_zones)) ; data%Fsed_doc_P(1:n_zones) = Fsed_doc(1:n_zones)
    ENDIF
    IF (Fsed_dic(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_dic_P(n_zones)) ; data%Fsed_dic_P(1:n_zones) = Fsed_dic(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_dic_P(n_zones)) ; data%Fsed_dic_P(1:n_zones) = Fsed_dic(1:n_zones)
    ENDIF
    IF (Fsed_ch4(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_ch4_P(n_zones)) ; data%Fsed_ch4_P(1:n_zones) = Fsed_ch4(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_ch4_P(n_zones)) ; data%Fsed_ch4_P(1:n_zones) = Fsed_ch4(1:n_zones)
    ENDIF
    IF (Fsed_ch4_ebb(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_ch4_ebb_P(n_zones)) ; data%Fsed_ch4_ebb_P(1:n_zones) = Fsed_ch4_ebb(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_ch4_ebb_P(n_zones)) ; data%Fsed_ch4_ebb_P(1:n_zones) = Fsed_ch4_ebb(1:n_zones)
    ENDIF
    IF (Fsed_feii(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_feii_P(n_zones)) ; data%Fsed_feii_P(1:n_zones) = Fsed_feii(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_feii_P(n_zones)) ; data%Fsed_feii_P(1:n_zones) = Fsed_feii(1:n_zones)
    ENDIF
    IF (Fsed_n2o(1) .NE. MISVAL ) THEN
-      ALLOCATE(data%Fsed_n2o_P(n_zones)) ; data%Fsed_n2o_P(1:n_zones) = Fsed_n2o(1:n_zones)/secs_per_day
+      ALLOCATE(data%Fsed_n2o_P(n_zones)) ; data%Fsed_n2o_P(1:n_zones) = Fsed_n2o(1:n_zones)
    ENDIF
 END SUBROUTINE load_sed_zone_data
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -396,28 +396,28 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       IF (status /= 0) STOP 'ERROR reading namelist for &aed_sed_constant'
 
       ! Store parameter values in our own derived type
-      ! NB: all rates must be provided in values per day,
-      ! and are converted here to values per second.
-      data%Fsed_oxy  = Fsed_oxy / secs_per_day
-      data%Fsed_rsi  = Fsed_rsi / secs_per_day
-      data%Fsed_amm  = Fsed_amm / secs_per_day
-      data%Fsed_nit  = Fsed_nit / secs_per_day
-      data%Fsed_n2o  = Fsed_n2o / secs_per_day
-      data%Fsed_frp  = Fsed_frp / secs_per_day
-      data%Fsed_pon  = Fsed_pon / secs_per_day
-      data%Fsed_don  = Fsed_don / secs_per_day
-      data%Fsed_pop  = Fsed_pop / secs_per_day
-      data%Fsed_dop  = Fsed_dop / secs_per_day
-      data%Fsed_poc  = Fsed_poc / secs_per_day
-      data%Fsed_doc  = Fsed_doc / secs_per_day
-      data%Fsed_dic  = Fsed_dic / secs_per_day
-      data%Fsed_ch4  = Fsed_ch4 / secs_per_day
-      data%Fsed_ch4_ebb  = Fsed_ch4_ebb / secs_per_day
-      data%Fsed_feii = Fsed_feii/ secs_per_day
+      !   NB: all rates must be provided in values per day
+      !   and are converted when used (elsewhere) to values per second.
+      data%Fsed_oxy  = Fsed_oxy
+      data%Fsed_rsi  = Fsed_rsi
+      data%Fsed_amm  = Fsed_amm
+      data%Fsed_nit  = Fsed_nit
+      data%Fsed_n2o  = Fsed_n2o
+      data%Fsed_frp  = Fsed_frp
+      data%Fsed_pon  = Fsed_pon
+      data%Fsed_don  = Fsed_don
+      data%Fsed_pop  = Fsed_pop
+      data%Fsed_dop  = Fsed_dop
+      data%Fsed_poc  = Fsed_poc
+      data%Fsed_doc  = Fsed_doc
+      data%Fsed_dic  = Fsed_dic
+      data%Fsed_ch4  = Fsed_ch4
+      data%Fsed_ch4_ebb  = Fsed_ch4_ebb
+      data%Fsed_feii = Fsed_feii
    ELSEIF ( sedflux_model .EQ. "dynamic" ) THEN
       data%sed_modl = SED_DYNAMIC
 
-      data%Fsed_oxy = 10. / secs_per_day
+      !data%Fsed_oxy = 10.
    ELSEIF ( sedflux_model .EQ. "constant2d" .OR. sedflux_model .EQ. "dynamic2d" ) THEN
       IF ( sedflux_model .EQ. "constant2d" ) THEN
          data%sed_modl = SED_CONSTANT_2D
@@ -469,52 +469,52 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    ! Register state variables
    ! NOTE the "_sheet_"  which specifies the variable is benthic.
    IF ( Fsed_oxy .GT. MISVAL ) &
-      data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol/m2/s',   &
+      data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol O2/m2/d',   &
                                           'flux rate of oxygen across the swi')
    IF ( Fsed_dic .GT. MISVAL ) &
-      data%id_Fsed_dic = aed_define_sheet_diag_variable('Fsed_dic','mmol/m2/s',   &
+      data%id_Fsed_dic = aed_define_sheet_diag_variable('Fsed_dic','mmol C/m2/d',   &
                                           'flux rate of dic across the swi')
    IF ( Fsed_ch4 .GT. MISVAL ) &
-      data%id_Fsed_ch4 = aed_define_sheet_diag_variable('Fsed_ch4','mmol/m2/s',   &
+      data%id_Fsed_ch4 = aed_define_sheet_diag_variable('Fsed_ch4','mmol C/m2/d',   &
                                           'flux rate of ch4 across the swi')
    IF ( Fsed_ch4_ebb .GT. MISVAL ) &
-      data%id_Fsed_ch4_ebb = aed_define_sheet_diag_variable('Fsed_ch4_ebb','mmol/m2/s',   &
+      data%id_Fsed_ch4_ebb = aed_define_sheet_diag_variable('Fsed_ch4_ebb','mmol C/m2/d',   &
                                           'flux rate of ch4 bubbles across the swi')
    IF ( Fsed_rsi .GT. MISVAL ) &
-      data%id_Fsed_rsi = aed_define_sheet_diag_variable('Fsed_rsi','mmol/m2/s',   &
+      data%id_Fsed_rsi = aed_define_sheet_diag_variable('Fsed_rsi','mmol Si/m2/d',   &
                                           'flux rate of rsi across the swi')
    IF ( Fsed_amm .GT. MISVAL ) &
-      data%id_Fsed_amm = aed_define_sheet_diag_variable('Fsed_amm','mmol/m2/s',   &
+      data%id_Fsed_amm = aed_define_sheet_diag_variable('Fsed_amm','mmol N/m2/d',   &
                                           'flux rate of amm across the swi')
    IF ( Fsed_nit .GT. MISVAL ) &
-      data%id_Fsed_nit = aed_define_sheet_diag_variable('Fsed_nit','mmol/m2/s',   &
+      data%id_Fsed_nit = aed_define_sheet_diag_variable('Fsed_nit','mmol N/m2/d',   &
                                           'flux rate of nit across the swi')
    IF ( Fsed_n2o .GT. MISVAL ) &
-      data%id_Fsed_n2o = aed_define_sheet_diag_variable('Fsed_n2o','mmol/m2/s',   &
+      data%id_Fsed_n2o = aed_define_sheet_diag_variable('Fsed_n2o','mmol N/m2/d',   &
                                           'flux rate of n2o across the swi')
    IF ( Fsed_frp .GT. MISVAL ) &
-      data%id_Fsed_frp = aed_define_sheet_diag_variable('Fsed_frp','mmol/m2/s',   &
+      data%id_Fsed_frp = aed_define_sheet_diag_variable('Fsed_frp','mmol P/m2/d',   &
                                           'flux rate of frp across the swi')
    IF ( Fsed_poc .GT. MISVAL ) &
-      data%id_Fsed_poc = aed_define_sheet_diag_variable('Fsed_poc','mmol/m2/s',   &
+      data%id_Fsed_poc = aed_define_sheet_diag_variable('Fsed_poc','mmol C/m2/d',   &
                                           'sedimentation rate of poc')
    IF ( Fsed_doc .GT. MISVAL ) &
-      data%id_Fsed_doc = aed_define_sheet_diag_variable('Fsed_doc','mmol/m2/s',   &
+      data%id_Fsed_doc = aed_define_sheet_diag_variable('Fsed_doc','mmol C/m2/d',   &
                                           'flux rate of doc across the swi')
    IF ( Fsed_pon .GT. MISVAL ) &
-      data%id_Fsed_pon = aed_define_sheet_diag_variable('Fsed_pon','mmol/m2/s',   &
+      data%id_Fsed_pon = aed_define_sheet_diag_variable('Fsed_pon','mmol N/m2/d',   &
                                           'sedimentation rate of pon')
    IF ( Fsed_don .GT. MISVAL ) &
-      data%id_Fsed_don = aed_define_sheet_diag_variable('Fsed_don','mmol/m2/s',   &
+      data%id_Fsed_don = aed_define_sheet_diag_variable('Fsed_don','mmol N/m2/d',   &
                                           'flux rate of don across the swi')
    IF ( Fsed_pop .GT. MISVAL ) &
-      data%id_Fsed_pop = aed_define_sheet_diag_variable('Fsed_pop','mmol/m2/s',   &
+      data%id_Fsed_pop = aed_define_sheet_diag_variable('Fsed_pop','mmol P/m2/d',   &
                                           'sedimentation rate of pop')
    IF ( Fsed_dop .GT. MISVAL ) &
-      data%id_Fsed_dop = aed_define_sheet_diag_variable('Fsed_dop','mmol/m2/s',   &
+      data%id_Fsed_dop = aed_define_sheet_diag_variable('Fsed_dop','mmol P/m2/d',   &
                                           'flux rate of dop across the swi')
    IF ( Fsed_feii .GT. MISVAL ) &
-      data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol/m2/s', &
+      data%id_Fsed_feii = aed_define_sheet_diag_variable('Fsed_feii','mmol Fe/m2/d', &
                                           'flux rate of feii across the swi')
 
    IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
@@ -536,8 +536,6 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       CALL aed_set_const_var(data%id_Fsed_feii)
    ENDIF
 
-   !data%id_Fsed_oxy_pel = aed_define_diag_variable('Fsed_oxy_pel','mmol/m**2',&
-   !                                          'sedimentation rate of oxygen')
 
 END SUBROUTINE aed_define_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -660,10 +658,9 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 
-    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &  !MH INTENT issues this comment out is temporary
+    IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
       CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 
-!    print*,"sedflux oxy in zone ",zone," := ", _DIAG_VAR_S_(data%id_Fsed_oxy)
 END SUBROUTINE aed_calculate_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

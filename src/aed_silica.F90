@@ -141,7 +141,7 @@ SUBROUTINE aed_define_silica(data, namlst)
    data%use_oxy = silica_reactant_variable .NE. '' !This means oxygen module switched on
 
    ! Register state variables
-   data%id_rsi = aed_define_variable('rsi','mmol/m3', 'silica',     &
+   data%id_rsi = aed_define_variable('rsi','mmol Si/m3', 'silica',     &
                                     rsi_initial,minimum=rsi_min,maximum=rsi_max)
 
    ! Register external state variable dependencies
@@ -153,7 +153,7 @@ SUBROUTINE aed_define_silica(data, namlst)
       data%id_Fsed_rsi = aed_locate_sheet_variable(Fsed_rsi_variable)
 
    ! Register diagnostic variables
-   data%id_sed_rsi = aed_define_sheet_diag_variable('sed_rsi','mmol/m**2/d', &
+   data%id_sed_rsi = aed_define_sheet_diag_variable('dsf_rsi','mmol/m2/d', &
                      'Si exchange across sed/water interface')
 
    ! Register environmental dependencies
@@ -229,9 +229,9 @@ SUBROUTINE aed_calculate_benthic_silica(data,column,layer_idx)
    IF (data%use_sed_model) THEN
      ! Linked to aed_sedflux, check if its constant or dynamically set
      IF ( aed_is_const_var(data%id_Fsed_rsi) ) THEN
-        Fsed_rsi = _DIAG_VAR_S_(data%id_Fsed_rsi) * MIN(3.,fDO * fT)
+        Fsed_rsi = _DIAG_VAR_S_(data%id_Fsed_rsi) * MIN(3.,fDO * fT) / secs_per_day
      ELSE
-        Fsed_rsi = _DIAG_VAR_S_(data%id_Fsed_rsi)
+        Fsed_rsi = _DIAG_VAR_S_(data%id_Fsed_rsi) / secs_per_day
      ENDIF
    ELSE
      Fsed_rsi = data%Fsed_rsi * MIN(3.,fDO * fT)

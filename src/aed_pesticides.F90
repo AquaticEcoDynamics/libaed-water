@@ -401,7 +401,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        ! Register group as a state variable
        data%id_pstd(i) = aed_define_variable(                                  &
                              TRIM(data%pesticides(i)%name)//'_d',              &
-                             'mmol/m**3', 'pesticide dissolved concentration', &
+                             'mmol/m3', 'pesticide dissolved concentration',   &
                              min_conc,                                         &
                              minimum=min_conc)
 
@@ -412,7 +412,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
            pst_name(1:1) = CHAR(ICHAR('0') + ns)
            data%id_psta(i,ns) = aed_define_variable(                             &
                              TRIM(data%pesticides(i)%name)//'_'//TRIM(pst_name), &
-                             'mmol/m**3', 'pesticide sorbed concentration',      &
+                             'mmol/m3', 'pesticide sorbed concentration',        &
                              min_conc,                                           &
                              minimum=min_conc,                                   &
                              mobility = zero_)
@@ -426,15 +426,15 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
 
        !data%id_total(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_t', 'orgs/m3', 'total')
        IF ( diag_level >= 2 ) THEN
-         data%id_atmvolat(i)  = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_vol', 'mmol/m2/day', 'volatilisation')
-         data%id_sedflux(i)   = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_dsf', 'mmol/m2/day', 'dissolved sediment flux')
-         data%id_resus(i)     = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_res', 'mmol/m2/day', 'resuspension flux')
-         data%id_settling(i)  = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_set', 'mmol/m3/day', 'settling rate')
-         data%id_sorption(i)  = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_srp', 'mmol/m3/day', 'sorption rate')
-         data%id_photolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_pht', 'mmol/m3/day', 'photolysis rate')
-         data%id_hydrolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_hyd', 'mmol/m3/day', 'hydrolysis rate')
-         data%id_uptake(i)    = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_upt', 'mmol/m3/day', 'uptake rate')
-         data%id_total(i)     = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3', 'total pesticide concentration')
+         data%id_atmvolat(i)  = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_atm', 'mmol/m2/d', 'volatilisation')
+         data%id_sedflux(i)   = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_dsf', 'mmol/m2/d', 'dissolved sediment flux')
+         data%id_resus(i)     = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_res', 'mmol/m2/d', 'resuspension flux')
+         data%id_settling(i)  = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_set', 'mmol/m3/d', 'settling rate')
+         data%id_sorption(i)  = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_srp', 'mmol/m3/d', 'sorption rate')
+         data%id_photolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_pht', 'mmol/m3/d', 'photolysis rate')
+         data%id_hydrolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_hyd', 'mmol/m3/d', 'hydrolysis rate')
+         data%id_uptake(i)    = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_upt', 'mmol/m3/d', 'uptake rate')
+         data%id_total(i)     = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
        ENDIF
    ENDDO
 END SUBROUTINE aed_pesticides_load_params
@@ -795,7 +795,7 @@ SUBROUTINE aed_mobility_pesticides(data,column,layer_idx,mobility)
      IF ( diag_level >= 2 ) _DIAG_VAR_(data%id_settling(pst_i)) = zero_
 
      DO sorp_i=1,data%pesticides(pst_i)%num_sorb
-       sorbent_vvel(sorp_i) = _DIAG_VAR_(data%pesticides(pst_i)%id_sorbv(sorp_i))
+       sorbent_vvel(sorp_i) = _DIAG_VAR_(data%pesticides(pst_i)%id_sorbv(sorp_i)) / secs_per_day
        mobility(data%id_psta(pst_i,sorp_i)) = sorbent_vvel(sorp_i)
 
        IF ( diag_level >= 2 ) THEN

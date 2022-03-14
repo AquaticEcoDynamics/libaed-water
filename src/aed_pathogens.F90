@@ -202,7 +202,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
 
 !-----------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_pathogens initialization"
+   print *,"        aed_pathogens configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_pathogens,iostat=status)
