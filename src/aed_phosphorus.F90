@@ -334,7 +334,8 @@ SUBROUTINE aed_equilibrate_phosphorus(data,column,layer_idx)
                                  frp+frpads,                          &
                                  tss,                                 &
                                  Kpo4p,data%Kadsratio,data%Qmax,      &
-                                 PO4dis,PO4par)                          ! Returning variables
+                                 PO4dis,PO4par,                       &  ! Returning variables
+                                 temp_=temp,salt_=salt)
    ENDIF
 
    ! Set back to core variables

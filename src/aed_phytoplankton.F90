@@ -431,7 +431,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
           data%id_PhyMORc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_mor_c', &
                                                                    'mmol C/m3/d', 'group mortality')
           data%id_PhySEDc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_set_c', &
-                                                                   'mmol C/m2/d', 'group sedimentation')
+                                                                   'mmol C/m3/d', 'group sedimentation')
           data%id_PhyGPPn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_gpp_n', &
                                                                    'mmol N/m3/d', 'group primary production')
           data%id_PhyRSPn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_rsp_n', &
