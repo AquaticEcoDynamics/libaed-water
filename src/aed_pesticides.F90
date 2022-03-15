@@ -270,7 +270,7 @@ INTEGER FUNCTION load_csv(dbase, pd)
    TYPE(pesticide_data_t) :: pd(MAX_PSTC_TYPES)
 !
 !LOCALS
-   INTEGER :: unit, nccols, ccol
+   INTEGER :: unit, nccols, ccol, dcol
    CHARACTER(len=32),POINTER,DIMENSION(:) :: csvnames
    CHARACTER(len=32) :: name_
    TYPE(AED_SYMBOL),DIMENSION(:),ALLOCATABLE :: values
@@ -290,30 +290,31 @@ INTEGER FUNCTION load_csv(dbase, pd)
 
    DO WHILE ( aed_csv_read_row(unit, values) )
       DO ccol=2,nccols
-         pd(ccol)%name = csvnames(ccol)
+         dcol = ccol - 1
+         pd(dcol)%name = csvnames(ccol)
          CALL copy_name(values(1), name_)
 
          SELECT CASE (name_)
-            CASE ('Rhydrol')           ; pd(ccol)%Rhydrol           = extract_double(values(ccol))
-            CASE ('Rphoto')            ; pd(ccol)%Rphoto            = extract_double(values(ccol))
-            CASE ('Ruptake')           ; pd(ccol)%Ruptake           = extract_double(values(ccol))
-            CASE ('theta_hydrol')      ; pd(ccol)%theta_hydrol      = extract_double(values(ccol))
-            CASE ('K_gpp')             ; pd(ccol)%K_gpp             = extract_double(values(ccol))
-            CASE ('Fsed_pst')          ; pd(ccol)%Fsed_pst          = extract_double(values(ccol))
-            CASE ('coef_light_kb_vis') ; pd(ccol)%coef_light_kb_vis = extract_double(values(ccol))
-            CASE ('coef_light_kb_uva') ; pd(ccol)%coef_light_kb_uva = extract_double(values(ccol))
-            CASE ('coef_light_kb_uvb') ; pd(ccol)%coef_light_kb_uvb = extract_double(values(ccol))
-            CASE ('sorption_model')    ; pd(ccol)%sorption_model    = extract_integer(values(ccol))
-            CASE ('num_sorb')          ; pd(ccol)%num_sorb          = extract_integer(values(ccol))
+            CASE ('Rhydrol')           ; pd(dcol)%Rhydrol           = extract_double(values(ccol))
+            CASE ('Rphoto')            ; pd(dcol)%Rphoto            = extract_double(values(ccol))
+            CASE ('Ruptake')           ; pd(dcol)%Ruptake           = extract_double(values(ccol))
+            CASE ('theta_hydrol')      ; pd(dcol)%theta_hydrol      = extract_double(values(ccol))
+            CASE ('K_gpp')             ; pd(dcol)%K_gpp             = extract_double(values(ccol))
+            CASE ('Fsed_pst')          ; pd(dcol)%Fsed_pst          = extract_double(values(ccol))
+            CASE ('coef_light_kb_vis') ; pd(dcol)%coef_light_kb_vis = extract_double(values(ccol))
+            CASE ('coef_light_kb_uva') ; pd(dcol)%coef_light_kb_uva = extract_double(values(ccol))
+            CASE ('coef_light_kb_uvb') ; pd(dcol)%coef_light_kb_uvb = extract_double(values(ccol))
+            CASE ('sorption_model')    ; pd(dcol)%sorption_model    = extract_integer(values(ccol))
+            CASE ('num_sorb')          ; pd(dcol)%num_sorb          = extract_integer(values(ccol))
 
-            CASE ('sorb(1)%pest_sorbent') ; CALL copy_name(values(ccol), pd(ccol)%sorbents(1)%pest_sorbent)
-            CASE ('sorb(1)%Kpst_sorb') ; pd(ccol)%sorbents(1)%Kpst_sorb = extract_double(values(ccol))
+            CASE ('sorb(1)%pest_sorbent') ; CALL copy_name(values(ccol), pd(dcol)%sorbents(1)%pest_sorbent)
+            CASE ('sorb(1)%Kpst_sorb') ; pd(dcol)%sorbents(1)%Kpst_sorb = extract_double(values(ccol))
 
-            CASE ('sorb(2)%pest_sorbent') ; CALL copy_name(values(ccol), pd(ccol)%sorbents(2)%pest_sorbent)
-            CASE ('sorb(2)%Kpst_sorb') ; pd(ccol)%sorbents(2)%Kpst_sorb = extract_double(values(ccol))
+            CASE ('sorb(2)%pest_sorbent') ; CALL copy_name(values(ccol), pd(dcol)%sorbents(2)%pest_sorbent)
+            CASE ('sorb(2)%Kpst_sorb') ; pd(dcol)%sorbents(2)%Kpst_sorb = extract_double(values(ccol))
 
-            CASE ('sorb(3)%pest_sorbent') ; CALL copy_name(values(ccol), pd(ccol)%sorbents(3)%pest_sorbent)
-            CASE ('sorb(3)%Kpst_sorb') ; pd(ccol)%sorbents(3)%Kpst_sorb = extract_double(values(ccol))
+            CASE ('sorb(3)%pest_sorbent') ; CALL copy_name(values(ccol), pd(dcol)%sorbents(3)%pest_sorbent)
+            CASE ('sorb(3)%Kpst_sorb') ; pd(dcol)%sorbents(3)%Kpst_sorb = extract_double(values(ccol))
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name_), '"'
          END SELECT
