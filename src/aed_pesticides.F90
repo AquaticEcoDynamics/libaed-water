@@ -391,7 +391,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
 
     DO i=1,count
        ! Assign parameters from database to simulated groups
-       data%pesticides(i) = pd(list(i)+1)
+       data%pesticides(i) = pd(list(i))
 
        ! Unit adjustments from read-in parameters
        data%pesticides(i)%Fsed_pst = data%pesticides(i)%Fsed_pst / secs_per_day
