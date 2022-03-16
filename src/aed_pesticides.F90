@@ -316,7 +316,7 @@ INTEGER FUNCTION load_csv(dbase, pd)
             CASE ('sorb(3)%pest_sorbent') ; CALL copy_name(values(ccol), pd(dcol)%sorbents(3)%pest_sorbent)
             CASE ('sorb(3)%Kpst_sorb') ; pd(dcol)%sorbents(3)%Kpst_sorb = extract_double(values(ccol))
 
-            CASE DEFAULT ; print *, 'Unknown row "', TRIM(name_), '"'
+            CASE DEFAULT ; print *, 'Unknown pesticide CSV parameter row "', TRIM(name_), '"'
          END SELECT
       ENDDO
    ENDDO
