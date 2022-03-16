@@ -50,7 +50,7 @@ MODULE aed_noncohesive
 !-------------------------------------------------------------------------------
 ! aed_noncohesive --- noncohesive sediment model
 !
-! The AED2 module noncohesive contains equations that describe a
+! The AED module noncohesive contains equations that describe a
 ! particle, noncohesive, sediment. It is subject to processes of
 ! resupension and settling, and other modules may link to these pools.
 !-------------------------------------------------------------------------------
@@ -117,7 +117,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read in and the variables simulated
-!  by the model are registered with AED2 core.
+!  by the model are registered with AED core.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst

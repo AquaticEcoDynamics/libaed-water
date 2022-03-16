@@ -563,7 +563,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
      FCO2 = kCO2 * (1e6*Ko) * (pCO2 - data%atm_co2)
 
      !--------------------------------------------------------------------------
-     !# Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver
+     !# Transfer surface exchange value to AED (mmmol/m2/s) converted by driver
      _FLUX_VAR_T_(data%id_dic) = -FCO2
 
      !# Also store co2 flux across the atm/water interface as a
@@ -606,7 +606,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
      FCH4 = kCH4 *  (ch4 - CH4solub)
 
      !----------------------------------------------------------------------------
-     !# Transfer surface exchange value to AED2 (mmmol/m2) converted by driver.
+     !# Transfer surface exchange value to AED (mmmol/m2) converted by driver.
      _FLUX_VAR_T_(data%id_ch4) = -FCH4
 
      !# Also store CH4 flux across the atm/water interface as

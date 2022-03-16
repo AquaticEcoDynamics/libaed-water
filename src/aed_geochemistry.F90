@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2021 -  The University of Western Australia               #
+!#  Copyright 2012 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -122,7 +122,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read and the variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_geochemistry_data_t),INTENT(inout) :: data
@@ -208,7 +208,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    IF (status /= 0) STOP 'Error reading namelist aed_geochemistry'
 
    data%simEq = simEq
-   data%speciation_dt = speciation_dt  ! Note this is now managed in FV_AED2 or GLM_AED2
+   data%speciation_dt = speciation_dt  ! Note this is now managed in FV_AED or GLM_AED
 
    data%Riron_red = Riron_red             ; data%Kiron_red= Kiron_red
    data%theta_iron_red= theta_iron_red    ; data%theta_iron_ox=theta_iron_ox
@@ -397,7 +397,7 @@ SUBROUTINE aed_initialize_geochemistry(data, column, layer_idx)
    !-- Redo geochemical equilibration, now spatial initialisation is done
    CALL InitialiseGCProperties(dissConcs, partConcs, 2, inTemp=REAL(temp))
 
-   !-- Copy back into main AED2 arrays
+   !-- Copy back into main AED arrays
    DO i=1,data%num_comp
       IF (.NOT.data%component_linked(i)) THEN
          _STATE_VAR_(data%id_comp(i)) =  dissConcs(i)
@@ -607,7 +607,7 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
                                stoEq=.true., upDerv=.true.)
 
 
-   !-- Copy back into main AED2 arrays
+   !-- Copy back into main AED arrays
    DO i=1,data%num_comp
       IF (.NOT.data%component_linked(i)) THEN
          _STATE_VAR_(data%id_comp(i)) =  dissConcs(i)

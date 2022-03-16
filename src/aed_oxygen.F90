@@ -8,14 +8,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -107,7 +107,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 ! Setup and initialise the aed_oxygen model
 !
 !  Here, the oxygen namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_oxygen_data_t),INTENT(inout) :: data
@@ -316,7 +316,7 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    ! Get the oxygen flux
    oxy_atm_flux = koxy_trans * (Coxy_air - oxy)
 
-   ! Transfer surface exchange value to AED2 (mmmol/m2/s) converted by driver
+   ! Transfer surface exchange value to AED (mmmol/m2/s) converted by driver
    _FLUX_VAR_T_(data%id_oxy) = oxy_atm_flux
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)

@@ -326,10 +326,10 @@ END SUBROUTINE str_tolower
 !###############################################################################
 SUBROUTINE aed_define_sedflux(data, namlst)
 !-------------------------------------------------------------------------------
-! Initialise the AED2 model
+! Initialise the AED model
 !
 !  Here, the aed namelist is read and the variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_sedflux_data_t),INTENT(inout) :: data

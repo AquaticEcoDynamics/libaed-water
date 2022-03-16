@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -51,7 +51,7 @@ MODULE aed_tracer
 !-------------------------------------------------------------------------------
 ! aed_tracer --- tracer biogeochemical model
 !
-! The AED2 module tracer contains equations that describe a
+! The AED module tracer contains equations that describe a
 ! soluble or particle tracer, including decay, sediment interaction, and
 ! resupension and settling
 !-------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ SUBROUTINE aed_define_tracer(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read in and the variables simulated
-!  by the model are registered with AED2 core.
+!  by the model are registered with AED core.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst

@@ -248,6 +248,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        CASE (CSV_TYPE)
            status = load_csv(dbase, pd)
        CASE (NML_TYPE)
+           print*,"nml format parameter file is deprecated. Please update to CSV format"
            tfil = find_free_lun()
            open(tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Cannot open phyto_data namelist file'
@@ -470,7 +471,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
 ! Initialise the phytoplankton biogeochemical model
 !
 !  Here, the aed_p_m namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_phytoplankton_data_t),INTENT(inout) :: data

@@ -587,7 +587,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
      n2o_atm_flux = kn2o_trans * (n2o - Cn2o_air) * f_pres
 
      !-----------------------------------------------
-     ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+     ! Set surface exchange value (mmmol/m2/s) for AED ODE solution.
      _FLUX_VAR_T_(data%id_n2o) = -n2o_atm_flux
 
      !-----------------------------------------------
@@ -600,7 +600,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
   !# Atmosphere loading of DIN to the water, due to dry or wet deposition
   IF( data%simDryDeposition ) THEN
     !-----------------------------------------------
-    ! Set surface exchange value (mmmol/m2/s) for AED2 ODE solution.
+    ! Set surface exchange value (mmmol/m2/s) for AED ODE solution.
     _FLUX_VAR_T_(data%id_nox) = data%atm_din_dd * data%f_dindep_nox
     _FLUX_VAR_T_(data%id_amm) = data%atm_din_dd * (1.-data%f_dindep_nox)
   ENDIF

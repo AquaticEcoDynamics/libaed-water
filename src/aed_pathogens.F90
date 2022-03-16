@@ -148,7 +148,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
 ! Initialise the pathogen biogeochemical model
 !
 !  Here, the aed_p_m namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
@@ -376,6 +376,7 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
        CASE (CSV_TYPE)
            status = load_csv(dbase, pd)
        CASE (NML_TYPE)
+           print*,"nml format parameter file is deprecated. Please update to CSV format"
            tfil = find_free_lun()
            open(tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Error opening namelist pathogen_data'

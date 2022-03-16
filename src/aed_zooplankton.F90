@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -209,6 +209,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
        CASE (CSV_TYPE)
            status = load_csv(dbase, zoop_param)
        CASE (NML_TYPE)
+           print*,"nml format parameter file is deprecated. Please update to CSV format"
            tfil = find_free_lun()
            open(tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Error opening zoop_params namelist file'
@@ -279,7 +280,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
 ! Initialise the zooplankton biogeochemical model
 !
 !  Here, the aed_zooplankton namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_zooplankton_data_t),INTENT(inout) :: data

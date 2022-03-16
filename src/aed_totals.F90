@@ -107,7 +107,7 @@ SUBROUTINE aed_define_totals(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
