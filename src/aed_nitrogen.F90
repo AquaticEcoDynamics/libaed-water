@@ -137,6 +137,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    AED_REAL          :: Rnitrif       =   0.01
    AED_REAL          :: Rdenit        =   0.01
    AED_REAL          :: Rn2o          =   0.0015
+   AED_REAL          :: Ranammox      =   0.0
    AED_REAL          :: kanammox      =   0.0
    AED_REAL          :: Rdnra         =   0.0
    AED_REAL          :: Knitrif       = 150.0
@@ -204,7 +205,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 nitrif_reactant_variable,denit_product_variable,nitrif_ph_variable,&
                 Fsed_amm_variable,Fsed_nit_variable,Fsed_n2o_variable,Fsed_no2_variable,&
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
-                kanammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
+                Ranammox,kanammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
                 simNitrfpH, simNitrfLight, simNitrfSal, K_sal, S0,             &
                 simDryDeposition, simWetDeposition, &
                 atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model, &
@@ -219,10 +220,12 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    read(namlst,nml=aed_nitrogen,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist for &aed_nitrogen'
 
+   IF(Ranammox>1e-10) STOP 'Ranammox is now deprecated; please replace with kanammox.'
+
    !---------------------------------------------------------------------------+
-   ! Store config options and parameter values in module's own derived type
-   ! Note: all rates must be provided in values per day in the nml,
-   ! and are converted for internal use as values per second.
+   ! Store config options and parameter values in module main data structure
+   !    Note: all rates must be provided in values per day in the nml,
+   !          but are converted for internal use as values per second.
    data%simNitrfpH       = simNitrfpH
    data%simNitrfSal      = simNitrfSal   ;  IF(simNitrfSal) data%sal_model = 1
    data%simNitrfLight    = simNitrfLight

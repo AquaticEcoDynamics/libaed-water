@@ -418,13 +418,6 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
       _DIAG_VAR_S_(data%id_swi_dz) = _DIAG_VAR_S_(data%id_swi_dz) &
                                    - ((resus_flux+ss_flux-set_flux) / ((1.-data%sed_porosity) * (data%rho_ss(i)*1e3)) * secs_per_day)
 
-
-                                   !      IF ( data%simSedimentMass ) THEN
-                                   !        ! Remove/add sediment fluxes value from the sediment vars
-                                   !        _FLUX_VAR_B_(data%id_ss_sed(i)) = _FLUX_VAR_B_(data%id_ss_sed(i)) - vvel*ss
-                                   !      ENDIF
-
-
       IF ( data%simSedimentMass ) THEN
         ! Remove/add sediment fluxes value from the sediment vars
         _FLUX_VAR_B_(data%id_ss_sed(i)) = _FLUX_VAR_B_(data%id_ss_sed(i)) &
@@ -493,7 +486,7 @@ SUBROUTINE aed_mobility_noncohesive(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   _DIAG_VAR_S_(data%id_set) = zero_
+   _DIAG_VAR_(data%id_set) = zero_
    ! settling = 0 : no settling
    ! settling = 1 : constant settling @ w_pom
    ! settling = 2 : constant settling @ w_pom, corrected for variable density
