@@ -425,39 +425,40 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
           data%id_fSal(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSal', '-', 'fSal (0-1+)')
           ! Mass flux tracking
           data%id_PhyGPPc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_gpp_c', &
-                                                                   'mmol C/m3/d', 'group primary production')
+                                                         'mmol C/m3/d', 'group primary production')
           data%id_PhyRSPc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_rsp_c', &
-                                                                   'mmol C/m3/d', 'group respiration')
+                                                         'mmol C/m3/d', 'group respiration')
           data%id_PhyEXCc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_exc_c', &
-                                                                   'mmol C/m3/d', 'group excretion/exudation')
+                                                         'mmol C/m3/d', 'group excretion/exudation')
           data%id_PhyMORc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_mor_c', &
-                                                                   'mmol C/m3/d', 'group mortality')
+                                                         'mmol C/m3/d', 'group mortality')
           data%id_PhySEDc(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_set_c', &
-                                                                   'mmol C/m3/d', 'group sedimentation')
+                                                         'mmol C/m3/d', 'group sedimentation')
           data%id_PhyGPPn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_gpp_n', &
-                                                                   'mmol N/m3/d', 'group primary production')
+                                                         'mmol N/m3/d', 'group primary production')
           data%id_PhyRSPn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_rsp_n', &
-                                                                   'mmol N/m3/d', 'group respiration')
+                                                         'mmol N/m3/d', 'group respiration')
           data%id_PhyEXCn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_exc_n', &
-                                                                   'mmol N/m3/d', 'group excretion/exudation')
+                                                         'mmol N/m3/d', 'group excretion/exudation')
           data%id_PhyMORn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_mor_n', &
-                                                                   'mmol N/m3/d', 'group mortality')
+                                                         'mmol N/m3/d', 'group mortality')
           data%id_PhySEDn(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_set_n', &
-                                                                   'mmol N/m3/d', 'group sedimentation')
+                                                         'mmol N/m3/d', 'group sedimentation')
           data%id_PhyGPPp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_gpp_p', &
-                                                                   'mmol P/m3/d', 'group primary production')
+                                                         'mmol P/m3/d', 'group primary production')
           data%id_PhyRSPp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_rsp_p', &
-                                                                   'mmol P/m3/d', 'group respiration')
+                                                         'mmol P/m3/d', 'group respiration')
           data%id_PhyEXCp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_exc_p', &
-                                                                   'mmol P/m3/d', 'group excretion/exudation')
+                                                         'mmol P/m3/d', 'group excretion/exudation')
           data%id_PhyMORp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_mor_p', &
-                                                                   'mmol P/m3/d', 'group mortality')
+                                                         'mmol P/m3/d', 'group mortality')
           data%id_PhySEDp(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_set_p', &
-                                                                   'mmol P/m3/d', 'group sedimentation')
+                                                         'mmol P/m3/d', 'group sedimentation')
           ! Register vertical velocity diagnostic, where relevant
           IF (data%phytos(i)%settling == _MOB_STOKES_ .OR. &
                                    data%phytos(i)%settling == _MOB_MOTILE_) THEN
-            data%id_vvel(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_vvel', 'm/d', 'vertical velocity')
+            data%id_vvel(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_vvel',   &
+                                                         'm/d', 'vertical velocity')
           ENDIF
        ENDIF
     ENDDO
