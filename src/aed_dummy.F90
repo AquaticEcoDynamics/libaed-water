@@ -200,9 +200,7 @@ SUBROUTINE aed_calculate_dummy(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-!  INTEGER  :: i, count
-!  AED_REAL :: val, tot
-   INTEGER :: i
+   INTEGER  :: i
    AED_REAL :: scale, offs
 
 !-------------------------------------------------------------------------------
