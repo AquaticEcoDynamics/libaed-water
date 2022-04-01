@@ -27,7 +27,8 @@
 !#                                                                             #
 !# Created August 2011                                                         #
 !#                                                                             #
-!#  Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed-water
+!#  Track changes on GitHub @                                                  #
+!#           https://github.com/AquaticEcoDynamics/libaed-water                #
 !#                                                                             #
 !###############################################################################
 !                                                                              !
@@ -152,6 +153,13 @@ INTEGER FUNCTION load_csv(dbase,pd)
       RETURN !# No file found
    ENDIF
 
+   !# default values for some
+   pd%c1           = 0.1240/60.   ! From Chung et al (2014)
+   pd%c3           = 0.0230/60.   !  "
+   pd%f1           = 0.675        ! Ross and Sharples (2007)
+   pd%f2           = 0.750        !  "
+   pd%d_phy        = 1e-5
+
    ALLOCATE(values(nccols))
 
    DO WHILE ( aed_csv_read_row(unit, values) )
@@ -207,6 +215,12 @@ INTEGER FUNCTION load_csv(dbase,pd)
             CASE ('Si_0')          ; pd(dcol)%Si_0          = extract_double(values(ccol))
             CASE ('K_Si')          ; pd(dcol)%K_Si          = extract_double(values(ccol))
             CASE ('X_sicon')       ; pd(dcol)%X_sicon       = extract_double(values(ccol))
+
+            CASE ('c1')            ; pd(dcol)%c1            = extract_double(values(ccol))
+            CASE ('c3')            ; pd(dcol)%c3            = extract_double(values(ccol))
+            CASE ('f1')            ; pd(dcol)%f1            = extract_double(values(ccol))
+            CASE ('f2')            ; pd(dcol)%f2            = extract_double(values(ccol))
+            CASE ('d_phy')         ; pd(dcol)%d_phy         = extract_double(values(ccol))
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
          END SELECT
@@ -344,12 +358,12 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%Si_0         = pd(list(i))%Si_0
        data%phytos(i)%K_Si         = pd(list(i))%K_Si
        data%phytos(i)%X_sicon      = pd(list(i))%X_sicon
-       ! Hardocoded parameter values
-       data%phytos(i)%c1           = 0.1240/60.   ! From Chung et al (2014)
-       data%phytos(i)%c3           = 0.0230/60.   !  "
-       data%phytos(i)%f1           = 0.675        ! Ross and Sharples (2007)
-       data%phytos(i)%f2           = 0.750        !  "
-       data%phytos(i)%d_phy        = 1e-5
+
+       data%phytos(i)%c1           = pd(list(i))%c1
+       data%phytos(i)%c3           = pd(list(i))%c3
+       data%phytos(i)%f1           = pd(list(i))%f1
+       data%phytos(i)%f2           = pd(list(i))%f2
+       data%phytos(i)%d_phy        = pd(list(i))%d_phy
 
        ! Register group as a state variable
        data%id_p(i) = aed_define_variable(                                     &

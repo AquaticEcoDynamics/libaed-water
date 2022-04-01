@@ -110,6 +110,8 @@ MODULE aed_bio_utils
       ! Silica parameters
       INTEGER  :: simSiUptake
       AED_REAL :: Si_0, K_Si, X_sicon
+      !
+      AED_REAL :: c1, c3, f1, f2, d_phy
    END TYPE phyto_param_t
    ! %% END NAMELIST   %% phyto_param_t
 
