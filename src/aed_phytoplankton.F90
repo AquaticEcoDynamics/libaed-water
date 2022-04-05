@@ -169,6 +169,7 @@ INTEGER FUNCTION load_csv(dbase,pd)
 
          CALL copy_name(values(1), name)
          SELECT CASE (name)
+            CASE ('p_initial')     ; pd(dcol)%p_initial     = extract_double(values(ccol))
             CASE ('p0')            ; pd(dcol)%p0            = extract_double(values(ccol))
             CASE ('w_p')           ; pd(dcol)%w_p           = extract_double(values(ccol))
             CASE ('Xcc')           ; pd(dcol)%Xcc           = extract_double(values(ccol))
