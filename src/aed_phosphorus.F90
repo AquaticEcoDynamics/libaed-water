@@ -249,7 +249,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
      ! Check diagnostics specific for adsorbed phosphate
      data%id_frpads_set = aed_define_diag_variable('frp_ads_set','mmol P/m3/d',&
                                            'adsobed PO4 sedimentation flux')
-     data%id_frpads_res = aed_define_diag_variable('frp_ads_res','mmol P/m2/d',&
+     data%id_frpads_res = aed_define_sheet_diag_variable('frp_ads_res','mmol P/m2/d',&
                                            'adsobed PO4 resuspension flux')
      data%id_frp_srp = aed_define_diag_variable('frp_srp','mmol P/m3/d',       &
                                            'PO4 adsorption rate')
@@ -297,6 +297,7 @@ SUBROUTINE aed_equilibrate_phosphorus(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
    IF(.NOT. data%simPO4Adsorption) RETURN
 
    tss = zero_
@@ -467,6 +468,8 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    !ENDIF
    frp_flux = Fsed_frp
 
+  print *,'frp_flux,',frp,frp_flux
+
    ! Set bottom fluxes for the pelagic (change per surface area per second)
    _FLUX_VAR_(data%id_frp) = _FLUX_VAR_(data%id_frp) + frp_flux
 
@@ -477,7 +480,7 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_frp) = frp_flux * secs_per_day
 
-   _DIAG_VAR_(data%id_frpads_res) = zero_
+   IF (data%simPO4Adsorption) _DIAG_VAR_S_(data%id_frpads_res) = zero_
 
 END SUBROUTINE aed_calculate_benthic_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -496,8 +499,6 @@ SUBROUTINE aed_mobility_phosphorus(data,column,layer_idx,mobility)
 !
 !LOCALS
    AED_REAL :: vvel, dz
-!
-
 !-------------------------------------------------------------------------------
 !BEGIN
 
@@ -505,7 +506,6 @@ SUBROUTINE aed_mobility_phosphorus(data,column,layer_idx,mobility)
 
    vvel = zero_
    dz = _STATE_VAR_(data%id_dz)
-
 
    IF( data%id_frpads_vvel>0 ) THEN
      ! adopt vertical velocity of host particle
