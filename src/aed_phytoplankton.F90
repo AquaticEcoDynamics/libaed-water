@@ -571,6 +571,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    dtlim = zerolimitfudgefactor
    IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
    IF ( extra_diag ) diag_level = 10
+   IF ( do_mpb==0 ) resus_link = ''
 
    ! Set module parameters
    data%min_rho = min_rho ; data%max_rho = max_rho

@@ -596,6 +596,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
 
        !zone = INT(_STATE_VAR_S_(data%id_zones))                     !MH upgrade this for active zones
        sedz = _STATE_VAR_S_(data%id_zones)
+
        IF ( .NOT. in_zone_set(sedz, data%active_zones) ) RETURN
 
        zone = 0
@@ -640,6 +641,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
    IF ( data%id_Fsed_ch4  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4)  = Fsed_ch4
    IF ( data%id_Fsed_feii > 0 ) _DIAG_VAR_S_(data%id_Fsed_feii) = Fsed_feii
    IF ( data%id_Fsed_ch4_ebb  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_ebb)  = Fsed_ch4_ebb
+
 END SUBROUTINE aed_initialize_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -657,7 +659,6 @@ SUBROUTINE aed_calculate_benthic_sedflux(data,column,layer_idx)
 !   INTEGER :: zone
 !
 !-------------------------------------------------------------------------------
-
     IF ( data%sed_modl .EQ. SED_CONSTANT .OR. data%sed_modl .EQ. SED_CONSTANT_2D ) &
       CALL aed_initialize_benthic_sedflux(data, column, layer_idx)
 

@@ -204,7 +204,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%simDIC        = .false.
    data%simCH4        = .false.
    data%simCH4ebb     = .false.
-   IF (ebb_model>0) data%simCH4ebb = .true.
 
    !# Read the namelist
    read(namlst,nml=aed_carbon,iostat=status)
@@ -212,6 +211,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
       print *,'Error reading namelist for &aed_carbon'
       STOP
    ENDIF
+
+   IF (ebb_model>0) data%simCH4ebb = .true.
 
    !# Store parameter values in modules own derived type
    !  Note: rates are provided in values per day, and

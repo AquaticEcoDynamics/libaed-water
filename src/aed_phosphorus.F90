@@ -468,8 +468,6 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    !ENDIF
    frp_flux = Fsed_frp
 
-  print *,'frp_flux,',frp,frp_flux
-
    ! Set bottom fluxes for the pelagic (change per surface area per second)
    _FLUX_VAR_(data%id_frp) = _FLUX_VAR_(data%id_frp) + frp_flux
 
