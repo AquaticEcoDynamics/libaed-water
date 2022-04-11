@@ -227,12 +227,13 @@ SUBROUTINE display_var(var, idx)
    ENDIF
    line = TRIM(line) // '             '
 
+#if 1
    IF ( var%sheet ) THEN
-     IF ( ASSOCIATED(var%model) .AND. var%model%aed_model_zone_avg ) THEN
-      line = line(1:40) // ' SZ '
-     ELSE
-      line = line(1:40) // ' 2D '
-     ENDIF
+      IF ( ASSOCIATED(var%model) .AND. var%model%aed_model_zone_avg ) THEN
+         line = line(1:40) // ' SZ '
+      ELSE
+         line = line(1:40) // ' 2D '
+      ENDIF
    ELSE
       line = line(1:40) // ' 3D '
    ENDIF
@@ -259,10 +260,13 @@ SUBROUTINE display_var(var, idx)
          ENDIF
       ENDDO
    ENDIF
-   IF ( var%zavg_req .and. .NOT. var%model%aed_model_zone_avg) THEN
-      line = TRIM(line) // "     (zavg req)"
+   IF ( var%zavg_req ) THEN
+      IF ( ASSOCIATED(var%model) .AND. .NOT. var%model%aed_model_zone_avg ) THEN
+         line = TRIM(line) // "     (zavg req)"
+      ENDIF
    ENDIF
 
+#endif
    write(log, *) TRIM(line)
 END SUBROUTINE display_var
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -359,7 +363,7 @@ SUBROUTINE extend_allocated_variables(pcount)
 !
 !LOCALS
    TYPE(aed_variable_t),DIMENSION(:),ALLOCATABLE :: tmp
-   INTEGER count
+   INTEGER count, i
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -376,6 +380,9 @@ SUBROUTINE extend_allocated_variables(pcount)
       ALLOCATE(all_vars(1:count))
    ENDIF
 
+!  DO i=1,count
+!     NULLIFY(all_vars(a_vars+i)%model)
+!  ENDDO
    all_vars(a_vars+1:a_vars+count)%initial = nan_
    all_vars(a_vars+1:a_vars+count)%minimum = nan_
    all_vars(a_vars+1:a_vars+count)%maximum = nan_
@@ -487,7 +494,9 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%name = tname
 !print*,"CREATE Variable '",TRIM(tname),"' long name '",TRIM(longname),"' with units '",TRIM(units),"' at ", ret
 
-      all_vars(ret)%model => current_model
+!     IF ( ASSOCIATED(current_model) ) THEN
+         all_vars(ret)%model => current_model
+!     ENDIF
       all_vars(ret)%longname = longname
       all_vars(ret)%units = units
 

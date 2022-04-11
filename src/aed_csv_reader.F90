@@ -384,7 +384,11 @@ FUNCTION extract_double(sym) RESULT(num)
     ENDDO
     tbuf(sym%length+1:)=' '
 
-    read(tbuf,*) num
+    IF (len_trim(tbuf) == 0) THEN
+       num = 0.;
+    ELSE
+       read(tbuf,*) num
+    ENDIF
 END FUNCTION extract_double
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -409,7 +413,11 @@ FUNCTION extract_integer(sym) RESULT(num)
     ENDDO
     tbuf(sym%length+1:)=' '
 
-    read(tbuf,*) num
+    IF (len_trim(tbuf) == 0) THEN
+       num = 0.;
+    ELSE
+       read(tbuf,*) num
+    ENDIF
 END FUNCTION extract_integer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -434,7 +442,11 @@ FUNCTION extract_logical(sym) RESULT(res)
     ENDDO
     tbuf(sym%length+1:)=' '
 
-    read(tbuf,*) res
+    IF (len_trim(tbuf) == 0) THEN
+       res = .FALSE.
+    ELSE
+       read(tbuf,*) res
+    ENDIF
 END FUNCTION extract_logical
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -577,6 +589,7 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
 !BEGIN
    aedr => units(unit)%p
    ncols = aedr%n_cols
+   NULLIFY(sym%sym)
 
    values(1:ncols)%length = 0
    i = 0

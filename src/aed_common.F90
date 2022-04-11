@@ -193,6 +193,7 @@ SUBROUTINE aed_define_model(modeldef, namlst)
       last_model => model
    ELSE
       print *,'*** Unknown module ', TRIM(modelname)
+      STOP
    ENDIF
 END SUBROUTINE aed_define_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
