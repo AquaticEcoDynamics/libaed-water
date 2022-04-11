@@ -13,14 +13,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -358,7 +358,7 @@ LOGICAL FUNCTION end_parse(aedr)
 !-------------------------------------------------------------------------------
 !BEGIN
     close(aedr%lun, iostat=iostat)
-    DEALLOCATE(aedr)
+    IF ( ASSOCIATED(aedr) ) DEALLOCATE(aedr)
     end_parse=(iostat .eq. 0)
 END FUNCTION end_parse
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -384,7 +384,11 @@ FUNCTION extract_double(sym) RESULT(num)
     ENDDO
     tbuf(sym%length+1:)=' '
 
-    read(tbuf,*) num
+    IF (len_trim(tbuf) == 0) THEN
+       num = 0.;
+    ELSE
+       read(tbuf,*) num
+    ENDIF
 END FUNCTION extract_double
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -409,7 +413,11 @@ FUNCTION extract_integer(sym) RESULT(num)
     ENDDO
     tbuf(sym%length+1:)=' '
 
-    read(tbuf,*) num
+    IF (len_trim(tbuf) == 0) THEN
+       num = 0.;
+    ELSE
+       read(tbuf,*) num
+    ENDIF
 END FUNCTION extract_integer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -434,7 +442,11 @@ FUNCTION extract_logical(sym) RESULT(res)
     ENDDO
     tbuf(sym%length+1:)=' '
 
-    read(tbuf,*) res
+    IF (len_trim(tbuf) == 0) THEN
+       res = .FALSE.
+    ELSE
+       read(tbuf,*) res
+    ENDIF
 END FUNCTION extract_logical
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -577,6 +589,7 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
 !BEGIN
    aedr => units(unit)%p
    ncols = aedr%n_cols
+   NULLIFY(sym%sym)
 
    values(1:ncols)%length = 0
    i = 0

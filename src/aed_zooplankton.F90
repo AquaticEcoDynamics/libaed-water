@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -113,7 +113,7 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
    TYPE(zoop_param_t),INTENT(out) :: zoop_param(MAX_ZOOP_TYPES)
 !
 !LOCALS
-   INTEGER :: unit, nccols, ccol
+   INTEGER :: unit, nccols, ccol, dcol
    CHARACTER(len=32),POINTER,DIMENSION(:) :: csvnames
    CHARACTER(len=32) :: name
    TYPE(AED_SYMBOL),DIMENSION(:),ALLOCATABLE :: values
@@ -133,41 +133,42 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
 
    DO WHILE ( aed_csv_read_row(unit, values) )
       DO ccol=2,nccols
-         zoop_param(ccol)%zoop_name = csvnames(ccol)
+         dcol = ccol - 1
+         zoop_param(dcol)%zoop_name = csvnames(ccol)
 
          CALL copy_name(values(1), name)
          SELECT CASE (name)
-            CASE ('zoop_initial')      ; zoop_param(ccol)%zoop_initial   = extract_double(values(ccol))
-            CASE ('min_zoo')           ; zoop_param(ccol)%min_zoo        = extract_double(values(ccol))
-            CASE ('Rgrz_zoo')          ; zoop_param(ccol)%Rgrz_zoo       = extract_double(values(ccol))
-            CASE ('fassim_zoo')        ; zoop_param(ccol)%fassim_zoo     = extract_double(values(ccol))
-            CASE ('Kgrz_zoo')          ; zoop_param(ccol)%Kgrz_zoo       = extract_double(values(ccol))
-            CASE ('theta_grz_zoo')     ; zoop_param(ccol)%theta_grz_zoo  = extract_double(values(ccol))
-            CASE ('Rresp_zoo')         ; zoop_param(ccol)%Rresp_zoo      = extract_double(values(ccol))
-            CASE ('Rmort_zoo')         ; zoop_param(ccol)%Rmort_zoo      = extract_double(values(ccol))
-            CASE ('ffecal_zoo')        ; zoop_param(ccol)%ffecal_zoo     = extract_double(values(ccol))
-            CASE ('fexcr_zoo')         ; zoop_param(ccol)%fexcr_zoo      = extract_double(values(ccol))
-            CASE ('ffecal_sed')        ; zoop_param(ccol)%ffecal_sed     = extract_double(values(ccol))
-            CASE ('theta_resp_zoo')    ; zoop_param(ccol)%theta_resp_zoo = extract_integer(values(ccol))
-            CASE ('Tstd_zoo')          ; zoop_param(ccol)%Tstd_zoo       = extract_integer(values(ccol))
-            CASE ('Topt_zoo')          ; zoop_param(ccol)%Topt_zoo       = extract_integer(values(ccol))
-            CASE ('Tmax_zoo')          ; zoop_param(ccol)%Tmax_zoo       = extract_integer(values(ccol))
-            CASE ('saltfunc_zoo')      ; zoop_param(ccol)%saltfunc_zoo   = extract_integer(values(ccol))
-            CASE ('Smin_zoo')          ; zoop_param(ccol)%Smin_zoo       = extract_integer(values(ccol))
-            CASE ('Smax_zoo')          ; zoop_param(ccol)%Smax_zoo       = extract_integer(values(ccol))
-            CASE ('Sint_zoo')          ; zoop_param(ccol)%Sint_zoo       = extract_integer(values(ccol))
-            CASE ('INC_zoo')           ; zoop_param(ccol)%INC_zoo        = extract_double(values(ccol))
-            CASE ('IPC_zoo')           ; zoop_param(ccol)%IPC_zoo        = extract_double(values(ccol))
-            CASE ('DOmin_zoo')         ; zoop_param(ccol)%DOmin_zoo      = extract_double(values(ccol))
-            CASE ('Cmin_grz_zoo')      ; zoop_param(ccol)%Cmin_grz_zoo   = extract_double(values(ccol))
-            CASE ('num_prey')          ; zoop_param(ccol)%num_prey       = extract_integer(values(ccol))
+            CASE ('zoop_initial')      ; zoop_param(dcol)%zoop_initial   = extract_double(values(ccol))
+            CASE ('min_zoo')           ; zoop_param(dcol)%min_zoo        = extract_double(values(ccol))
+            CASE ('Rgrz_zoo')          ; zoop_param(dcol)%Rgrz_zoo       = extract_double(values(ccol))
+            CASE ('fassim_zoo')        ; zoop_param(dcol)%fassim_zoo     = extract_double(values(ccol))
+            CASE ('Kgrz_zoo')          ; zoop_param(dcol)%Kgrz_zoo       = extract_double(values(ccol))
+            CASE ('theta_grz_zoo')     ; zoop_param(dcol)%theta_grz_zoo  = extract_double(values(ccol))
+            CASE ('Rresp_zoo')         ; zoop_param(dcol)%Rresp_zoo      = extract_double(values(ccol))
+            CASE ('Rmort_zoo')         ; zoop_param(dcol)%Rmort_zoo      = extract_double(values(ccol))
+            CASE ('ffecal_zoo')        ; zoop_param(dcol)%ffecal_zoo     = extract_double(values(ccol))
+            CASE ('fexcr_zoo')         ; zoop_param(dcol)%fexcr_zoo      = extract_double(values(ccol))
+            CASE ('ffecal_sed')        ; zoop_param(dcol)%ffecal_sed     = extract_double(values(ccol))
+            CASE ('theta_resp_zoo')    ; zoop_param(dcol)%theta_resp_zoo = extract_integer(values(ccol))
+            CASE ('Tstd_zoo')          ; zoop_param(dcol)%Tstd_zoo       = extract_integer(values(ccol))
+            CASE ('Topt_zoo')          ; zoop_param(dcol)%Topt_zoo       = extract_integer(values(ccol))
+            CASE ('Tmax_zoo')          ; zoop_param(dcol)%Tmax_zoo       = extract_integer(values(ccol))
+            CASE ('saltfunc_zoo')      ; zoop_param(dcol)%saltfunc_zoo   = extract_integer(values(ccol))
+            CASE ('Smin_zoo')          ; zoop_param(dcol)%Smin_zoo       = extract_integer(values(ccol))
+            CASE ('Smax_zoo')          ; zoop_param(dcol)%Smax_zoo       = extract_integer(values(ccol))
+            CASE ('Sint_zoo')          ; zoop_param(dcol)%Sint_zoo       = extract_integer(values(ccol))
+            CASE ('INC_zoo')           ; zoop_param(dcol)%INC_zoo        = extract_double(values(ccol))
+            CASE ('IPC_zoo')           ; zoop_param(dcol)%IPC_zoo        = extract_double(values(ccol))
+            CASE ('DOmin_zoo')         ; zoop_param(dcol)%DOmin_zoo      = extract_double(values(ccol))
+            CASE ('Cmin_grz_zoo')      ; zoop_param(dcol)%Cmin_grz_zoo   = extract_double(values(ccol))
+            CASE ('num_prey')          ; zoop_param(dcol)%num_prey       = extract_integer(values(ccol))
 
-            CASE ('prey(1)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(ccol)%prey(1)%zoop_prey)
-            CASE ('prey(1)%Pzoo_prey') ; zoop_param(ccol)%prey(1)%Pzoo_prey = extract_double(values(ccol))
-            CASE ('prey(2)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(ccol)%prey(3)%zoop_prey)
-            CASE ('prey(2)%Pzoo_prey') ; zoop_param(ccol)%prey(2)%Pzoo_prey = extract_double(values(ccol))
-            CASE ('prey(3)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(ccol)%prey(3)%zoop_prey)
-            CASE ('prey(3)%Pzoo_prey') ; zoop_param(ccol)%prey(3)%Pzoo_prey = extract_double(values(ccol))
+            CASE ('prey(1)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(dcol)%prey(1)%zoop_prey)
+            CASE ('prey(1)%Pzoo_prey') ; zoop_param(dcol)%prey(1)%Pzoo_prey = extract_double(values(ccol))
+            CASE ('prey(2)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(dcol)%prey(3)%zoop_prey)
+            CASE ('prey(2)%Pzoo_prey') ; zoop_param(dcol)%prey(2)%Pzoo_prey = extract_double(values(ccol))
+            CASE ('prey(3)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(dcol)%prey(3)%zoop_prey)
+            CASE ('prey(3)%Pzoo_prey') ; zoop_param(dcol)%prey(3)%Pzoo_prey = extract_double(values(ccol))
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
          END SELECT
@@ -208,6 +209,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
        CASE (CSV_TYPE)
            status = load_csv(dbase, zoop_param)
        CASE (NML_TYPE)
+           print*,"nml format parameter file is deprecated. Please update to CSV format"
            tfil = find_free_lun()
            open(tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Error opening zoop_params namelist file'
@@ -278,7 +280,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
 ! Initialise the zooplankton biogeochemical model
 !
 !  Here, the aed_zooplankton namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_zooplankton_data_t),INTENT(inout) :: data
@@ -318,7 +320,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
                     dbase, simZoopFeedback, diag_level
 !-----------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_zooplankton initialization"
+   print *,"        aed_zooplankton configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_zooplankton,iostat=status)
@@ -343,7 +345,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
                               data%zoops%zoop_name)
 
 
-   !Register link to prey state variables
+   ! Register link to prey state variables
    DO zoop_i = 1,num_zoops
       phy_i = 0
       DO prey_i = 1,data%zoops(zoop_i)%num_prey

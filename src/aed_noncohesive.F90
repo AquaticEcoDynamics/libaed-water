@@ -4,19 +4,18 @@
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
-!#      School of Agriculture and Environment                                  #
 !#      The University of Western Australia                                    #
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018 - 2021 - The University of Western Australia                #
+!#  Copyright 2018 - 2022 - The University of Western Australia                #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -51,7 +50,7 @@ MODULE aed_noncohesive
 !-------------------------------------------------------------------------------
 ! aed_noncohesive --- noncohesive sediment model
 !
-! The AED2 module noncohesive contains equations that describe a
+! The AED module noncohesive contains equations that describe a
 ! particle, noncohesive, sediment. It is subject to processes of
 ! resupension and settling, and other modules may link to these pools.
 !-------------------------------------------------------------------------------
@@ -68,10 +67,10 @@ MODULE aed_noncohesive
    TYPE,extends(aed_model_data_t) :: aed_noncohesive_data_t
       !# Variable identifiers
       INTEGER,ALLOCATABLE :: id_ss(:), id_ss_vvel(:)
-      INTEGER,ALLOCATABLE :: id_ss_sed(:), id_sfss(:)
-      INTEGER :: id_l_bot, id_tau_0, id_epsilon, id_resus
+      INTEGER,ALLOCATABLE :: id_ss_sed(:), id_sfss(:), id_ss_set(:)
+      INTEGER :: id_l_bot, id_tau_0, id_epsilon, id_resus, id_set
       INTEGER :: id_e_temp, id_e_taub, id_e_salt, id_e_rho
-      INTEGER :: id_e_sedzone , id_sed, id_swi_dz
+      INTEGER :: id_e_sedzone , id_sed, id_swi_dz, id_ss_swi
       INTEGER :: id_d_taub
 
       !# Module configuration
@@ -118,7 +117,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read in and the variables simulated
-!  by the model are registered with AED2 core.
+!  by the model are registered with AED core.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
@@ -150,6 +149,11 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    AED_REAL          :: sed_porosity    = 0.3
    AED_REAL          :: sed_initial     = zero_
    CHARACTER(len=64) :: macrophyte_link_var = ''
+   CHARACTER(len=64) :: ss1_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64) :: ss2_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64) :: ss3_particle_link = ''  !   For FV API 2.0 (To be implemented)
+   CHARACTER(len=64) :: ss4_particle_link = ''  !   For FV API 2.0 (To be implemented)
+
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
@@ -158,15 +162,21 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_noncohesive/
 
-   NAMELIST /aed_noncohesive/ num_ss, decay, Ke_ss,                         &
+   NAMELIST /aed_noncohesive/ num_ss,                                       &
+                            ! core
+                              decay, Ke_ss,                                 &
                               settling, w_ss, rho_ss, d_ss,                 &
                               resuspension, epsilon, tau_0, tau_r, Ktau_0,  &
                               macrophyte_link_var, Fsed, fs,                &
-                              simSedimentMass, ss_initial, sed_porosity, diag_level
+                              simSedimentMass, ss_initial, sed_porosity,    &
+                              diag_level,                                   &
+                            ! optional/advanced
+                              ss1_particle_link, ss2_particle_link,         &
+                              ss3_particle_link, ss4_particle_link
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_noncohesive initialization"
+   print *,"        aed_noncohesive configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_noncohesive,iostat=status)
@@ -187,6 +197,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
 
    ! Setup non-cohesive particle groups
    ALLOCATE(data%id_ss(num_ss)) ; ALLOCATE(data%id_ss_vvel(num_ss))
+   ALLOCATE(data%id_ss_set(num_ss))
    IF ( simSedimentMass ) ALLOCATE(data%id_ss_sed(num_ss))
 
    ALLOCATE(data%decay(num_ss)) ; data%decay(1:num_ss) = decay(1:num_ss)
@@ -205,32 +216,33 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    DO i=1,num_ss
      ncs_name(3:3) = CHAR(ICHAR('0') + i)
                                              ! divide settling by secs_per_day to convert m/d to m/s
-     data%id_ss(i) = aed_define_variable(TRIM(ncs_name),'g/m**3','noncohesive particle group', &
+     data%id_ss(i) = aed_define_variable(TRIM(ncs_name),'g/m3','noncohesive particle group', &
                          ss_initial(i),minimum=zero_,maximum=1e4,mobility=(w_ss(i)/secs_per_day))
-     data%id_ss_vvel(i) = aed_define_diag_variable(TRIM(ncs_name)//'_vvel','m/s','vertical velocity')
+     data%id_ss_vvel(i) = aed_define_diag_variable(TRIM(ncs_name)//'_vvel','m/d','vertical velocity')
+     data%id_ss_set(i)  = aed_define_diag_variable(TRIM(ncs_name)//'_set','g/m3/d','sedimentation flux')
 
      IF ( simSedimentMass ) THEN
-       sed_initial = data%sed_porosity * fs(i) * sed_depth * data%rho_ss(i)
+       sed_initial = (1.-data%sed_porosity) * fs(i) * sed_depth * data%rho_ss(i) * 1e3
        data%id_ss_sed(i) = aed_define_sheet_variable(TRIM(ncs_name)//'_sed',&
-                                'g/m**2','sedimented noncohesive particles', &
+                                'g/m2','sedimented noncohesive particles', &
                                 sed_initial,minimum=zero_)
      ENDIF
    ENDDO
 
    ! Setup bottom diag arrays for sediment and spatially variable resuspension
    IF ( simSedimentMass ) THEN
-     data%id_sed = aed_define_sheet_diag_variable('ss_sed','g/m**2','total non-cohesive sediment mass')
+     data%id_sed = aed_define_sheet_diag_variable('ss_sed','g/m2','total non-cohesive sediment mass')
    ENDIF
    IF ( resuspension == 2 ) THEN
-      data%id_tau_0 = aed_define_sheet_diag_variable('tau_0','N/m**2','dynamic bottom drag')
-      data%id_epsilon = aed_define_sheet_diag_variable('epsilon','g/m**2/s','max resuspension rate')
+      data%id_tau_0 = aed_define_sheet_diag_variable('tau_0','N/m2','dynamic bottom drag')
+      data%id_epsilon = aed_define_sheet_diag_variable('epsilon','g/m2/s','max resuspension rate')
 
       ALLOCATE(data%id_sfss(num_ss))
 
       ncs_name = 'fs0'
       DO i=1,num_ss
          ncs_name(3:3) = CHAR(ICHAR('0') + i)
-         data%id_sfss(i) =  aed_define_sheet_diag_variable(TRIM(ncs_name),'-', 'sediment fraction of sed size')
+         data%id_sfss(i) =  aed_define_sheet_diag_variable(TRIM(ncs_name),'w/w', 'sediment fraction of sed size')
       ENDDO
 
       IF ( macrophyte_link_var .NE. '' ) THEN
@@ -244,19 +256,21 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
       ENDIF
    ENDIF
 
+   data%id_set =  aed_define_diag_variable('set','g/m3/d','total sedimentation flux')
+   data%id_ss_swi =  aed_define_sheet_diag_variable('swi','g/m2/d','net flux across the sediment-water interface')
+   data%id_swi_dz =  aed_define_sheet_diag_variable('swi_dz','m/d','cum. swi position change')
+   IF ( resuspension > 0 ) THEN
+      data%id_resus = aed_define_sheet_diag_variable('resus','g/m2/s','resuspension rate')
+      data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m2','taub diagnostic')
+      data%id_e_taub = aed_locate_sheet_global('taub')
+      data%id_e_sedzone = aed_locate_sheet_global('sed_zone')
+   ENDIF
+
    ! Register environmental dependencies
    data%id_e_temp = aed_locate_global('temperature')
    data%id_e_salt = aed_locate_global('salinity')
    IF ( settling > 1 ) THEN
       data%id_e_rho = aed_locate_global('density')
-   ENDIF
-
-   data%id_swi_dz =  aed_define_sheet_diag_variable('swi_dz','m/s','cum. swi position change')
-   IF ( resuspension > 0 ) THEN
-      data%id_resus = aed_define_sheet_diag_variable('resus','g/m**2/s','resuspension rate')
-      data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m**2','taub diagnostic')
-      data%id_e_taub = aed_locate_sheet_global('taub')
-      data%id_e_sedzone = aed_locate_sheet_global('sed_zone')
    ENDIF
 
 END SUBROUTINE aed_define_noncohesive
@@ -284,7 +298,7 @@ SUBROUTINE aed_initialize_benthic_noncohesive(data, column, layer_idx)
    IF ( data%resuspension == 2 ) THEN
     DO i=1,data%num_ss
      _STATE_VAR_S_(data%id_ss_sed(i))=_DIAG_VAR_S_(data%id_sfss(i)) * sed_depth &
-                                      * data%sed_porosity * (data%rho_ss(i)*1e3)
+                                  * (1.-data%sed_porosity) * (data%rho_ss(i)*1e3)
     ENDDO
    ENDIF
    !---------------------------------------------------------------------------+
@@ -333,14 +347,16 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
    AED_REAL :: ss
 
    ! Temporary variables
-   AED_REAL :: resus_flux, ss_flux, dummy_eps, dummy_tau
+   AED_REAL :: resus_flux, ss_flux, set_flux
+   AED_REAL :: dummy_eps, dummy_tau
    INTEGER  :: i
 
 !-------------------------------------------------------------------------------
 !BEGIN
    IF ( .NOT. ALLOCATED(data%id_ss) ) RETURN
 
-   resus_flux = zero_
+   resus_flux = zero_ ;  set_flux = zero_  ; ss_flux = zero_
+   _DIAG_VAR_S_(data%id_ss_swi) = zero_
 
    ! Retrieve current environmental conditions for the bottom pelagic layer
    IF ( data%resuspension  > 0) THEN
@@ -387,24 +403,35 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
       ! Constant sediment "flux"  (not for general consumption)
       ss_flux = data%Fsed(i)
 
+      ! Settling rate
+      set_flux = _DIAG_VAR_(data%id_ss_set(i)) / secs_per_day
+
       ! Transfer sediment flux value to model for ODE
       _FLUX_VAR_(data%id_ss(i)) = _FLUX_VAR_(data%id_ss(i)) + ss_flux + resus_flux
+
+
+      ! Log the flux across the sediment-water interface, cumulating over groups
+      _DIAG_VAR_S_(data%id_ss_swi) = _DIAG_VAR_S_(data%id_ss_swi) + (ss_flux + resus_flux - set_flux) * secs_per_day
 
       ! Keep track of the cumulative deviation in SWI position due to
       ! resuspension of this particle class
       _DIAG_VAR_S_(data%id_swi_dz) = _DIAG_VAR_S_(data%id_swi_dz) &
-                                   - (resus_flux+ss_flux) / (data%sed_porosity * (data%rho_ss(i)*1e3))
+                                   - ((resus_flux+ss_flux-set_flux) / ((1.-data%sed_porosity) * (data%rho_ss(i)*1e3)) * secs_per_day)
 
       IF ( data%simSedimentMass ) THEN
         ! Remove/add sediment fluxes value from the sediment vars
         _FLUX_VAR_B_(data%id_ss_sed(i)) = _FLUX_VAR_B_(data%id_ss_sed(i)) &
-                                        - resus_flux - ss_flux
+                                        - resus_flux - ss_flux - set_flux
 
         ! Recompute the total sediment mass, adding this group
         _DIAG_VAR_S_(data%id_sed) = _DIAG_VAR_S_(data%id_sed) + &
-                                  _STATE_VAR_S_(data%id_ss_sed(i))
+                                    _STATE_VAR_S_(data%id_ss_sed(i))
       ENDIF
    ENDDO
+
+
+
+
 
 END SUBROUTINE aed_calculate_benthic_noncohesive
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -429,8 +456,9 @@ SUBROUTINE aed_light_extinction_noncohesive(data,column,layer_idx,extinction)
 !BEGIN
 
    IF ( .NOT. ALLOCATED(data%id_ss) ) RETURN
-   
-   DO ss_i=1,ubound(data%id_ss,1)
+
+  !DO ss_i=1,ubound(data%id_ss,1)
+   DO ss_i=1,data%num_ss
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_ss(ss_i))
 
@@ -461,6 +489,7 @@ SUBROUTINE aed_mobility_noncohesive(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   _DIAG_VAR_(data%id_set) = zero_
    ! settling = 0 : no settling
    ! settling = 1 : constant settling @ w_pom
    ! settling = 2 : constant settling @ w_pom, corrected for variable density
@@ -502,20 +531,24 @@ SUBROUTINE aed_mobility_noncohesive(data,column,layer_idx,mobility)
       !------------------------------------------------------------------------+
       ! Set global mobility array
       mobility(data%id_ss(i)) = vvel
-      _DIAG_VAR_(data%id_ss_vvel(i)) = vvel
+      _DIAG_VAR_(data%id_ss_vvel(i)) = vvel * secs_per_day
 
       !------------------------------------------------------------------------+
       ! EXPERIMENTAL : SEDIMENT CUMULATION
       ! Keep track of the cumulative deviation in SWI position due to
       ! sedimentation of this particle class
       ss = _STATE_VAR_(data%id_ss(i))
-      _DIAG_VAR_S_(data%id_swi_dz) = _DIAG_VAR_S_(data%id_swi_dz) - (vvel*ss) &
-                                   / (data%sed_porosity * (data%rho_ss(i)*1e3))
 
-      IF ( data%simSedimentMass ) THEN
-        ! Remove/add sediment fluxes value from the sediment vars
-        _FLUX_VAR_B_(data%id_ss_sed(i)) = _FLUX_VAR_B_(data%id_ss_sed(i)) - vvel*ss
-      ENDIF
+      _DIAG_VAR_(data%id_ss_set(i)) = ss * vvel * secs_per_day
+      _DIAG_VAR_(data%id_set) = _DIAG_VAR_(data%id_set) + ss * vvel * secs_per_day
+
+      _DIAG_VAR_S_(data%id_swi_dz) = _DIAG_VAR_S_(data%id_swi_dz) - (vvel*ss) &
+                                   / ((1.-data%sed_porosity) * (data%rho_ss(i)*1e3))
+
+!      IF ( data%simSedimentMass ) THEN
+!        ! Remove/add sediment fluxes value from the sediment vars
+!        _FLUX_VAR_B_(data%id_ss_sed(i)) = _FLUX_VAR_B_(data%id_ss_sed(i)) - vvel*ss
+!      ENDIF
       !------------------------------------------------------------------------+
 
    ENDDO

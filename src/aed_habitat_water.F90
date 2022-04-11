@@ -1,6 +1,6 @@
 !###############################################################################
 !#                                                                             #
-!# aed_habitat.F90                                                             #
+!# aed_habitat_water.F90                                                       #
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2016 - 2021 -  The University of Western Australia               #
+!#  Copyright 2016 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -153,7 +153,7 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_habitat_water initialization"
+   print *,"        aed_habitat_water configuration"
    print *,"          WARNING! aed_habitat model is currently under development"
 
    ! Default

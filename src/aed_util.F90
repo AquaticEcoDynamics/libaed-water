@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -797,7 +797,8 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
                                  ParticleConc_,      &
                                  Kpo4p,K,Qm,         &
                                  PO4dis,PO4par,      &
-                                 thepH)
+                                 thepH,              &
+                                 temp_,salt_)
 !-------------------------------------------------------------------------------
 ! Routine to compute fraction of PO4 adsorped to sediment/particulate concentration
 !-------------------------------------------------------------------------------
@@ -806,13 +807,15 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
     AED_REAL, INTENT(IN)  :: Kpo4p,K,Qm
     AED_REAL, INTENT(OUT) :: PO4dis, PO4par
     AED_REAL, INTENT(IN), OPTIONAL :: thepH
+    AED_REAL, INTENT(in), OPTIONAL :: temp_
+    AED_REAL, INTENT(in), OPTIONAL :: salt_
 
 !-------------------------------------------------------------------------------
 !LOCALS
-    AED_REAL :: buffer, f_pH, pH
     AED_REAL :: PO4tot, ParticleConc
+    AED_REAL :: buffer, f_pH, pH                                         ! for option 2
+    AED_REAL :: parA, parB, Pexch, EPC0, Ppar, temp, salt, Kpo4p_fT_fSal ! for option 3
     AED_REAL,PARAMETER :: one_e_neg_ten = 1e-10
-
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -865,6 +868,51 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
 
      ! Now set dissolved portion
      PO4dis = PO4tot - PO4par
+
+
+   ELSEIF(PO4AdsorptionModel == 3) THEN
+     !-----------------------------------------------------
+     ! Kpo4P values as interpolated from Eq(9) and Eq(10) of
+     !  Zhang and Huang 2011, in Florida bay
+
+     ! exchangable phosphate content in the particles in unit of umol/g, default = 0.78 for Coorong
+     ! [umol P/g SS] = uM/mM mmol /m3 / g/m3
+     Pexch = 1e3 * PO4tot / ParticleConc   ! this could get high?
+
+     temp = 20. ; salt = 1.
+     IF(PRESENT(temp_)) temp = temp_
+     IF(PRESENT(salt_)) salt = salt_
+
+     ! the Zhang's experiment and function only valid for temperature range of
+     ! 15 to 35 degrees, when temp<15 the function goes funny, so need to
+     ! assume the the Kpo4p for temperature under 15 is the same to 15
+     IF (temp<15.0) temp=15.0;
+
+     ! Eq(9) and Eq(10) from Zhang and Huang 2011
+     parA=-140.5 + 1098.2/temp + 30.67*log(temp)+0.0907*salt;
+     parB=1225.96 - 6880.49/temp - 278.77*log(temp)+0.4561*salt;
+
+     ! calculate the equilibrium P content in the water as uM
+     EPC0=parA*Pexch + parB*(Pexch)**2;
+
+     PO4dis = EPC0
+     PO4par = PO4tot - PO4dis
+
+     !! equilibrium P content in the particles (100 mg)
+     !Ppar=PO4tot-EPC0;       ! initial P is 60 uM
+     !IF (Ppar<0) Ppar=0      ! add a limitation to avoid Ppar goes negative
+
+     ! calculate the Kpo4p, defined as the ratio of the particulate P concentration
+     !         to the dissolved P concentration per mg of SS
+     !Kpo4p_fT_fSal = Ppar/EPC0/100;
+     !PO4par = Kpo4p_fT_fSal * ParticleConc
+
+     ! Check for stupid solutions
+     IF(PO4par > PO4tot) PO4par = PO4tot
+     IF(PO4par < zero_) PO4par = zero_
+
+     !! Now set dissolved portion
+     !PO4dis = PO4tot - PO4par
 
    ELSE
      !-----------------------------------------------------

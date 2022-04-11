@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018 - 2021 -  The University of Western Australia               #
+!#  Copyright 2018 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -37,7 +37,7 @@ MODULE aed_bio_particles
 !-------------------------------------------------------------------------------
 ! aed_bio_particles --- test particle model
 !
-! The AED2 module test contains basic equations that have no dependencies
+! The AED module test contains basic equations that have no dependencies
 !-------------------------------------------------------------------------------
    USE aed_core
 
@@ -105,7 +105,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read and the variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst

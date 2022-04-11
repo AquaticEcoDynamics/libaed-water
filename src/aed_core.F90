@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -53,6 +53,7 @@ MODULE aed_core
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC model_list, last_model
+   PUBLIC n_aed_models
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_prefix_list_t
@@ -105,7 +106,9 @@ MODULE aed_core
       AED_REAL          :: mobility
       AED_REAL          :: light_extinction
       LOGICAL           :: sheet, diag, extern, found
-      LOGICAL           :: top, bot, zavg, const
+      LOGICAL           :: top, bot, const
+      LOGICAL           :: zavg, zavg_req
+      INTEGER           :: particle_link
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -126,6 +129,7 @@ MODULE aed_core
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    INTEGER :: cur_mod_base = 0
+   INTEGER :: n_aed_models = 0
    INTEGER :: n_aed_vars = 0, a_vars = 0
    INTEGER :: n_vars = 0, n_sheet_vars = 0
    INTEGER :: n_diags = 0, n_sheet_diags = 0
@@ -137,6 +141,17 @@ MODULE aed_core
    CLASS(aed_model_data_t), POINTER :: current_model => null()
 
    LOGICAL :: host_has_cell_vel = .false.
+
+#ifdef f2003
+   USE, intrinsic :: iso_fortran_env, ONLY : stdin=>input_unit, &
+                                             stdout=>output_unit, &
+                                             stderr=>error_unit
+#else
+#  define stdin  5
+#  define stdout 6
+#  define stderr 0
+#endif
+   INTEGER :: log = stderr
 
    !#---------------------------------------------------------------------------
 
@@ -208,14 +223,19 @@ SUBROUTINE display_var(var, idx)
       line = line(1:20) // ' ' // var%model%aed_model_name
    ELSE
       line = line(1:20) // ' ???'
-!     print*,'Requested variable ', TRIM(var%name), ' not defined.'
+!     print log,'Requested variable ', TRIM(var%name), ' not defined.'
    ENDIF
    line = TRIM(line) // '             '
 
+#if 1
    IF ( var%sheet ) THEN
-      line = line(1:40) // ' 2D'
+      IF ( ASSOCIATED(var%model) .AND. var%model%aed_model_zone_avg ) THEN
+         line = line(1:40) // ' SZ '
+      ELSE
+         line = line(1:40) // ' 2D '
+      ENDIF
    ELSE
-      line = line(1:40) // ' 3D'
+      line = line(1:40) // ' 3D '
    ENDIF
 
    req => var%req
@@ -232,7 +252,7 @@ SUBROUTINE display_var(var, idx)
       DO WHILE ( ASSOCIATED(req%next) )
          req => req%next
          IF (LEN_TRIM(line) >= 75 .AND. ASSOCIATED(req%next)) THEN
-             print*, TRIM(line),","
+             write(log, *) TRIM(line),","
              line(1:51)=' '
              line = line(1:51) // req%aed_model_prefix
          ELSE
@@ -240,8 +260,14 @@ SUBROUTINE display_var(var, idx)
          ENDIF
       ENDDO
    ENDIF
+   IF ( var%zavg_req ) THEN
+      IF ( ASSOCIATED(var%model) .AND. .NOT. var%model%aed_model_zone_avg ) THEN
+         line = TRIM(line) // "     (zavg req)"
+      ENDIF
+   ENDIF
 
-   print *, TRIM(line)
+#endif
+   write(log, *) TRIM(line)
 END SUBROUTINE display_var
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -260,17 +286,17 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print*
-   print*,' ---------------------- AED Variables Summary ----------------------'
-   print*,'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
-   print*
-   print*,'ENVIRONMENT:'
+   write(log, *)
+   write(log, *) ' ---------------------- AED Variables Summary ----------------------'
+   write(log, *) 'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
+   write(log, *)
+   write(log, *) 'ENVIRONMENT:'
    DO i=1,n_aed_vars
       IF ( all_vars(i)%extern ) CALL display_var(all_vars(i), i)
    ENDDO
 
-   print*
-   print*,'STATE:'
+   write(log, *)
+   write(log, *) 'STATE:'
    n_vars = 0 ; n_sheet_vars = 0
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. .NOT. all_vars(i)%diag ) THEN
@@ -280,8 +306,8 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
       ENDIF
    ENDDO
 
-   print*
-   print*,'DIAGNOSTIC:'
+   write(log, *)
+   write(log, *) 'DIAGNOSTIC:'
    n_diags = 0 ; n_sheet_diags = 0;
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. all_vars(i)%diag ) THEN
@@ -290,9 +316,9 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
          ELSE ; n_diags = n_diags + 1 ; ENDIF
       ENDIF
    ENDDO
-   print*
-   print*,' -------------------------------------------------------------------'
-   print*
+   write(log, *)
+   write(log, *) ' -------------------------------------------------------------------'
+   write(log, *)
 
    n_v = n_vars;  n_sv = n_sheet_vars
    n_d = n_diags; n_sd = n_sheet_diags
@@ -337,7 +363,7 @@ SUBROUTINE extend_allocated_variables(pcount)
 !
 !LOCALS
    TYPE(aed_variable_t),DIMENSION(:),ALLOCATABLE :: tmp
-   INTEGER count
+   INTEGER count, i
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -354,6 +380,9 @@ SUBROUTINE extend_allocated_variables(pcount)
       ALLOCATE(all_vars(1:count))
    ENDIF
 
+!  DO i=1,count
+!     NULLIFY(all_vars(a_vars+i)%model)
+!  ENDDO
    all_vars(a_vars+1:a_vars+count)%initial = nan_
    all_vars(a_vars+1:a_vars+count)%minimum = nan_
    all_vars(a_vars+1:a_vars+count)%maximum = nan_
@@ -368,6 +397,7 @@ SUBROUTINE extend_allocated_variables(pcount)
    all_vars(a_vars+1:a_vars+count)%top = .false.
    all_vars(a_vars+1:a_vars+count)%bot = .false.
    all_vars(a_vars+1:a_vars+count)%zavg = .true.
+   all_vars(a_vars+1:a_vars+count)%zavg_req = .false.
    all_vars(a_vars+1:a_vars+count)%const = .false.
 
    a_vars = a_vars + count
@@ -464,7 +494,9 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%name = tname
 !print*,"CREATE Variable '",TRIM(tname),"' long name '",TRIM(longname),"' with units '",TRIM(units),"' at ", ret
 
-      all_vars(ret)%model => current_model
+!     IF ( ASSOCIATED(current_model) ) THEN
+         all_vars(ret)%model => current_model
+!     ENDIF
       all_vars(ret)%longname = longname
       all_vars(ret)%units = units
 
@@ -473,8 +505,10 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%extern = .false.
       all_vars(ret)%found = .false.
       all_vars(ret)%zavg = .false.
+      all_vars(ret)%zavg_req = .false.
       all_vars(ret)%top = .false.
       all_vars(ret)%bot = .false.
+      all_vars(ret)%particle_link = 0
    ENDIF
    IF ( ASSOCIATED(aed_cur_prefix) ) THEN
       CALL extend_requested(all_vars(ret), aed_cur_prefix)
@@ -583,6 +617,7 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
 !-------------------------------------------------------------------------------
 !BEGIN
    ret = aed_create_variable(name, longname, units, .false.)
+
    n_sheet_diags = n_sheet_diags + 1
 
    all_vars(ret)%sheet = .true.
@@ -599,8 +634,10 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
 
    IF ( PRESENT(zavg) ) THEN
       all_vars(ret)%zavg = zavg
+      all_vars(ret)%zavg_req = .FALSE.
    ELSE
-      all_vars(ret)%zavg = .TRUE.
+      all_vars(ret)%zavg = .FALSE.
+      all_vars(ret)%zavg_req = .FALSE.
    ENDIF
 
    ret = n_aed_vars
@@ -688,22 +725,26 @@ END FUNCTION aed_locate_variable
 
 
 !###############################################################################
-FUNCTION aed_locate_sheet_variable(name) RESULT(ret)
+FUNCTION aed_locate_sheet_variable(name,update_from_zone) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
+   LOGICAL, OPTIONAL       :: update_from_zone  ! requesting module using zones
 !
 !LOCALS
    INTEGER :: ret
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
+   IF ( TRIM(name) == '' ) THEN ; ret = 0 ; RETURN ; ENDIF
 
    ret = aed_create_variable(name, '', '', .true.)
 
    IF ( ret /= 0 ) THEN
      IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
+   ENDIF
+   IF ( ret /= 0 .AND. PRESENT(update_from_zone)) THEN
+     all_vars(ret)%zavg_req = .true.
    ENDIF
 !  IF ( ret /= 0 ) THEN
 !    print*,"SHEET_VAR ",TRIM(name)," LOCATED at ",ret

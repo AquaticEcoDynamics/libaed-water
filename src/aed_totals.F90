@@ -9,14 +9,14 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2021 -  The University of Western Australia               #
+!#  Copyright 2013 - 2022 -  The University of Western Australia               #
 !#                                                                             #
-!#   GLM is free software: you can redistribute it and/or modify               #
+!#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
 !#   the Free Software Foundation, either version 3 of the License, or         #
 !#   (at your option) any later version.                                       #
 !#                                                                             #
-!#   GLM is distributed in the hope that it will be useful,                    #
+!#   AED is distributed in the hope that it will be useful,                    #
 !#   but WITHOUT ANY WARRANTY; without even the implied warranty of            #
 !#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
 !#   GNU General Public License for more details.                              #
@@ -107,7 +107,7 @@ SUBROUTINE aed_define_totals(data, namlst)
 ! Initialise the AED model
 !
 !  Here, the aed namelist is read and te variables exported
-!  by the model are registered with AED2.
+!  by the model are registered with AED.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
@@ -153,7 +153,7 @@ SUBROUTINE aed_define_totals(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        aed_totals initialization"
+   print *,"        aed_totals configuration"
 
    ! Read the namelist
    read(namlst,nml=aed_totals,iostat=status)
@@ -242,22 +242,22 @@ SUBROUTINE aed_define_totals(data, namlst)
    ! Register diagnostic variables
    IF (data%num_tn>0) THEN
      data%id_totals_tn = aed_define_diag_variable('tn',               &
-                     'mmol/m**3', 'Total Nitrogen')
+                     'mmol/m3', 'Total Nitrogen')
    ENDIF
 
    IF (data%num_tkn>0) THEN
      data%id_totals_tkn = aed_define_diag_variable('tkn',             &
-                     'mmol/m**3', 'Total Kjedhal Nitrogen')
+                     'mmol/m3', 'Total Kjedhal Nitrogen')
    ENDIF
 
    IF (data%num_tp>0) THEN
      data%id_totals_tp = aed_define_diag_variable('tp',               &
-                     'mmol/m**3', 'Total Phosphorus')
+                     'mmol/m3', 'Total Phosphorus')
    ENDIF
 
    IF (data%num_toc>0) THEN
      data%id_totals_toc = aed_define_diag_variable('toc',             &
-                     'mmol/m**3', 'Total Organic Carbon')
+                     'mmol/m3', 'Total Organic Carbon')
    ENDIF
 
    IF (data%num_tss>0) THEN
@@ -272,12 +272,12 @@ SUBROUTINE aed_define_totals(data, namlst)
 
    IF (data%num_tfe>0) THEN
      data%id_tfe = aed_define_diag_variable('tfe',                    &
-                     'mmol/m**3', 'Total Iron')
+                     'mmol/m3', 'Total Iron')
    ENDIF
 
    IF (data%num_tal>0) THEN
      data%id_tal = aed_define_diag_variable('tal',                    &
-                     'mmol/m**3', 'Total Aluminium')
+                     'mmol/m3', 'Total Aluminium')
    ENDIF
 
    IF (data%outputLight) THEN
@@ -381,11 +381,11 @@ SUBROUTINE aed_calculate_totals(data,column,layer_idx)
    ! Light and Extinction Coefficient
    IF (data%outputLight) THEN
      val = _STATE_VAR_(data%id_par)
-     _DIAG_VAR_(data%id_totals_light) =  val/0.45
-     _DIAG_VAR_(data%id_totals_par) =    val
-     _DIAG_VAR_(data%id_totals_uv) =     (val/0.45)*0.03
+     _DIAG_VAR_(data%id_totals_light) =  val/0.43
+     _DIAG_VAR_(data%id_totals_par)   =  val
+     _DIAG_VAR_(data%id_totals_uv)    = (val/0.43)*0.05
      val = _STATE_VAR_(data%id_extc)
-     _DIAG_VAR_(data%id_totals_extc) =   val
+     _DIAG_VAR_(data%id_totals_extc)  =  val
    END IF
 END SUBROUTINE aed_calculate_totals
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
