@@ -358,7 +358,7 @@ LOGICAL FUNCTION end_parse(aedr)
 !-------------------------------------------------------------------------------
 !BEGIN
     close(aedr%lun, iostat=iostat)
-    DEALLOCATE(aedr)
+    IF ( ASSOCIATED(aedr) ) DEALLOCATE(aedr)
     end_parse=(iostat .eq. 0)
 END FUNCTION end_parse
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
