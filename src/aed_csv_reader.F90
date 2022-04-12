@@ -322,7 +322,7 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
       ENDDO
    ELSE IF (aedr%buf(s1:s1) == ',' ) THEN
       ! We are done
-      e1 = e1 + 1
+      e1=s1+1
    ELSE
       e1=s1+1
       DO WHILE((e1 .LE. aedr%buf_len) .AND. (char_in_str(aedr%buf(e1:e1),term) .EQ. 0))
