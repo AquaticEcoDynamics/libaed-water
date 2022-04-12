@@ -320,6 +320,9 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
       DO WHILE((e1 .LE. aedr%buf_len) .AND. (aedr%buf(e1:e1) .NE. quot))
          e1=e1+1
       ENDDO
+   ELSE IF (aedr%buf(s1:s1) == ',' ) THEN
+      ! We are done
+      e1 = e1 + 1
    ELSE
       e1=s1+1
       DO WHILE((e1 .LE. aedr%buf_len) .AND. (char_in_str(aedr%buf(e1:e1),term) .EQ. 0))
@@ -379,15 +382,15 @@ FUNCTION extract_double(sym) RESULT(num)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-    DO i=1,sym%length
-       tbuf(i:i)=sym%sym(i)
-    ENDDO
-    tbuf(sym%length+1:)=' '
+    IF ( sym%length > 0 ) THEN
+       DO i=1,sym%length
+          tbuf(i:i)=sym%sym(i)
+       ENDDO
+       tbuf(sym%length+1:)=' '
 
-    IF (len_trim(tbuf) == 0) THEN
-       num = 0.;
-    ELSE
        read(tbuf,*) num
+    ELSE
+       num = 0.;
     ENDIF
 END FUNCTION extract_double
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -408,15 +411,15 @@ FUNCTION extract_integer(sym) RESULT(num)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-    DO i=1,sym%length
-       tbuf(i:i)=sym%sym(i)
-    ENDDO
-    tbuf(sym%length+1:)=' '
+    IF ( sym%length > 0 ) THEN
+       DO i=1,sym%length
+          tbuf(i:i)=sym%sym(i)
+       ENDDO
+       tbuf(sym%length+1:)=' '
 
-    IF (len_trim(tbuf) == 0) THEN
-       num = 0.;
-    ELSE
        read(tbuf,*) num
+    ELSE
+       num = 0.;
     ENDIF
 END FUNCTION extract_integer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -437,12 +440,12 @@ FUNCTION extract_logical(sym) RESULT(res)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-    DO i=1,sym%length
-       tbuf(i:i)=sym%sym(i)
-    ENDDO
-    tbuf(sym%length+1:)=' '
+    IF ( sym%length > 0 ) THEN
+       DO i=1,sym%length
+          tbuf(i:i)=sym%sym(i)
+       ENDDO
+       tbuf(sym%length+1:)=' '
 
-    IF (len_trim(tbuf) == 0) THEN
        res = .FALSE.
     ELSE
        read(tbuf,*) res
@@ -465,10 +468,14 @@ FUNCTION extract_string(sym) RESULT(str)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-    DO i=1,sym%length
-       str(i:i)=sym%sym(i)
-    ENDDO
-    str(sym%length+1:)=' '
+    IF ( sym%length > 0 ) THEN
+       DO i=1,sym%length
+          str(i:i)=sym%sym(i)
+       ENDDO
+       str(sym%length+1:)=' '
+    ELSE
+       str = ''
+    ENDIF
 END FUNCTION extract_string
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
