@@ -460,7 +460,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
          deltapH = 5.
          ! As carbonate alkalinity depends on H+, lets iterate
          iter = 0
-         DO WHILE (abs(deltapH) > 1e-10)
+         DO WHILE (abs(deltapH) > 1e-5)
            ! Use CO2SYS to estimate TA, from past pH
            CALL CO2SYS(1,T,S,zero_,tadum,TCO2,pH,pHdum,co2dum,talk)
            ! Use CO2SYS to re-estimate pH, from TA
