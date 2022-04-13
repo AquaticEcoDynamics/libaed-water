@@ -601,7 +601,9 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
    values(1:ncols)%length = 0
    i = 0
    DO WHILE ( next_symbol(aedr, sym) ) !#
-      IF ( sym%sym(1) .EQ. EOLN ) EXIT
+      IF ( sym%length > 0 ) THEN
+         IF ( sym%sym(1) .EQ. EOLN ) EXIT
+      ENDIF
       i = i + 1
       IF ( i <= ncols ) THEN
          IF ( ASSOCIATED(values(i)%sym) ) NULLIFY( values(i)%sym )
