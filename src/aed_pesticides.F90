@@ -183,12 +183,16 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %% /aed_pesticides/
 
-   NAMELIST /aed_pesticides/ num_pesticides, the_pesticides, &
-                             oxy_variable,         &
-             simSediment,      &
-            resuspension,  &
-            dbase, extra_diag, diag_level, &
-            gpp_variable
+   NAMELIST /aed_pesticides/ num_pesticides, the_pesticides,       &
+                             oxy_variable,                         &
+                             simSediment,                          &
+                             simResuspension, resuspension,        &
+                             simVolatilisation, pst_piston_model,  &
+                             simSorption,                          &
+                             simPhotolysis,                        &
+                             simUptake, gpp_variable,              &
+                             dbase, diag_level
+
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_pesticides configuration"
