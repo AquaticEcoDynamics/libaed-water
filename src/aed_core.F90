@@ -227,10 +227,16 @@ SUBROUTINE display_var(var, idx)
    ENDIF
    line = TRIM(line) // '             '
 
-#if 1
    IF ( var%sheet ) THEN
-      IF ( ASSOCIATED(var%model) .AND. var%model%aed_model_zone_avg ) THEN
-         line = line(1:40) // ' SZ '
+      !# IF ( ASSOCIATED(var%model) .and. var%model%aed_model_zone_avg ) THEN 
+      !# The above will segfault if var%model is null - like pascal, it seems fortran
+      !# also evaluates both conditions regardless
+      IF ( ASSOCIATED(var%model) ) THEN
+         IF ( var%model%aed_model_zone_avg ) THEN
+            line = line(1:40) // ' SZ '
+         ELSE
+            line = line(1:40) // ' 2D '
+         ENDIF
       ELSE
          line = line(1:40) // ' 2D '
       ENDIF
@@ -266,7 +272,6 @@ SUBROUTINE display_var(var, idx)
       ENDIF
    ENDIF
 
-#endif
    write(log, *) TRIM(line)
 END SUBROUTINE display_var
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -380,9 +385,9 @@ SUBROUTINE extend_allocated_variables(pcount)
       ALLOCATE(all_vars(1:count))
    ENDIF
 
-!  DO i=1,count
-!     NULLIFY(all_vars(a_vars+i)%model)
-!  ENDDO
+   DO i=1,count
+      NULLIFY(all_vars(a_vars+i)%model)
+   ENDDO
    all_vars(a_vars+1:a_vars+count)%initial = nan_
    all_vars(a_vars+1:a_vars+count)%minimum = nan_
    all_vars(a_vars+1:a_vars+count)%maximum = nan_
