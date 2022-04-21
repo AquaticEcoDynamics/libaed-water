@@ -1258,7 +1258,10 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      par  = _STATE_VAR_(data%id_par)        ! local photosynt. active radiation
      dz   = _STATE_VAR_(data%id_dz)         ! cell depth
      mpb  = _STATE_VAR_S_(data%id_mpb)      ! local mpb density
-     IF(data%do_mpb==2) mpb  = _DIAG_VAR_S_(data%id_d_mpb)
+     IF(data%do_mpb==2) THEN
+       mpb  = MAX( _DIAG_VAR_S_(data%id_d_mpb), 10.)
+      ! print *,'ss',data%id_d_mpb,mpb
+     ENDIF
 
      ! Get sedimentation flux (mmmol/m2/d) loss into the benthos (diagnostic was set in mobility)
      Psed_phy = _DIAG_VAR_(data%id_Psed_phy)
@@ -1344,7 +1347,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      IF(data%do_mpb/=2) _DIAG_VAR_S_(data%id_d_mpb) = mpb
      _DIAG_VAR_S_(data%id_d_bpp) =      (mpb_prod) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_bcp) =      (mpb_resp) * mpb * secs_per_day
-     _DIAG_VAR_S_(data%id_d_mpbv)= -Psed_phy - (Fsed_phy * secs_per_day)
+     _DIAG_VAR_S_(data%id_d_mpbv)=  Psed_phy + (Fsed_phy * secs_per_day)
      _DIAG_VAR_S_(data%id_d_res) =              Fsed_phy * secs_per_day
    ENDIF
 END SUBROUTINE aed_calculate_benthic_phytoplankton

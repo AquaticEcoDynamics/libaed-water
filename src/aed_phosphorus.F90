@@ -70,7 +70,7 @@ MODULE aed_phosphorus
       INTEGER  :: id_Fsed_frp
       INTEGER  :: id_e_temp, id_e_salt, id_e_rain, id_tssext, id_dz
       INTEGER  :: id_sed_frp, id_frpads_vvel, id_atm_dep, &
-                  id_frpads_set, id_frp_srp, id_frpads_res
+                  id_frpads_set, id_frp_srp, id_frpads_res, id_frpads_swi
 
       !# Model parameters
       AED_REAL :: Fsed_frp,Ksed_frp,theta_sed_frp             ! Benthic
@@ -251,6 +251,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
                                            'adsobed PO4 sedimentation flux')
      data%id_frpads_res = aed_define_sheet_diag_variable('frp_ads_res','mmol P/m2/d',&
                                            'adsobed PO4 resuspension flux')
+     data%id_frpads_swi = aed_define_sheet_diag_variable('frp_ads_swi','mmol P/m2/d',&
+                                           'adsobed PO4 net flux at the swi')
      data%id_frp_srp = aed_define_diag_variable('frp_srp','mmol P/m3/d',       &
                                            'PO4 adsorption rate')
 
@@ -422,7 +424,7 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp
+   AED_REAL :: temp,dz
 
    ! State
    AED_REAL :: frp,oxy
@@ -435,6 +437,7 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_E_temp)       ! local temperature
+   dz = _STATE_VAR_(data%id_dz)
 
    ! Retrieve current (local) state variable values.
    frp = _STATE_VAR_(data%id_frp)           ! phosphorus
@@ -478,7 +481,11 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    ! Also store sediment flux as diagnostic variable.
    _DIAG_VAR_S_(data%id_sed_frp) = frp_flux * secs_per_day
 
-   IF (data%simPO4Adsorption) _DIAG_VAR_S_(data%id_frpads_res) = zero_
+   IF (data%simPO4Adsorption) THEN
+     _DIAG_VAR_S_(data%id_frpads_res) = zero_
+     _DIAG_VAR_S_(data%id_frpads_swi) = _DIAG_VAR_(data%id_frpads_set)*dz + _DIAG_VAR_S_(data%id_frpads_res)
+   ENDIF
+
 
 END SUBROUTINE aed_calculate_benthic_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -411,7 +411,7 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
 
 
       ! Log the flux across the sediment-water interface, cumulating over groups
-      _DIAG_VAR_S_(data%id_ss_swi) = _DIAG_VAR_S_(data%id_ss_swi) + (ss_flux + resus_flux - set_flux) * secs_per_day
+      _DIAG_VAR_S_(data%id_ss_swi) = _DIAG_VAR_S_(data%id_ss_swi) - (ss_flux + resus_flux - set_flux) * secs_per_day
 
       ! Keep track of the cumulative deviation in SWI position due to
       ! resuspension of this particle class
