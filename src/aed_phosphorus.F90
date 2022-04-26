@@ -67,7 +67,7 @@ MODULE aed_phosphorus
    TYPE,extends(aed_model_data_t) :: aed_phosphorus_data_t
       !# Variable identifiers
       INTEGER  :: id_frp, id_frpads, id_oxy,  id_tss, id_pH
-      INTEGER  :: id_Fsed_frp
+      INTEGER  :: id_Fsed_frp, id_l_resus
       INTEGER  :: id_e_temp, id_e_salt, id_e_rain, id_tssext, id_dz
       INTEGER  :: id_sed_frp, id_frpads_vvel, id_atm_dep, &
                   id_frpads_set, id_frp_srp, id_frpads_res, id_frpads_swi
@@ -79,7 +79,7 @@ MODULE aed_phosphorus
       AED_REAL :: w_po4ads                                    ! Sedimentation
       LOGICAL  :: simDryDeposition,simWetDeposition
       LOGICAL  :: ben_use_oxy,ben_use_aedsed
-      INTEGER  :: PO4AdsorptionModel
+      INTEGER  :: PO4AdsorptionModel, resuspension
       LOGICAL  :: simPO4Adsorption, ads_use_pH, ads_use_external_tss
 
      CONTAINS
@@ -147,6 +147,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    CHARACTER(len=64) :: po4sorption_target_variable=''
    CHARACTER(len=64) :: frp_ads_particle_link=''            !   For FV API 2.0 (To be implemented)
    CHARACTER(len=64) :: pH_variable  ='CAR_pH'
+   CHARACTER(len=64) :: resus_link   =''
+   INTEGER           :: resuspension = 0
    ! Atmospheric deposition
    LOGICAL           :: simDryDeposition = .false.
    LOGICAL           :: simWetDeposition = .false.
@@ -169,7 +171,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
                             Kpo4p,theta_Kpo4,K_sal,Kadsratio,Qmax,             &
                             ads_use_pH,pH_variable, w_po4ads,                  &
                             simDryDeposition, simWetDeposition,                &
-                            atm_pip_dd, atm_frp_conc, diag_level
+                            atm_pip_dd, atm_frp_conc,                          &
+                            resuspension, resus_link, diag_level
 !
 !------------------------------------------------------------------------------+
 !BEGIN
@@ -199,9 +202,11 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    data%atm_frp_conc         = MAX(zero_,atm_frp_conc)
    data%simDryDeposition     = simDryDeposition
    data%simWetDeposition     = simWetDeposition
+   data%resuspension         = resuspension
 
    ! Register main state variable
-   data%id_frp = aed_define_variable( 'frp', 'mmol P/m3', 'phosphorus',     &
+   data%id_frp = aed_define_variable( 'frp', 'mmol P/m3',                      &
+                                    'filterable reactive phosphate',           &
                                     frp_initial,minimum=frp_min,maximum=frp_max)
 
    ! Register external state variable dependencies (for benthic flux)
@@ -246,7 +251,18 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
        data%id_pH = aed_locate_variable(pH_variable)
      ENDIF
 
-     ! Check diagnostics specific for adsorbed phosphate
+     !-- resuspension link variable
+     IF ( resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
+        data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link)) ! ('NCS_resus')
+       !IF ( resuspension>1 ) THEN
+       !    data%id_sedpipfr  = aed_define_sheet_diag_variable('pip_sed_frac','w/w',  'Sediment PIP fraction')
+       !  ENDIF
+     ELSE
+        data%id_l_resus = 0
+        data%resuspension = 0
+     ENDIF
+
+     !-- Check diagnostics specific for adsorbed phosphate
      data%id_frpads_set = aed_define_diag_variable('frp_ads_set','mmol P/m3/d',&
                                            'adsobed PO4 sedimentation flux')
      data%id_frpads_res = aed_define_sheet_diag_variable('frp_ads_res','mmol P/m2/d',&
@@ -430,7 +446,7 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    AED_REAL :: frp,oxy
 
    ! Temporary variables
-   AED_REAL :: frp_flux, Fsed_frp, fT, fDO
+   AED_REAL :: frp_flux, Fsed_frp, fT, fDO, sedpipfr, Fsed_pip
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -482,8 +498,13 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    _DIAG_VAR_S_(data%id_sed_frp) = frp_flux * secs_per_day
 
    IF (data%simPO4Adsorption) THEN
-     _DIAG_VAR_S_(data%id_frpads_res) = zero_
-     _DIAG_VAR_S_(data%id_frpads_swi) = _DIAG_VAR_(data%id_frpads_set)*dz + _DIAG_VAR_S_(data%id_frpads_res)
+     Fsed_pip = zero_
+     IF( data%resuspension > 0 ) THEN
+       sedpipfr = 100./1e6 ! 100mg/kg
+       Fsed_pip = _DIAG_VAR_S_(data%id_l_resus) * sedpipfr * 1e3/30.91   ! g/m2/s * gP/gSed * mmol/mol / g/mol = mmol/m2/s
+       _DIAG_VAR_S_(data%id_frpads_res) = Fsed_pip
+     ENDIF
+     _DIAG_VAR_S_(data%id_frpads_swi) = _DIAG_VAR_(data%id_frpads_set)*dz + Fsed_pip*secs_per_day
    ENDIF
 
 
