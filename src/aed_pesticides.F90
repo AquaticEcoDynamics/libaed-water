@@ -431,15 +431,19 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
 
        !data%id_total(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_t', 'orgs/m3', 'total')
        IF ( diag_level >= 2 ) THEN
-         data%id_atmvolat(i)  = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_atm', 'mmol/m2/d', 'volatilisation')
-         data%id_sedflux(i)   = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_dsf', 'mmol/m2/d', 'dissolved sediment flux')
-         data%id_resus(i)     = aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_res', 'mmol/m2/d', 'resuspension flux')
+         data%id_atmvolat(i)  = &
+                aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_atm', 'mmol/m2/d', 'volatilisation')
+         data%id_sedflux(i)   = &
+                aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_dsf', 'mmol/m2/d', 'dissolved sediment flux')
+         data%id_resus(i)     = &
+                aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_res', 'mmol/m2/d', 'resuspension flux')
          data%id_settling(i)  = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_set', 'mmol/m3/d', 'settling rate')
          data%id_sorption(i)  = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_srp', 'mmol/m3/d', 'sorption rate')
          data%id_photolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_pht', 'mmol/m3/d', 'photolysis rate')
          data%id_hydrolysis(i)= aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_hyd', 'mmol/m3/d', 'hydrolysis rate')
          data%id_uptake(i)    = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_upt', 'mmol/m3/d', 'uptake rate')
-         data%id_total(i)     = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
+         data%id_total(i)     = &
+                aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
        ENDIF
    ENDDO
 END SUBROUTINE aed_pesticides_load_params
@@ -629,8 +633,10 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
       ! SET DIAGNOSTICS
 
       IF ( diag_level >= 2 ) THEN
-        _DIAG_VAR_(data%id_hydrolysis(pst_i)) = hydrolysis * (_DIAG_VAR_(data%id_total(pst_i))+pest_d) * secs_per_day
-        _DIAG_VAR_(data%id_photolysis(pst_i)) = photolysis * (_DIAG_VAR_(data%id_total(pst_i))/2.+pest_d) * secs_per_day
+        _DIAG_VAR_(data%id_hydrolysis(pst_i)) = &
+            hydrolysis * (_DIAG_VAR_(data%id_total(pst_i))+pest_d) * secs_per_day
+        _DIAG_VAR_(data%id_photolysis(pst_i)) = &
+            photolysis * (_DIAG_VAR_(data%id_total(pst_i))/2.+pest_d) * secs_per_day
         _DIAG_VAR_(data%id_uptake(pst_i)) = uptake * pest_d * secs_per_day
       ENDIF
 

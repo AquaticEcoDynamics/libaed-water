@@ -88,7 +88,7 @@ MODULE aed_csv_reader
 !-------------------------------------------------------------------------------
    PUBLIC aed_csv_read_header, aed_csv_read_row, aed_csv_close, AED_SYMBOL
    PUBLIC extract_double, extract_logical, extract_integer, extract_string
-   PUBLIC copy_name
+   PUBLIC copy_name, indexed_field
 
 CONTAINS
 
@@ -637,6 +637,35 @@ LOGICAL FUNCTION aed_csv_close(unit)
    NULLIFY(aedr)
    units(unit)%p => aedr
 END FUNCTION aed_csv_close
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+INTEGER FUNCTION indexed_field(s1, s2, n, s3)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: s1, s2, s3
+   INTEGER,INTENT(in) :: n
+!LOCALS
+   CHARACTER(len=4)  :: ext
+   CHARACTER(len=64) :: res
+   INTEGER :: idx
+!BEGIN
+!-------------------------------------------------------------------------------
+   DO idx=1,n
+     WRITE(ext, "(i2)") idx
+     ext = TRIM(ADJUSTL(ext))
+
+     res = TRIM(s1) // TRIM(ext) // TRIM(s2)
+     print *, "idx = ",idx, "res = '", TRIM(res), "'"
+     IF ( TRIM(res) .eq. TRIM(s3) ) THEN
+       indexed_field = idx
+       RETURN
+     ENDIF
+   ENDDO
+
+   indexed_field = -1
+END FUNCTION indexed_field
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

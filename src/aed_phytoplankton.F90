@@ -1281,7 +1281,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
 
      ! Update flux terms for other O2, CO2 and nutrient fluxes (mmolO2/m2/s)
      IF (data%do_DOuptake) THEN
-        IF(data%do_mpb/=2)_FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
+        IF(data%do_mpb/=2) &
+            _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
      ENDIF
      IF (data%do_Cuptake) THEN
         IF(data%do_mpb/=2)_FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
@@ -1301,7 +1302,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      ENDIF
      IF (data%do_Puptake) THEN
         ! increment flux from bottom cell nutrient (po4) amount (mmol P/m2/s)
-        IF(data%do_mpb/=2)_FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
+        IF(data%do_mpb/=2) &
+            _FLUX_VAR_(data%id_Pupttarget(1)) = _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
         ! log this uptake into the bulk community P uptake diagnostic (mmol P/m3/d)
         _DIAG_VAR_(data%id_PUP) = _DIAG_VAR_(data%id_PUP) - mpb_flux * (1./106.) * secs_per_day
      ENDIF
