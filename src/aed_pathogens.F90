@@ -367,11 +367,12 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
    INTEGER  :: i,tfil
    AED_REAL :: minPath
 
-   TYPE(pathogen_param_t) :: pd(MAX_PATHO_TYPES)
+   TYPE(pathogen_param_t),ALLOCATABLE :: pd(:)
    NAMELIST /pathogen_data/ pd    ! %% pathogen_param_t - see above
 !-------------------------------------------------------------------------------
 !BEGIN
     minPath = 1e-5
+    ALLOCATE(pd(MAX_PATHO_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
            status = load_csv(dbase, pd)
@@ -456,6 +457,7 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
           data%id_mortality(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
        ENDIF
    ENDDO
+   DEALLOCATE(pd)
 END SUBROUTINE aed_pathogens_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
