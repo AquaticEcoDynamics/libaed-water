@@ -201,10 +201,11 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
    INTEGER  :: i,j,tfil,sort_i(MAX_ZOOP_PREY)
    AED_REAL :: Pzoo_prey(MAX_ZOOP_PREY)
 
-   TYPE(zoop_param_t)  :: zoop_param(MAX_ZOOP_TYPES)
+   TYPE(zoop_param_t),ALLOCATABLE :: zoop_param(:)
    NAMELIST /zoop_params/ zoop_param         ! %% zoop_param_t - see aed_zoop_utils
 !-------------------------------------------------------------------------------
 !BEGIN
+    ALLOCATE(zoop_param(MAX_ZOOP_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
            status = load_csv(dbase, zoop_param)
@@ -270,6 +271,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
                               minimum=zoop_param(list(i))%min_zoo)
     ENDDO
 !
+    DEALLOCATE(zoop_param)
 END SUBROUTINE aed_zooplankton_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

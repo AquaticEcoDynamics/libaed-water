@@ -353,11 +353,12 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
 
    CHARACTER(4) :: pst_name
 
-   TYPE(pesticide_data_t) :: pd(MAX_PSTC_TYPES)
+   TYPE(pesticide_data_t),ALLOCATABLE :: pd(:)
    NAMELIST /pesticide_data/ pd   ! %% pesticide_param_t - see above
 !-------------------------------------------------------------------------------
 !BEGIN
     min_conc = 1e-8
+    ALLOCATE(pd(MAX_PSTC_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
            status = load_csv(dbase, pd)
@@ -446,6 +447,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
                 aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
        ENDIF
    ENDDO
+   DEALLOCATE(pd)
 END SUBROUTINE aed_pesticides_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
