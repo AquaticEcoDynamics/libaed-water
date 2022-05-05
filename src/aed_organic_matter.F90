@@ -99,11 +99,12 @@ MODULE aed_organic_matter
       INTEGER  :: id_l_resus,    id_denit,       id_anaerobic
       INTEGER  :: id_pom_vvel,   id_cpom_vvel
       INTEGER  :: id_bod,        id_cdom
-      INTEGER  :: id_photolysis
+      INTEGER  :: id_photolysis, id_floc
 
       !# Model options
       INTEGER  :: resuspension, settling
-      INTEGER  :: simDenitrification,simFeReduction,simSO4Reduction,simMethanogenesis,simSedimentOM
+      INTEGER  :: simDenitrification,simFeReduction,simSO4Reduction,simMethanogenesis
+      INTEGER  :: simFlocculation, simSedimentOM
       LOGICAL  :: simRPools,simPhotolysis
       LOGICAL  :: use_oxy,use_amm,use_frp,use_dic,use_nit,use_no2,use_n2o,use_fe3,use_ch4,use_so4
       LOGICAL  :: use_Fsed_link_don, use_Fsed_link_dop, use_Fsed_link_doc
@@ -121,6 +122,7 @@ MODULE aed_organic_matter
       AED_REAL :: w_pom, d_pom, rho_pom, w_cpom, d_cpom, rho_cpom
       AED_REAL :: sedimentOMfrac, Xsc, Xsn, Xsp
       AED_REAL :: Ksed_dom, theta_sed_dom, Fsed_doc, Fsed_don, Fsed_dop
+      AED_REAL :: Rdom_floc,Kdom_floc,dom_floc0,dom_flocS
 
      CONTAINS
          PROCEDURE :: define            => aed_define_organic_matter
@@ -270,6 +272,13 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    CHARACTER(len=64)         :: Fsed_pop_variable=''
    CHARACTER(len=64)         :: Fsed_dop_variable=''
 
+   !-- DOM flocculation
+   INTEGER                   :: simFlocculation  = 0
+   AED_REAL                  ::       Kdom_floc  = 1.0
+   AED_REAL                  ::       Rdom_floc  = zero_
+   AED_REAL                  ::       dom_floc0  = 1e3
+   AED_REAL                  ::       dom_flocS  = 1.0
+
    !-- From Module Globals
 !  LOGICAL  :: extra_diag = .FALSE.      !## Obsolete Use diag_level = 10
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
@@ -311,6 +320,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
                       Fsed_pon_variable, Fsed_don_variable,                    &
                       simDenitrification, simFeReduction,                      &
                       simSO4Reduction, simMethanogenesis, simSedimentOM,       &
+                      simFlocculation,Rdom_floc,Kdom_floc,dom_floc0,dom_flocS, &
                       extra_diag, diag_level
 
 !-------------------------------------------------------------------------------
@@ -390,6 +400,13 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%Fsed_dop            = Fsed_dop/secs_per_day
    data%Ksed_dom            = Ksed_dom
    data%theta_sed_dom       = theta_sed_dom
+   !-- DOM flocculation
+   data%simFlocculation     = simFlocculation
+   data%Rdom_floc           = Rdom_floc/secs_per_day
+   data%Kdom_floc           = Kdom_floc
+   data%dom_floc0           = dom_floc0
+   data%dom_flocS           = dom_flocS
+
 
    ! Register state variables
 
@@ -649,6 +666,10 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      IF (simRpools) data%id_cpom_vvel = aed_define_diag_variable('cpom_vvel','m/d','CPOM vertical velocity')
 
    ENDIF
+   IF(data%simFlocculation>0) THEN
+     data%id_floc = aed_define_diag_variable('doc_floc','mmol C/m3/d','DOC flocculation')
+   ENDIF
+
 
    ! Register environmental dependencies
    data%id_temp = aed_locate_global('temperature')
@@ -674,7 +695,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: poc,pon,pop
    AED_REAL :: doc,don,dop
    AED_REAL :: docr,donr,dopr,cpom,cdom
-   AED_REAL :: temp,dic,amm,oxy,nit,no2,n2o,frp,feiii,so4,ch4
+   AED_REAL :: temp,salt,dic,amm,oxy,nit,no2,n2o,frp,feiii,so4,ch4
    AED_REAL :: pom_hydrolysis, dom_mineralisation
    AED_REAL :: pon_hydrolysis, don_mineralisation
    AED_REAL :: pop_hydrolysis, dop_mineralisation
@@ -686,6 +707,8 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc, att
    AED_REAL :: doc_min_aerobic, doc_min_anaerobic
    AED_REAL :: fereduction = 0., so4reduction = 0., methanogenesis = 0., fso4, fnit, ffe
+   AED_REAL :: doc_floc = 0., don_floc = 0., dop_floc = 0.
+   AED_REAL :: dom, dom0, dom_nc, dom_pc
 
 !-----------------------------------------------------------------------
 !BEGIN
@@ -704,6 +727,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
 
    !# Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_temp)  ! temperature
+   salt = _STATE_VAR_(data%id_salt)  ! salinity
 
    !# Retrieve current (local) state variable values.
    poc = _STATE_VAR_(data%id_poc)    ! particulate organic carbon
@@ -810,6 +834,23 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
       ENDIF
    ENDIF
 
+   ! Compute flocculation (units = mmol/m3/s)
+   IF(data%simFlocculation>0) THEN
+     dom  = doc ; IF (data%simRPools) dom = docr
+     dom0 = data%dom_floc0
+     doc_floc = dom * R_floc(data%Rdom_floc,data%Kdom_floc,dom,dom0,salt,data%dom_flocS)
+
+     dom  = don ; IF (data%simRPools) dom = donr
+     dom_nc = (don/MAX(doc,1.)) ; IF (data%simRPools) dom_nc = (donr/MAX(docr,1.))
+     dom0 = data%dom_floc0 * dom_nc
+     don_floc = dom * R_floc(data%Rdom_floc,data%Kdom_floc*dom_nc,dom,dom0,salt,data%dom_flocS)
+
+     dom  = dop ; IF (data%simRPools) dom = dopr
+     dom_pc = (dop/MAX(doc,1.)) ; IF (data%simRPools) dom_pc = (dopr/MAX(docr,1.))
+     dom0 = data%dom_floc0 * dom_pc
+     dop_floc = dom * R_floc(data%Rdom_floc,data%Kdom_floc*dom_pc,dom,dom0,salt,data%dom_flocS)
+   ENDIF
+
 
    !---------------------------------------------------------------------------+
    !# Flux updates for the ODE
@@ -817,31 +858,36 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
 
    !---------------------------------------------------------------------------+
    ! Set temporal derivatives : POM breakdown
-   _FLUX_VAR_(data%id_poc)  = _FLUX_VAR_(data%id_poc) - poc_hydrolysis
-   _FLUX_VAR_(data%id_pon)  = _FLUX_VAR_(data%id_pon) - pon_hydrolysis
-   _FLUX_VAR_(data%id_pop)  = _FLUX_VAR_(data%id_pop) - pop_hydrolysis
+   _FLUX_VAR_(data%id_poc)  = _FLUX_VAR_(data%id_poc) - poc_hydrolysis + doc_floc
+   _FLUX_VAR_(data%id_pon)  = _FLUX_VAR_(data%id_pon) - pon_hydrolysis + don_floc
+   _FLUX_VAR_(data%id_pop)  = _FLUX_VAR_(data%id_pop) - pop_hydrolysis + dop_floc
 
    !---------------------------------------------------------------------------+
    ! Set temporal derivatives : DOM metabolism
    _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc) + poc_hydrolysis - doc_mineralisation
    _FLUX_VAR_(data%id_don)  = _FLUX_VAR_(data%id_don) + pon_hydrolysis - don_mineralisation
    _FLUX_VAR_(data%id_dop)  = _FLUX_VAR_(data%id_dop) + pop_hydrolysis - dop_mineralisation
+   IF (.NOT. data%simRPools) THEN
+     _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc) - doc_floc
+     _FLUX_VAR_(data%id_don)  = _FLUX_VAR_(data%id_don) - don_floc
+     _FLUX_VAR_(data%id_dop)  = _FLUX_VAR_(data%id_dop) - dop_floc
+   ENDIF
 
    !---------------------------------------------------------------------------+
    ! Set temporal derivatives : Refractory Pools
    IF (data%simRPools) THEN
       docr = MAX(1.e-3,docr)
-      _FLUX_VAR_(data%id_docr) = _FLUX_VAR_(data%id_docr) - docr_mineralisation - photolysis
+      _FLUX_VAR_(data%id_docr) = _FLUX_VAR_(data%id_docr) - docr_mineralisation - photolysis - doc_floc
       _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc)  +  &
                                     docr_mineralisation + photolysis*photo_fmin
       _FLUX_VAR_(data%id_donr) = _FLUX_VAR_(data%id_donr) -  &
-                                    donr_mineralisation - photolysis*(donr/docr)
+                                    donr_mineralisation - photolysis*(donr/MAX(docr,1.)) - don_floc
       _FLUX_VAR_(data%id_don)  = _FLUX_VAR_(data%id_don)  +  &
-                                    donr_mineralisation + photolysis*photo_fmin*(donr/docr)
+                                    donr_mineralisation + photolysis*photo_fmin*(donr/MAX(docr,1.))
       _FLUX_VAR_(data%id_dopr) = _FLUX_VAR_(data%id_dopr) -  &
-                                    dopr_mineralisation - photolysis*(dopr/docr)
+                                    dopr_mineralisation - photolysis*(dopr/MAX(docr,1.)) - dop_floc
       _FLUX_VAR_(data%id_dop)  = _FLUX_VAR_(data%id_dop)  +  &
-                                    dopr_mineralisation + photolysis*photo_fmin*(dopr/docr)
+                                    dopr_mineralisation + photolysis*photo_fmin*(dopr/MAX(docr,1.))
       _FLUX_VAR_(data%id_cpom) = _FLUX_VAR_(data%id_cpom) - cpom_breakdown
       _FLUX_VAR_(data%id_poc)  = _FLUX_VAR_(data%id_poc) + (cpom_breakdown)
       _FLUX_VAR_(data%id_pon)  = _FLUX_VAR_(data%id_pon) + (cpom_breakdown)*data%X_cpom_n
@@ -957,6 +1003,10 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
         cdoc = MIN(doc,1.e4)
      ENDIF
      _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(cdoc)*(12./1e3))
+   ENDIF
+
+   IF(data%simFlocculation>0) THEN
+     _DIAG_VAR_(data%id_floc) = doc_floc*secs_per_day
    ENDIF
 
    !-- Extra diagnostics
@@ -1456,6 +1506,31 @@ PURE AED_REAL FUNCTION R_dom(Rdom_minerl,Ko2_an,f_an,theta,oxy,temp)
    R_dom = Rdom_minerl * f_oxy * (theta**(temp-20.0))
 
 END FUNCTION R_dom
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION R_floc(Rdom_floc,Kdom,dom,dom0,salt,Ksal)
+!-------------------------------------------------------------------------------
+! Michaelis-Menten formulation for flocculation
+!
+! Here, a weird Michaelis-Menten formulation for flocculation
+! is formulated.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: Rdom_floc,Kdom,dom,dom0,salt,Ksal
+   AED_REAL :: f_dom, f_sal
+!
+!-----------------------------------------------------------------------
+!BEGIN
+   R_floc = zero_
+   IF(dom>dom0) THEN
+     f_dom = (dom-dom0)/(Kdom+(dom-dom0))
+     f_sal = MAX(0.1,salt/(Ksal+salt))
+     R_floc = Rdom_floc * f_dom * f_sal
+   ENDIF
+
+END FUNCTION R_floc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
