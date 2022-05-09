@@ -117,7 +117,7 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
    CHARACTER(len=32),POINTER,DIMENSION(:) :: csvnames
    CHARACTER(len=32) :: name
    TYPE(AED_SYMBOL),DIMENSION(:),ALLOCATABLE :: values
-   INTEGER :: idx_col = 0
+   INTEGER :: idx_col = 0, idx_pry = 0
    LOGICAL :: meh
    INTEGER :: ret = 0
 !
@@ -163,14 +163,19 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
             CASE ('Cmin_grz_zoo')      ; zoop_param(dcol)%Cmin_grz_zoo   = extract_double(values(ccol))
             CASE ('num_prey')          ; zoop_param(dcol)%num_prey       = extract_integer(values(ccol))
 
-            CASE ('prey(1)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(dcol)%prey(1)%zoop_prey)
-            CASE ('prey(1)%Pzoo_prey') ; zoop_param(dcol)%prey(1)%Pzoo_prey = extract_double(values(ccol))
-            CASE ('prey(2)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(dcol)%prey(3)%zoop_prey)
-            CASE ('prey(2)%Pzoo_prey') ; zoop_param(dcol)%prey(2)%Pzoo_prey = extract_double(values(ccol))
-            CASE ('prey(3)%zoop_prey') ; CALL copy_name(values(ccol), zoop_param(dcol)%prey(3)%zoop_prey)
-            CASE ('prey(3)%Pzoo_prey') ; zoop_param(dcol)%prey(3)%Pzoo_prey = extract_double(values(ccol))
+            CASE DEFAULT
+                 idx_pry = indexed_field('prey(', ')%zoop_prey', MAX_ZOOP_PREY, name)
+                 IF ( idx_pry > 0 ) THEN
+                       CALL copy_name(values(ccol), zoop_param(dcol)%prey(idx_pry)%zoop_prey)
+                 ELSE
+                    idx_pry = indexed_field('prey(', ')%Pzoo_prey', MAX_ZOOP_PREY, name)
+                    IF ( idx_pry > 0 ) THEN
+                       zoop_param(dcol)%prey(idx_pry)%Pzoo_prey = extract_double(values(ccol))
+                    ELSE
+                       print *, 'Unknown row "', TRIM(name), '"'
+                    ENDIF
+                 ENDIF
 
-            CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
          END SELECT
       ENDDO
    ENDDO
