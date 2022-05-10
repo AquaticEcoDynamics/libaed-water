@@ -112,6 +112,7 @@ OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_util.o \
      ${objdir}/aed_bio_utils.o \
      ${objdir}/aed_zoop_utils.o \
+     ${objdir}/aed_light.o \
      ${objdir}/aed_bio_particles.o \
      ${objdir}/aed_csv_reader.o \
      ${objdir}/aed_carbon.o \
