@@ -657,7 +657,7 @@ INTEGER FUNCTION indexed_field(s1, s2, n, s3)
      ext = TRIM(ADJUSTL(ext))
 
      res = TRIM(s1) // TRIM(ext) // TRIM(s2)
-     print *, "idx = ",idx, "res = '", TRIM(res), "'"
+!    print *, "idx = ",idx, "res = '", TRIM(res), "'"
      IF ( TRIM(res) .eq. TRIM(s3) ) THEN
        indexed_field = idx
        RETURN

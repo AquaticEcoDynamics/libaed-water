@@ -346,7 +346,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
    INTEGER,INTENT(in) :: list(*)
 !
 !LOCALS
-   INTEGER  :: status
+   INTEGER  :: status = 0
 
    INTEGER  :: i,tfil,ns
    AED_REAL :: min_conc

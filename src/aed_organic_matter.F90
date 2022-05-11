@@ -877,7 +877,8 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    ! Set temporal derivatives : Refractory Pools
    IF (data%simRPools) THEN
       docr = MAX(1.e-3,docr)
-      _FLUX_VAR_(data%id_docr) = _FLUX_VAR_(data%id_docr) - docr_mineralisation - photolysis - doc_floc
+      _FLUX_VAR_(data%id_docr) = _FLUX_VAR_(data%id_docr) - &
+                                    docr_mineralisation - photolysis - doc_floc
       _FLUX_VAR_(data%id_doc)  = _FLUX_VAR_(data%id_doc)  +  &
                                     docr_mineralisation + photolysis*photo_fmin
       _FLUX_VAR_(data%id_donr) = _FLUX_VAR_(data%id_donr) -  &
