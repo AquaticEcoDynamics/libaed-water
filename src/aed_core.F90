@@ -205,6 +205,7 @@ SUBROUTINE display_var(var, idx)
 !
 !LOCALS
    CHARACTER(80) :: line
+   CHARACTER(80) :: l2
    CLASS(aed_prefix_list_t),POINTER :: req => null()
 !
 !-------------------------------------------------------------------------------
@@ -219,48 +220,51 @@ SUBROUTINE display_var(var, idx)
 
 !  line = line(1:4) // "  " // TRIM(var%name) // '                    '
    line = TRIM(var%name) // '                    '
+   l2 = line(1:20)
    IF ( var%found .AND. ASSOCIATED(var%model) ) THEN
-      line = line(1:20) // ' ' // var%model%aed_model_name
+      line = l2(1:20) // ' ' // var%model%aed_model_name
    ELSE
-      line = line(1:20) // ' ???'
+      line = l2(1:20) // ' ???'
 !     print log,'Requested variable ', TRIM(var%name), ' not defined.'
    ENDIF
    line = TRIM(line) // '             '
 
+   l2 = line(1:40)
    IF ( var%sheet ) THEN
       !# IF ( ASSOCIATED(var%model) .and. var%model%aed_model_zone_avg ) THEN 
       !# The above will segfault if var%model is null - like pascal, it seems fortran
       !# also evaluates both conditions regardless
       IF ( ASSOCIATED(var%model) ) THEN
          IF ( var%model%aed_model_zone_avg ) THEN
-            line = line(1:40) // ' SZ '
+            line = l2(1:40) // ' SZ'
          ELSE
-            line = line(1:40) // ' 2D '
+            line = l2(1:40) // ' 2D'
          ENDIF
       ELSE
-         line = line(1:40) // ' 2D '
+         line = l2(1:40) // ' 2D'
       ENDIF
    ELSE
-      line = line(1:40) // ' 3D '
+      line = l2(1:40) // ' 3D'
    ENDIF
 
    req => var%req
 
    IF ( var%extern ) THEN
-      line = TRIM(line) // '  ---'
+      line = TRIM(line) // '   ---'
    ELSE IF ( ASSOCIATED(req) ) THEN
-      line = TRIM(line) // '  ' // req%aed_model_prefix
+      line = TRIM(line) // '   ' // req%aed_model_prefix
       req => req%next
    ENDIF
    IF ( ASSOCIATED(req) ) THEN
-      line = TRIM(line) // "  " // req%aed_model_prefix
+      line = TRIM(line) // "   " // req%aed_model_prefix
 
       DO WHILE ( ASSOCIATED(req%next) )
          req => req%next
          IF (LEN_TRIM(line) >= 75 .AND. ASSOCIATED(req%next)) THEN
              write(log, *) TRIM(line),","
              line(1:51)=' '
-             line = line(1:51) // req%aed_model_prefix
+             l2 = line(1:51)
+             line = l2(1:51) // req%aed_model_prefix
          ELSE
              line = TRIM(line) // ", " // req%aed_model_prefix
          ENDIF

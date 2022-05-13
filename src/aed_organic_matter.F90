@@ -1334,7 +1334,8 @@ SUBROUTINE aed_mobility_organic_matter(data,column,layer_idx,mobility)
       _DIAG_VAR_(data%id_Psed_poc) = (vvel/dz)*_STATE_VAR_(data%id_poc)*secs_per_day
       _DIAG_VAR_(data%id_Psed_pon) = (vvel/dz)*_STATE_VAR_(data%id_pon)*secs_per_day
       _DIAG_VAR_(data%id_Psed_pop) = (vvel/dz)*_STATE_VAR_(data%id_pop)*secs_per_day
-      IF(data%simRPools) _DIAG_VAR_(data%id_Psed_cpom) = (vvel_cpom/dz)*_STATE_VAR_(data%id_cpom)*secs_per_day
+      IF(data%simRPools) _DIAG_VAR_(data%id_Psed_cpom) = &
+                               (vvel_cpom/dz)*_STATE_VAR_(data%id_cpom)*secs_per_day
 
 END SUBROUTINE aed_mobility_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

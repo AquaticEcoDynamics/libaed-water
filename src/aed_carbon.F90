@@ -705,7 +705,8 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    ! Set bottom fluxes for the pelagic (flux per surface area, per second)
    ! Increment sediment flux value into derivative of water column variable
    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
-   IF( data%simCH4 .and. diag_level>0) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
+   IF( data%simCH4 .and. diag_level>0) &
+                               _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
    ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day)
    IF ( diag_level > 0 ) THEN
