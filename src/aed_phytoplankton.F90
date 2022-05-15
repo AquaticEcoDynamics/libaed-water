@@ -128,13 +128,14 @@ CONTAINS
 
 
 !###############################################################################
-INTEGER FUNCTION load_csv(dbase,pd)
+INTEGER FUNCTION load_csv(dbase, pd, dbsize)
 !-------------------------------------------------------------------------------
    USE aed_csv_reader
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
    TYPE(phyto_param_t) :: pd(MAX_PHYTO_TYPES)
+   INTEGER,INTENT(out) :: dbsize
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol, dcol
@@ -147,6 +148,7 @@ INTEGER FUNCTION load_csv(dbase,pd)
 !
 !BEGIN
 !-------------------------------------------------------------------------------
+   dbsize = 0
    unit = aed_csv_read_header(dbase, csvnames, nccols)
    IF (unit <= 0) THEN
       load_csv = -1
@@ -234,6 +236,7 @@ INTEGER FUNCTION load_csv(dbase,pd)
    IF (ASSOCIATED(csvnames)) DEALLOCATE(csvnames)
    IF (ALLOCATED(values))    DEALLOCATE(values)
 
+   dbsize = nccols-1
    load_csv = ret
 END FUNCTION load_csv
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -245,14 +248,14 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
 !ARGUMENTS
    CLASS (aed_phytoplankton_data_t),INTENT(inout) :: data
    CHARACTER(len=*),INTENT(in) :: dbase
-   INTEGER,INTENT(in)          :: count
+   INTEGER,INTENT(inout)       :: count
    INTEGER,INTENT(in)          :: list(*)
    INTEGER,INTENT(in)          :: settling(*)
    AED_REAL,INTENT(in)         :: resuspension(*)
 !
 !LOCALS
    INTEGER  :: status
-   INTEGER  :: i,tfil
+   INTEGER  :: i,tfil, dbsize = 0
    AED_REAL :: minNut
 
    TYPE(phyto_param_t),ALLOCATABLE :: pd(:)
@@ -262,20 +265,25 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
     ALLOCATE(pd(MAX_PHYTO_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
-           status = load_csv(dbase, pd)
+           status = load_csv(dbase, pd, dbsize)
        CASE (NML_TYPE)
            print*,"nml format parameter file is deprecated. Please update to CSV format"
+           pd%p_name = ''
            tfil = find_free_lun()
            open(tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Cannot open phyto_data namelist file'
            read(tfil,nml=phyto_data,iostat=status)
            close(tfil)
+           DO i=1,MAX_PHYTO_TYPES
+              IF (pd(i)%p_name == '') EXIT
+              dbsize = dbsize + 1
+           ENDDO
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
     IF (status /= 0) STOP 'Error reading namelist phyto_data'
 
-    data%num_phytos = count
+    data%num_phytos = 0
     ALLOCATE(data%phytos(count))
     ALLOCATE(data%id_p(count)) ; data%id_p(:) = 0
     ALLOCATE(data%id_in(count)) ; data%id_in(:) = 0
@@ -308,6 +316,8 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
     ENDIF
 
     DO i=1,count
+       IF ( list(i) < 1 .OR. list(i) > dbsize ) EXIT  !# bad index, exit the loop
+       data%num_phytos = data%num_phytos + 1
        ! Assign parameters from database to chosen simulated groups
        ! Note:  all rates are provided in values per day,
        !        and are converted in here to values per second.

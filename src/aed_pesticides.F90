@@ -148,7 +148,6 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 !ARGUMENTS
    INTEGER,INTENT(in) :: namlst
    CLASS (aed_pesticides_data_t),INTENT(inout) :: data
-
 !
 !LOCALS
    INTEGER  :: status
@@ -265,13 +264,14 @@ END SUBROUTINE aed_define_pesticides
 
 
 !###############################################################################
-INTEGER FUNCTION load_csv(dbase, pd)
+INTEGER FUNCTION load_csv(dbase, pd, dbsize)
 !-------------------------------------------------------------------------------
    USE aed_csv_reader
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
    TYPE(pesticide_data_t) :: pd(MAX_PSTC_TYPES)
+   INTEGER,INTENT(out) :: dbsize
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol, dcol
@@ -284,6 +284,7 @@ INTEGER FUNCTION load_csv(dbase, pd)
 !
 !BEGIN
 !-------------------------------------------------------------------------------
+   dbsize = 0
    unit = aed_csv_read_header(dbase, csvnames, nccols)
    IF (unit <= 0) THEN
       load_csv = -1
@@ -331,6 +332,7 @@ INTEGER FUNCTION load_csv(dbase, pd)
    IF (ASSOCIATED(csvnames)) DEALLOCATE(csvnames)
    IF (ALLOCATED(values))    DEALLOCATE(values)
 
+   dbsize = nccols-1
    load_csv = ret
 END FUNCTION load_csv
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -342,13 +344,13 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
 !ARGUMENTS
    CLASS (aed_pesticides_data_t),INTENT(inout) :: data
    CHARACTER(len=*),INTENT(in) :: dbase
-   INTEGER,INTENT(in) :: count
+   INTEGER,INTENT(inout) :: count
    INTEGER,INTENT(in) :: list(*)
 !
 !LOCALS
    INTEGER  :: status = 0
 
-   INTEGER  :: i,tfil,ns
+   INTEGER  :: i,tfil,ns, dbsize = 0
    AED_REAL :: min_conc
 
    CHARACTER(4) :: pst_name
@@ -361,20 +363,26 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
     ALLOCATE(pd(MAX_PSTC_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
-           status = load_csv(dbase, pd)
+           status = load_csv(dbase, pd, dbsize)
        CASE (NML_TYPE)
            print *,'NML file type for pesticides is not supported, please convert to CSV'
+!          pesticide_data%name = ''
 !          tfil = find_free_lun()
 !          open(tfil,file=dbase, status='OLD',iostat=status)
 !          IF (status /= 0) STOP 'Error opening namelist pesticide_data'
 !          read(tfil,nml=pesticide_data,iostat=status)
 !          close(tfil)
+!          dbsize = 0
+!          DO i=1,MAX_PSTC_TYPES
+!             IF (pesticide_data(i)%name == '') EXIT
+!             dbsize = dbsize + 1
+!          ENDDO
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
     IF (status /= 0) STOP 'Error reading namelist pesticide_data'
 
-    data%num_pesticides = count
+    data%num_pesticides = 0
     ALLOCATE(data%pesticides(count))
     ALLOCATE(data%id_pstd(count))
     ALLOCATE(data%id_psta(count,10)) !need to get max num_sorb from pd
@@ -395,6 +403,9 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
     ENDIF
 
     DO i=1,count
+       IF ( list(i) < 1 .OR. list(i) > dbsize ) EXIT  !# bad index, exit the loop
+       data%num_pesticides = data%num_pesticides + 1
+
        ! Assign parameters from database to simulated groups
        data%pesticides(i) = pd(list(i))
 

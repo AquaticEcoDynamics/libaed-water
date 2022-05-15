@@ -104,13 +104,14 @@ CONTAINS
 
 
 !###############################################################################
-INTEGER FUNCTION load_csv(dbase, zoop_param)
+INTEGER FUNCTION load_csv(dbase, zoop_param, dbsize)
 !-------------------------------------------------------------------------------
    USE aed_csv_reader
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(len=*),INTENT(in) :: dbase
    TYPE(zoop_param_t),INTENT(out) :: zoop_param(MAX_ZOOP_TYPES)
+   INTEGER,INTENT(out) :: dbsize
 !
 !LOCALS
    INTEGER :: unit, nccols, ccol, dcol
@@ -123,6 +124,7 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
 !
 !BEGIN
 !-------------------------------------------------------------------------------
+   dbsize = 0
    unit = aed_csv_read_header(dbase, csvnames, nccols)
    IF (unit <= 0) THEN
       load_csv = -1
@@ -186,6 +188,7 @@ INTEGER FUNCTION load_csv(dbase, zoop_param)
    IF (ASSOCIATED(csvnames)) DEALLOCATE(csvnames)
    IF (ALLOCATED(values))    DEALLOCATE(values)
 
+   dbsize = nccols-1
    load_csv = ret
 END FUNCTION load_csv
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -197,11 +200,11 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
 !ARGUMENTS
    CLASS (aed_zooplankton_data_t),INTENT(inout) :: data
    CHARACTER(len=*),INTENT(in) :: dbase
-   INTEGER,INTENT(in)          :: count !Number of zooplankton groups
+   INTEGER,INTENT(inout)       :: count !Number of zooplankton groups
    INTEGER,INTENT(in)          :: list(*) !List of zooplankton groups to simulate
 !
 !LOCALS
-   INTEGER  :: status
+   INTEGER  :: status, dbsize
 
    INTEGER  :: i,j,tfil,sort_i(MAX_ZOOP_PREY)
    AED_REAL :: Pzoo_prey(MAX_ZOOP_PREY)
@@ -213,7 +216,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
     ALLOCATE(zoop_param(MAX_ZOOP_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
-           status = load_csv(dbase, zoop_param)
+           status = load_csv(dbase, zoop_param, dbsize)
        CASE (NML_TYPE)
            print*,"nml format parameter file is deprecated. Please update to CSV format"
            tfil = find_free_lun()
@@ -221,14 +224,21 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
            IF (status /= 0) STOP 'Error opening zoop_params namelist file'
            read(tfil,nml=zoop_params,iostat=status)
            close(tfil)
+           dbsize = 0
+           DO i=1,MAX_ZOOP_TYPES
+              IF (zoop_param(i)%zoop_name == '') EXIT
+              dbsize = dbsize + 1
+           ENDDO
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
     IF (status /= 0) STOP 'Error reading namelist zoop_params'
 
-    data%num_zoops = count
+    data%num_zoops = 0
     allocate(data%zoops(count))
     DO i=1,count
+       IF ( list(i) < 1 .OR. list(i) > dbsize ) EXIT  !# bad index, exit the loop
+       data%num_zoops = data%num_zoops + 1
        ! Assign parameters from database to simulated groups
        data%zoops(i)%zoop_name         = zoop_param(list(i))%zoop_name
        data%zoops(i)%zoop_initial      = zoop_param(list(i))%zoop_initial
