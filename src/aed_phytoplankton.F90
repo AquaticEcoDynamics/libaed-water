@@ -1285,38 +1285,37 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      mpb_flux = (mpb_prod-mpb_resp)*mpb
 
      ! Update the MPB biomass, include net production and add sedimented phytos (mmolC/m2/s)
-     IF(data%do_mpb/=2) _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) + mpb_flux + (-Psed_phy/secs_per_day)
+     IF(data%do_mpb/=2) _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) &
+                                          + mpb_flux + (-Psed_phy/secs_per_day)
 
      ! log this uptake into the bulk community GPP/NCP diagnostics (mmolC/m3/d)
      _DIAG_VAR_(data%id_GPP) =  _DIAG_VAR_(data%id_GPP) + (mpb_prod/dz) * mpb * secs_per_day
      _DIAG_VAR_(data%id_NCP) =  _DIAG_VAR_(data%id_NCP) + (mpb_flux/dz) * secs_per_day
 
      ! Update flux terms for other O2, CO2 and nutrient fluxes (mmolO2/m2/s)
-     IF (data%do_DOuptake) THEN
-        IF(data%do_mpb/=2) &
-            _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
+     IF (data%do_DOuptake .and. data%do_mpb/=2) THEN
+       _FLUX_VAR_(data%id_DOupttarget) = _FLUX_VAR_(data%id_DOupttarget) + mpb_flux
      ENDIF
-     IF (data%do_Cuptake) THEN
-        IF(data%do_mpb/=2)_FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
+     IF (data%do_Cuptake .and. data%do_mpb/=2) THEN
+        _FLUX_VAR_(data%id_Cupttarget) = _FLUX_VAR_(data%id_Cupttarget) - mpb_flux
         ! log this uptake into the bulk community C uptake diagnostic
         _DIAG_VAR_(data%id_CUP) = _DIAG_VAR_(data%id_CUP) - (mpb_flux/dz) * secs_per_day
      ENDIF
      ! A quick and dirty nutrient uptake by MPB; needs cleaning to account for limitation and excretion of DOM
-     IF (data%do_Nuptake) THEN
+     IF (data%do_Nuptake .and. data%do_mpb/=2) THEN
         ! increment flux from bottom cell nutrient amount (mmol N/m2/s)
-        IF(data%do_mpb/=2)_FLUX_VAR_(data%id_Nupttarget(1)) = &
-                           _FLUX_VAR_(data%id_Nupttarget(1)) - mpb_flux * (16./106.) *0.5
-        IF(data%do_mpb/=2)_FLUX_VAR_(data%id_Nupttarget(2)) = &
-                           _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
+        _FLUX_VAR_(data%id_Nupttarget(1)) = &
+                 _FLUX_VAR_(data%id_Nupttarget(1)) - mpb_flux * (16./106.) *0.5
+        _FLUX_VAR_(data%id_Nupttarget(2)) = &
+                 _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * (16./106.) *0.5
         ! log this uptake into the bulk community N uptake diagnostic (mmol N/m3/d)
         _DIAG_VAR_(data%id_NUP1)= _DIAG_VAR_(data%id_NUP1)- (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
         _DIAG_VAR_(data%id_NUP2)= _DIAG_VAR_(data%id_NUP2)- (mpb_flux/dz) * (16./106.) *0.5 * secs_per_day
      ENDIF
-     IF (data%do_Puptake) THEN
+     IF (data%do_Puptake .and. data%do_mpb/=2) THEN
         ! increment flux from bottom cell nutrient (po4) amount (mmol P/m2/s)
-        IF(data%do_mpb/=2) &
-            _FLUX_VAR_(data%id_Pupttarget(1)) = &
-                          _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
+        _FLUX_VAR_(data%id_Pupttarget(1)) = &
+                      _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * (1./106.)
         ! log this uptake into the bulk community P uptake diagnostic (mmol P/m3/d)
         _DIAG_VAR_(data%id_PUP) = _DIAG_VAR_(data%id_PUP) - mpb_flux * (1./106.) * secs_per_day
      ENDIF
@@ -1329,8 +1328,11 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
          phy_sed_frac = SUM(data%resuspension(1:data%num_phytos))
          Fsed_phy = _DIAG_VAR_S_(data%id_l_resus) * phy_sed_frac
 
-         IF(data%do_mpb/=2)_FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy
+         ! update the benthic pool of MPB, assuming SDG is not doing this
+         IF(data%do_mpb/=2)&
+          _FLUX_VAR_B_(data%id_mpb) = _FLUX_VAR_B_(data%id_mpb) - Fsed_phy
 
+         ! add back into the water pool, split among groups
          IF( phy_sed_frac > zero_ ) THEN
           DO phy_i=1,data%num_phytos
            ! spread the resuspended phytoplantkon mass between the groups based
@@ -1359,7 +1361,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      ENDIF
 
      ! Update the diagnostic variables (mmol C/m2/d)
-     IF(data%do_mpb/=2) _DIAG_VAR_S_(data%id_d_mpb) = mpb
+     IF(data%do_mpb/=2) _DIAG_VAR_S_(data%id_d_mpb) = mpb  
      _DIAG_VAR_S_(data%id_d_bpp) =      (mpb_prod) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_bcp) =      (mpb_resp) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_mpbv)=  Psed_phy + (Fsed_phy * secs_per_day)
