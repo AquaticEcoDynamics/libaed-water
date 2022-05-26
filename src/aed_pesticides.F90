@@ -174,7 +174,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
    CHARACTER(len=128) :: dbase='aed_pesticide_pars.csv'
 
 ! From Module Globals
-   LOGICAL  :: extra_diag = .FALSE.      !## Obsolete Use diag_level = 10
+   LOGICAL  :: extra_diag = .FALSE.           !## Obsolete Use diag_level = 10
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
@@ -635,7 +635,7 @@ SUBROUTINE aed_calculate_pesticides(data,column,layer_idx)
 
       DO sorp_i=1,data%pesticides(pst_i)%num_sorb
         pest_a = _STATE_VAR_(data%id_psta(pst_i,sorp_i))
-        _FLUX_VAR_(data%id_psta(pst_i,sorp_i)) = _FLUX_VAR_(data%id_psta(pst_i,sorp_i))        &
+        _FLUX_VAR_(data%id_psta(pst_i,sorp_i)) = _FLUX_VAR_(data%id_psta(pst_i,sorp_i)) &
                                       -  (hydrolysis + photolysis/2.)*pest_a
         _DIAG_VAR_(data%id_total(pst_i)) = _DIAG_VAR_(data%id_total(pst_i)) + pest_a
       ENDDO
