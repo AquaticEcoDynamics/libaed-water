@@ -84,6 +84,8 @@ MODULE aed_bio_utils
       AED_REAL :: w_p, d_phy, rho_phy, f1, f2, c1, c3
       ! Resuspension parameters
       AED_REAL  :: resuspension, tau_0
+      ! Growth form (benthic, water, surface)
+      INTEGER  :: growth_form, slough_model
    END TYPE phyto_data_t
 
 

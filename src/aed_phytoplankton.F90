@@ -1278,10 +1278,19 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      ! Get sedimentation flux (mmmol/m2/d) loss into the benthos (diagnostic was set in mobility)
      Psed_phy = _DIAG_VAR_(data%id_Psed_phy)
 
-     ! Compute photosynthesis and respiration
-     fI = photosynthesis_irradiance(3,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
-     mpb_prod = data%R_mpbg*fI*(data%theta_mpb_growth**(temp-20.))*(1.-(MIN(mpb,data%mpb_max)/data%mpb_max))
-     mpb_resp = (data%R_mpbr*(data%theta_mpb_resp**(temp-20.)))           !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
+
+     ! Compute photosynthesis and respiration, in active zones
+     IF ( data%n_zones > 0 ) THEN
+       IF( in_zone_set(matz,data%active_zones) ) THEN
+         fI = photosynthesis_irradiance(3,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
+         mpb_prod = data%R_mpbg*fI*(data%theta_mpb_growth**(temp-20.))*(1.-(MIN(mpb,data%mpb_max)/data%mpb_max))
+         mpb_resp = (data%R_mpbr*(data%theta_mpb_resp**(temp-20.)))           !*(( (mpb-mpb_min)/(data%mpb_max-mpb_min) )
+       ELSE
+         fI = zero_
+         mpb_prod = zero_
+         mpb_resp = zero_
+       ENDIF
+     ENDIF
      mpb_flux = (mpb_prod-mpb_resp)*mpb
 
      ! Update the MPB biomass, include net production and add sedimented phytos (mmolC/m2/s)
@@ -1361,7 +1370,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      ENDIF
 
      ! Update the diagnostic variables (mmol C/m2/d)
-     IF(data%do_mpb/=2) _DIAG_VAR_S_(data%id_d_mpb) = mpb  
+     IF(data%do_mpb/=2) _DIAG_VAR_S_(data%id_d_mpb) = mpb
      _DIAG_VAR_S_(data%id_d_bpp) =      (mpb_prod) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_bcp) =      (mpb_resp) * mpb * secs_per_day
      _DIAG_VAR_S_(data%id_d_mpbv)=  Psed_phy + (Fsed_phy * secs_per_day)
