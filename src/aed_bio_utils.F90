@@ -676,7 +676,23 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
 
          fI = ( EXP(1-par_b/I_S) - &
                 EXP(1-par_t/I_S)   ) / (extc * dz)
-   END SELECT
+
+      CASE ( 10 )
+         ! Light limitation without photoinhibition.
+         ! This is the Webb et al. (1974) model.
+
+         x = par_b/I_K          ! Uses BOTTOM light
+         fI = one_ - EXP(-x)
+
+      CASE ( 11 )
+        ! Light limitation without photoinhibition.
+        ! This is the Webb et al. (1974) model.
+
+        x = par_t/I_K           ! Uses SURFACE light
+        fI = one_ - EXP(-x)
+
+
+  END SELECT
 
    IF ( fI < zero_ ) fI = zero_
 END FUNCTION photosynthesis_irradiance
