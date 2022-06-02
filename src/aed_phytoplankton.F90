@@ -1279,6 +1279,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      Psed_phy = _DIAG_VAR_(data%id_Psed_phy)
 
 
+     mpb_prod = zero_
+     mpb_resp = zero_
      ! Compute photosynthesis and respiration, in active zones
      IF ( data%n_zones > 0 ) THEN
        IF( in_zone_set(matz,data%active_zones) ) THEN
