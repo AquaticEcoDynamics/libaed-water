@@ -1327,6 +1327,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      _DIAG_VAR_S_(data%id_xpc_avg) = _DIAG_VAR_S_(data%id_xpc_avg) &
                              * (1-(DTday/DepoAvgTime)) + ratio*(DTday/DepoAvgTime)
 
+     mpb_prod = zero_
+     mpb_resp = zero_
      ! Compute photosynthesis and respiration, in active zones
      IF ( data%n_zones > 0 ) THEN
        IF( in_zone_set(matz,data%active_zones) ) THEN
