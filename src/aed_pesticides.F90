@@ -67,7 +67,7 @@ MODULE aed_pesticides
       AED_REAL          :: K_gpp
       AED_REAL          :: Fsed_pst
       AED_REAL          :: coef_light_kb_vis, coef_light_kb_uva, coef_light_kb_uvb  !-- Light inactivation
-      AED_REAL          :: porosity, Kpst_sorb_sed
+      AED_REAL          :: porosity, Kpst_sorb_sed, Kdsf
       AED_REAL          :: pst_initial, pst_initial_sed
       INTEGER           :: sorption_model
       INTEGER           :: num_sorb
@@ -316,6 +316,7 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('pst_initial')       ; pd(dcol)%pst_initial       = extract_double(values(ccol))
             CASE ('pst_initial_sed')   ; pd(dcol)%pst_initial_sed   = extract_double(values(ccol))
             CASE ('Kpst_sorb_sed')     ; pd(dcol)%Kpst_sorb_sed     = extract_double(values(ccol))
+            CASE ('Kdsf')              ; pd(dcol)%Kdsf     = extract_double(values(ccol))
 
             CASE ('coef_light_kb_vis') ; pd(dcol)%coef_light_kb_vis = extract_double(values(ccol))
             CASE ('coef_light_kb_uva') ; pd(dcol)%coef_light_kb_uva = extract_double(values(ccol))
@@ -787,7 +788,8 @@ SUBROUTINE aed_calculate_benthic_pesticides(data,column,layer_idx)
          hydrolysis = data%pesticides(pst_i)%Rhydrol * (data%pesticides(pst_i)%theta_hydrol**(temp-20.0))
 
          ! Dissolved pesticide flux to / from the sediment
-         diss_flux = data%pesticides(pst_i)%Fsed_pst
+         diss_flux = data%pesticides(pst_i)%Fsed_pst &
+                     * ( PSTdis / (MAX(data%pesticides(pst_i)%Kdsf,1e-3) + PSTdis) )
 
          ! Update pools
          _FLUX_VAR_B_(data%id_pstw(pst_i)) = _FLUX_VAR_B_(data%id_pstw(pst_i)) - diss_flux - hydrolysis*pest_sed_w
