@@ -575,37 +575,36 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
 ! overview presented in Table 1 of:
 !
 ! Baklouti, M., Diaz, F., Pinazo, C., Faure, V., Quéguiner, B., 2006.
-!  Investigation of mechanistic formulations depicting phytoplankton dynamics for
-!    models of marine pelagic ecosystems and description of a new model.
+!  Investigation of mechanistic formulations depicting phytoplankton dynamics
+!    for models of marine pelagic ecosystems and description of a new model.
 !  Progress in Oceanography 71 (1), 1-33.
 !
 !
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   INTEGER,INTENT(in)                          :: lightModel
-   AED_REAL,INTENT(in)                         :: I_K
-   AED_REAL,INTENT(in)                         :: I_S
-   AED_REAL,INTENT(in)                         :: par
-   AED_REAL,INTENT(in)                         :: extc
-   AED_REAL,INTENT(in)                         :: Io
-   AED_REAL,INTENT(in)                         :: dz
+   INTEGER, INTENT(in) :: lightModel
+   AED_REAL,INTENT(in) :: I_K
+   AED_REAL,INTENT(in) :: I_S
+   AED_REAL,INTENT(in) :: par
+   AED_REAL,INTENT(in) :: extc
+   AED_REAL,INTENT(in) :: Io
+   AED_REAL,INTENT(in) :: dz
+   AED_REAL            :: fI !-- Returns the light limitation
 !
 !CONSTANTS
-   AED_REAL,PARAMETER :: one_e_neg3 = 1e-3
+   AED_REAL,PARAMETER  :: one_e_neg3 = 1e-3
 !
 !LOCALS
-   AED_REAL :: fI !-- Returns the light limitation
-   AED_REAL :: par_t,par_b,par_c
-   AED_REAL :: z1,z2
-   AED_REAL :: x
-   AED_REAL, PARAMETER :: A = 5.0, eps = 0.5
+   AED_REAL,PARAMETER  :: A = 5.0, eps = 0.5
+   AED_REAL            :: par_t,par_b,par_c
+   AED_REAL            :: z1,z2,x
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    fI    = 0.0
    IF (Io == zero_) RETURN
 
-   ! MH fix this
+   ! Light at different points within the layer (MH: to be replaced by function)
    par_t = par
    par_b = par_t * EXP( -extc * dz )
    par_c = par_t * EXP( -extc * dz/2. )
@@ -613,8 +612,8 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
    SELECT CASE (lightModel)
       CASE ( 0 )
          ! Light limitation without photoinhibition.
-         ! This is the Webb et al (1974) model solved using the numerical
-         ! integration approach as in CAEDYM (Hipsey and Hamilton, 2008)
+         !   This is the Webb et al (1974) model solved using the numerical
+         !   integration approach as in CAEDYM (Hipsey and Hamilton, 2008)
 
          z1 = -par_t / I_K
          z2 = -par_b / I_K
@@ -624,8 +623,7 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
 
          fI = 1.0 + (z2 - z1) / MAX(extc * dz,one_e_neg3)
 
-         ! A simple check
-         IF (par_t < 5e-5 .OR. fI < 5e-5) fI = 0.0
+         IF (par_t < 5e-5 .OR. fI < 5e-5) fI = 0.0        ! A simple check
 
       CASE ( 1 )
          ! Light limitation without photoinhibition.

@@ -67,6 +67,8 @@ MODULE aed_pesticides
       AED_REAL          :: K_gpp
       AED_REAL          :: Fsed_pst
       AED_REAL          :: coef_light_kb_vis, coef_light_kb_uva, coef_light_kb_uvb  !-- Light inactivation
+      AED_REAL          :: porosity, Kpst_sorb_sed
+      AED_REAL          :: pst_initial, pst_initial_sed
       INTEGER           :: sorption_model
       INTEGER           :: num_sorb
       TYPE(pest_sorb_t) :: sorbents(MAX_PSTC_SORB)
@@ -76,7 +78,6 @@ MODULE aed_pesticides
       INTEGER  :: id_sorbv(MAX_PSTC_SORB)
    END TYPE
    !  %% END NAMELIST   %%  pesticide_param_t
-
 
    TYPE,extends(aed_model_data_t) :: aed_pesticides_data_t
       !# Variable identifiers
@@ -88,7 +89,7 @@ MODULE aed_pesticides
       ! Diagnostic IDs for processes
       INTEGER,ALLOCATABLE :: id_atmvolat(:), id_sedflux(:), id_sorption(:),    &
                              id_photolysis(:), id_hydrolysis(:), id_uptake(:), &
-                             id_settling(:), id_resus(:), id_total(:)
+                             id_settling(:), id_resus(:), id_total(:), id_tot_s(:)
 
       INTEGER  :: id_oxy, id_pH,  id_doc, id_tss           ! Dependency ID
       INTEGER  :: id_tem, id_sal, id_gpp                   ! Environmental IDs (3D)
@@ -187,7 +188,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 
    NAMELIST /aed_pesticides/ num_pesticides, the_pesticides,       &
                              oxy_variable,                         &
-                             simSediment,                          &
+                             simSediment, initSedimentConc,        &
                              simResuspension, resuspension,        &
                              simVolatilisation, pst_piston_model,  &
                              simSorption,                          &
@@ -224,6 +225,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 
    ! Set module values to user provided numbers in the namelist
    data%resuspension = resuspension
+   data%initSedimentConc = initSedimentConc
 
    ! Store pesticide specific parameter values in module data type
    !   NB: all rates must be provided in values per day,
@@ -309,6 +311,12 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('theta_hydrol')      ; pd(dcol)%theta_hydrol      = extract_double(values(ccol))
             CASE ('K_gpp')             ; pd(dcol)%K_gpp             = extract_double(values(ccol))
             CASE ('Fsed_pst')          ; pd(dcol)%Fsed_pst          = extract_double(values(ccol))
+
+            CASE ('porosity')          ; pd(dcol)%porosity          = extract_double(values(ccol))
+            CASE ('pst_initial')       ; pd(dcol)%pst_initial       = extract_double(values(ccol))
+            CASE ('pst_initial_sed')   ; pd(dcol)%pst_initial_sed   = extract_double(values(ccol))
+            CASE ('Kpst_sorb_sed')     ; pd(dcol)%Kpst_sorb_sed     = extract_double(values(ccol))
+
             CASE ('coef_light_kb_vis') ; pd(dcol)%coef_light_kb_vis = extract_double(values(ccol))
             CASE ('coef_light_kb_uva') ; pd(dcol)%coef_light_kb_uva = extract_double(values(ccol))
             CASE ('coef_light_kb_uvb') ; pd(dcol)%coef_light_kb_uvb = extract_double(values(ccol))
@@ -391,6 +399,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
     ALLOCATE(data%id_psta(count,10)) !need to get max num_sorb from pd
     IF (data%simSediment) THEN
        ALLOCATE(data%id_psts(count))
+       ALLOCATE(data%id_pstw(count))
     ENDIF
 
     IF ( diag_level >= 2 ) THEN
@@ -403,6 +412,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        ALLOCATE(data%id_hydrolysis(count))
        ALLOCATE(data%id_uptake(count))
        ALLOCATE(data%id_total(count))
+       ALLOCATE(data%id_tot_s(count))
     ENDIF
 
     DO i=1,count
@@ -440,8 +450,8 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        ENDIF
 
        IF (data%simSediment) THEN
-          data%id_psts(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_sed', 'mmol/m2', 'pesticides in sediment')
-          data%id_pstw(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_pw', 'mmol/m2', 'pesticides in sediment')
+          data%id_psts(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_sed', 'mmol/m2', 'sorbed pesticides in sediment')
+          data%id_pstw(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_pw', 'mmol/m2', 'porewater pesticides in sediment')
           PRINT *,'WARNING: simSediment is not complete'
        ENDIF
 
@@ -460,11 +470,14 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
          data%id_uptake(i)    = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_upt', 'mmol/m3/d', 'uptake rate')
          data%id_total(i)     = &
                 aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
+         data%id_tot_s(i)     = &
+                aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot_sed', 'mmol/m2'  , 'total pesticide concentration in the sediment')
        ENDIF
    ENDDO
    DEALLOCATE(pd)
 END SUBROUTINE aed_pesticides_load_params
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 !###############################################################################
@@ -479,37 +492,35 @@ SUBROUTINE aed_initialize_benthic_pesticides(data, column, layer_idx)
 !
 !LOCALS
    INTEGER  :: pst_i
-   AED_REAL :: matz, pst_conc
+   AED_REAL :: matz, pest_sed_w, pest_sed_d, PSTtot, PSTpar, PSTdis
+   AED_REAL :: porosity, density, KPSTp
+
 !-------------------------------------------------------------------------------
 !BEGIN
-   ! Check user wishes to initialise from spatial map
-   IF ( .NOT. data%initSedimentConc ) RETURN
 
    ! Update sediment conc units after initialisation
    DO pst_i=1,data%num_pesticides
 
-  !   pest_sed_w = _STATE_VAR_S_(data%id_pstw(pst_i))
-  !
-  !   ! Sorption
-  !   porosity = 0.5
-  !   density = 2.5
-  !   KPSTp = 1.4
-  !   PSTtot = _STATE_VAR_S_(data%id_psts(pst_i))  ! read in ug/kg
-  !   PSTtot = pest_sed_w*porosity + pest_sed_d*(1-porosity)
-  !   PSTdis = MAX(MIN(1/(porosity+density*((1-porosity)*KPSTp)),1.),0.)
-  !   PSTpar = (one_ - PSTdis) !fS()
-  !   PSTpar = PSTtot * PSTpar
-  !   PSTdis = PSTtot - PSTpar
-  !
-  !   ! Update the pools after partitoning calculation completed
-  !   pest_sed_w = PSTdis  /porosity
-  !   pest_sed_d = PSTpar  /(1-porosity)
-  !   _STATE_VAR_S_(data%id_psts(pst_i)) = pest_sed_d ! pesticide (sediment solids)
-  !   _STATE_VAR_S_(data%id_pstw(pst_i)) = pest_sed_w ! pesticide (sediment porewater)
+     ! Sorption
+     porosity = data%pesticides(pst_i)%porosity
+     density = 2.5 !kg/L
+     KPSTp = data%pesticides(pst_i)%Kpst_sorb_sed
 
+     PSTtot = data%pesticides(pst_i)%pst_initial_sed
+     ! Check if user wishes to initialise from spatial map
+     IF( data%initSedimentConc) THEN
+       PSTtot = _DIAG_VAR_S_(data%id_tot_s(pst_i))      ! read in mg/kg
+     ENDIF
+     PSTdis = MAX(MIN(1/(porosity+density*((1-porosity)*KPSTp)),1.),0.)
+     PSTpar = (one_ - PSTdis) !fS()
+     PSTpar = PSTtot * PSTpar
+     PSTdis = PSTtot - PSTpar
 
-     pst_conc = _STATE_VAR_S_(data%id_psts(pst_i))
-!     _STATE_VAR_S_(data%id_psts(pst_i))
+     ! Update the pools after partitoning calculation completed
+     pest_sed_w = PSTdis  /porosity
+     pest_sed_d = PSTpar  /(1-porosity)
+     _STATE_VAR_S_(data%id_psts(pst_i)) = pest_sed_d ! pesticide (sediment solids)
+     _STATE_VAR_S_(data%id_pstw(pst_i)) = pest_sed_w ! pesticide (sediment porewater)
 
    ENDDO
 END SUBROUTINE aed_initialize_benthic_pesticides
@@ -753,9 +764,10 @@ SUBROUTINE aed_calculate_benthic_pesticides(data,column,layer_idx)
          pest_sed_w = _STATE_VAR_S_(data%id_pstw(pst_i)) ! pesticide (sediment porewater)
 
          ! Sorption
-         porosity = 0.5
-         density = 2.5
-         KPSTp = 1.4
+         porosity = data%pesticides(pst_i)%porosity
+         density = 2.5 !kg/L
+         KPSTp = data%pesticides(pst_i)%Kpst_sorb_sed
+
          PSTtot = pest_sed_w*porosity + pest_sed_d*(1-porosity)
          PSTdis = MAX(MIN(1/(porosity+density*((1-porosity)*KPSTp)),1.),0.)
          PSTpar = (one_ - PSTdis) !fS()

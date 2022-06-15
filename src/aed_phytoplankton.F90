@@ -1332,7 +1332,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
      ! Compute photosynthesis and respiration, in active zones
      IF ( data%n_zones > 0 ) THEN
        IF( in_zone_set(matz,data%active_zones) ) THEN
-         fI = photosynthesis_irradiance(3,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
+         fI = photosynthesis_irradiance(10,data%I_Kmpb,data%I_Kmpb,par,extc,Io,dz)
          mpb_prod = data%R_mpbg*fI*(data%theta_mpb_growth**(temp-20.))*(1.-(MIN(mpb,data%mpb_max)/data%mpb_max))
          mpb_resp = (data%R_mpbr*(data%theta_mpb_resp**(temp-20.)))
          mpb_burial = data%R_mpbb*mpb
