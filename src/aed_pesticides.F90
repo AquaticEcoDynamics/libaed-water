@@ -472,7 +472,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
          data%id_total(i)     = &
                 aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
          data%id_tot_s(i)     = &
-                aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot_sed', 'mmol/m2'  , 'total pesticide concentration in the sediment')
+                aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_tot_sed', 'mmol/m2'  , 'total pesticide concentration in the sediment')
        ENDIF
    ENDDO
    DEALLOCATE(pd)
