@@ -1274,6 +1274,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
 !------------------------------------------------------------------------------+
 !BEGIN
 
+   mpb_burial = 0.
 
    !---------------------------------------------------------------------------+
    !-- Compute the mean fluxes of C, N and P hitting the benthos/sediment
