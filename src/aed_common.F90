@@ -40,8 +40,9 @@ MODULE aed_common
 
    USE aed_water
    USE aed_benthic
-   USE aed_riparian
    USE aed_demo
+   USE aed_riparian
+   USE aed_lighting
    USE aed_dev
 
    IMPLICIT NONE
@@ -166,8 +167,9 @@ SUBROUTINE aed_define_model(modeldef, namlst)
    NULLIFY(model)
    model => aed_new_wat_model(modelname)
    IF (.NOT. ASSOCIATED(model)) model => aed_new_ben_model(modelname)
-   IF (.NOT. ASSOCIATED(model)) model => aed_new_rip_model(modelname)
    IF (.NOT. ASSOCIATED(model)) model => aed_new_dmo_model(modelname)
+   IF (.NOT. ASSOCIATED(model)) model => aed_new_rip_model(modelname)
+   IF (.NOT. ASSOCIATED(model)) model => aed_new_lgt_model(modelname)
    IF (.NOT. ASSOCIATED(model)) model => aed_new_dev_model(modelname)
 
    IF ( ASSOCIATED(model) ) THEN
@@ -204,8 +206,9 @@ SUBROUTINE aed_print_version
 !-------------------------------------------------------------------------------
    CALL aed_print_wat_version
    CALL aed_print_ben_version
-   CALL aed_print_rip_version
    CALL aed_print_dmo_version
+   CALL aed_print_rip_version
+   CALL aed_print_lgt_version
    CALL aed_print_dev_version
 END SUBROUTINE aed_print_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
