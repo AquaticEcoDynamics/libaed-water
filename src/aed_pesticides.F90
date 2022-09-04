@@ -199,7 +199,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_pesticides configuration"
-   print *,"          NOTE : UNDER DEVELOPMENT ... "
+   print *,"          NOTE : This module is under development ... "
 
    !stop "Please disable the pesticide model in your configuration"
 
@@ -316,7 +316,7 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('pst_initial')       ; pd(dcol)%pst_initial       = extract_double(values(ccol))
             CASE ('pst_initial_sed')   ; pd(dcol)%pst_initial_sed   = extract_double(values(ccol))
             CASE ('Kpst_sorb_sed')     ; pd(dcol)%Kpst_sorb_sed     = extract_double(values(ccol))
-            CASE ('Kdsf')              ; pd(dcol)%Kdsf     = extract_double(values(ccol))
+            CASE ('Kdsf')              ; pd(dcol)%Kdsf              = extract_double(values(ccol))
 
             CASE ('coef_light_kb_vis') ; pd(dcol)%coef_light_kb_vis = extract_double(values(ccol))
             CASE ('coef_light_kb_uva') ; pd(dcol)%coef_light_kb_uva = extract_double(values(ccol))
@@ -371,7 +371,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
    NAMELIST /pesticide_data/ pd   ! %% pesticide_param_t - see above
 !-------------------------------------------------------------------------------
 !BEGIN
-    min_conc = 1e-8
+    min_conc = zero_ !1e-8
     ALLOCATE(pd(MAX_PSTC_TYPES))
     SELECT CASE (param_file_type(dbase))
        CASE (CSV_TYPE)
@@ -433,10 +433,10 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        data%id_pstd(i) = aed_define_variable(                                  &
                              TRIM(data%pesticides(i)%name)//'_d',              &
                              'mmol/m3', 'pesticide dissolved concentration',   &
-                             min_conc,                                         &
+                             data%pesticides(i)%pst_initial ,                  &
                              minimum=min_conc)
 
-       ! Check if we need to registrer a variable for the sorbed fraction(s)
+       ! Check if we need to register a variable for the sorbed fraction(s)
        IF (data%pesticides(i)%num_sorb > 0) THEN
          pst_name = '0'
          DO ns = 1, data%pesticides(i)%num_sorb
@@ -453,7 +453,6 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        IF (data%simSediment) THEN
           data%id_psts(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_sed', 'mmol/m2', 'sorbed pesticides in sediment')
           data%id_pstw(i) = aed_define_sheet_variable( TRIM(data%pesticides(i)%name)//'_pw', 'mmol/m2', 'porewater pesticides in sediment')
-          PRINT *,'WARNING: simSediment is not complete'
        ENDIF
 
        !data%id_total(i) = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_t', 'orgs/m3', 'total')
@@ -471,7 +470,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
          data%id_uptake(i)    = aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_upt', 'mmol/m3/d', 'uptake rate')
          data%id_total(i)     = &
                 aed_define_diag_variable( TRIM(data%pesticides(i)%name)//'_tot', 'mmol/m3'  , 'total pesticide concentration')
-         data%id_tot_s(i)     = &
+         IF (data%simSediment) data%id_tot_s(i)     = &
                 aed_define_sheet_diag_variable( TRIM(data%pesticides(i)%name)//'_tot_sed', 'mmol/m2'  , 'total pesticide concentration in the sediment')
        ENDIF
    ENDDO
@@ -498,6 +497,8 @@ SUBROUTINE aed_initialize_benthic_pesticides(data, column, layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+   IF (.NOT. data%simSediment) RETURN
 
    ! Update sediment conc units after initialisation
    DO pst_i=1,data%num_pesticides
@@ -880,9 +881,9 @@ SUBROUTINE aed_equilibrate_pesticides(data,column,layer_idx)
      pest_d = pesticide_sorption(temp,sorbents,pest_t,pest_s,Kpstp,data%pesticides(pst_i)%sorption_model)
 
      ! Update core data arrays
-     _STATE_VAR_(data%id_pstd(pst_i))    = pest_d              ! Dissolved
+     _STATE_VAR_(data%id_pstd(pst_i))= pest_d ! Dissolved
      DO sorp_i=1,data%pesticides(pst_i)%num_sorb
-      _STATE_VAR_(data%id_psta(pst_i,sorp_i)) = pest_s(sorp_i) ! Adsorped to particle group
+      _STATE_VAR_(data%id_psta(pst_i,sorp_i)) = pest_s(sorp_i) ! Adsorped to particle group i
      ENDDO
 
      ! Update diagnostic
