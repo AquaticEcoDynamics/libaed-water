@@ -59,7 +59,7 @@ MODULE aed_common
 
    PUBLIC aed_initialize, aed_initialize_benthic
    PUBLIC aed_calculate, aed_calculate_surface, aed_calculate_benthic
-   PUBLIC aed_calculate_riparian, aed_calculate_dry
+   PUBLIC aed_calculate_riparian, aed_calculate_dry, aed_calculate_column
    PUBLIC aed_light_extinction, aed_light_shading
    PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
    PUBLIC aed_bio_drag, aed_particle_bgc
@@ -417,6 +417,24 @@ END SUBROUTINE aed_calculate_riparian
 
 
 !###############################################################################
+SUBROUTINE aed_calculate_column(column, layer_map)
+   !-------------------------------------------------------------------------------
+      TYPE (aed_column_t),INTENT(inout) :: column(:)
+      INTEGER,INTENT(in) :: layer_map(:)
+   !
+   !LOCALS
+      CLASS (aed_model_data_t),POINTER :: model
+   !-------------------------------------------------------------------------------
+      model => model_list
+      DO WHILE (ASSOCIATED(model))
+         CALL model%calculate_column(column, layer_map)
+         model => model%next
+      ENDDO
+   END SUBROUTINE aed_calculate_column
+   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   
+   
+   !###############################################################################
 SUBROUTINE aed_calculate_dry(column, layer_idx)
 !-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)

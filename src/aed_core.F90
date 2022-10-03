@@ -78,6 +78,7 @@ MODULE aed_core
          procedure :: calculate_surface  => aed_calculate_surface
          procedure :: calculate          => aed_calculate
          procedure :: calculate_benthic  => aed_calculate_benthic
+         procedure :: calculate_column   => aed_calculate_column
          procedure :: calculate_riparian => aed_calculate_riparian
          procedure :: calculate_dry      => aed_calculate_dry
          procedure :: equilibrate        => aed_equilibrate
@@ -934,6 +935,18 @@ END SUBROUTINE aed_calculate_benthic
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+!###############################################################################
+SUBROUTINE aed_calculate_column(data,column,layer_map)
+   !-------------------------------------------------------------------------------
+      CLASS (aed_model_data_t),INTENT(in) :: data
+      TYPE (aed_column_t),INTENT(inout) :: column(:)
+      INTEGER,INTENT(in) :: layer_map(:)
+!-------------------------------------------------------------------------------
+!print*,"Default aed_calculate_benthic ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_calculate_column
+   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   
+   
 !###############################################################################
 SUBROUTINE aed_calculate_riparian(data,column,layer_idx, pc_wet)
 !-------------------------------------------------------------------------------
