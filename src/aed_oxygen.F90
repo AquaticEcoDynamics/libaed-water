@@ -231,10 +231,10 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                      'sat', '%', 'dissolved oxygen saturation')
 
      data%id_sed_oxy = aed_define_sheet_diag_variable(             &
-                     'oxy_dsf', 'mmol O2/m2/d', 'O2 exchange across sed/water interface')
+                     'oxy_dsf', 'mmol O2/m2/d', 'O2 exchange across sed/water interface', surf=.TRUE.)
 
      data%id_atm_oxy_exch = aed_define_sheet_diag_variable(        &
-                     'oxy_atm', 'mmol O2/m2/d', 'O2 exchange across atm/water interface')
+                     'oxy_atm', 'mmol O2/m2/d', 'O2 exchange across atm/water interface', surf=.TRUE.)
     IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
                      'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand')

@@ -292,14 +292,14 @@ SUBROUTINE aed_define_carbon(data, namlst)
      data%id_sed_dic = aed_define_sheet_diag_variable('sed_dic','mmol C/m2/d', &
                             'CO2 exchange across sed/water interface')
      data%id_atm_co2 = aed_define_sheet_diag_variable('atm_co2_flux',          &
-                            'mmol C/m2/d', 'CO2 exchange across atm/water interface')
+                            'mmol C/m2/d', 'CO2 exchange across atm/water interface', surf=.TRUE.)
 
      IF( data%simCH4 ) THEN
        data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol C/m3/d', 'methane oxidation rate')
        data%id_sed_ch4 = aed_define_sheet_diag_variable('ch4_dsf','mmol C/m2/d', &
                             'CH4 exchange across sed/water interface')
        data%id_atm_ch4 = aed_define_sheet_diag_variable('ch4_atm',        &
-                            'mmol C/m2/d', 'CH4 exchange across atm/water interface')
+                            'mmol C/m2/d', 'CH4 exchange across atm/water interface', surf=.TRUE.)
        IF( data%simCH4ebb ) THEN
          data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m3/d', &
                             'CH4 ebullition release rate')
@@ -308,7 +308,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
          data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_dsf','mmol C/m2/d', &
                             'CH4 ebullition across sed/water interface')
          data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_atm', &
-                            'mmol C/m2/d', 'CH4 ebullition across atm/water interface')
+                            'mmol C/m2/d', 'CH4 ebullition across atm/water interface', surf=.TRUE.)
        ENDIF
      ENDIF
    ENDIF

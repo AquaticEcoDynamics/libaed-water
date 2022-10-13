@@ -338,10 +338,10 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    IF( simN2O>0 )data%id_n2op    = aed_define_diag_variable('n2oprod','mmol N/m3/d','n2o prod rate')
 
    IF( simN2O>0 ) THEN
-    data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux')
+    data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux', surf=.TRUE.)
    ENDIF
    IF( simWetDeposition .OR. simDryDeposition ) THEN
-    data%id_atm_dep = aed_define_sheet_diag_variable('din_atm','mmol N/m2/d','din atmospheric deposition flux')
+    data%id_atm_dep = aed_define_sheet_diag_variable('din_atm','mmol N/m2/d','din atmospheric deposition flux', surf=.TRUE.)
    ENDIF
 
    !---------------------------------------------------------------------------+
