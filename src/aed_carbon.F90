@@ -198,7 +198,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *,"        hello world!!"
+
    print *,"        aed_carbon configuration"
 
    !# Set defaults
