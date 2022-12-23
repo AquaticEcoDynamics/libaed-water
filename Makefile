@@ -32,6 +32,9 @@ incdir=include
 ifeq ($(F90),)
   F90=gfortran
 endif
+ifeq ($(MDEBUG),true)
+  DEBUG=true
+endif
 
 ifeq ($(SINGLE),true)
   TARGET=lib/libaed-water_s.a
@@ -44,6 +47,7 @@ else
 endif
 
 INCLUDES=-I${incdir}
+MDBG_FFLAGS=""
 
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
@@ -76,6 +80,7 @@ else ifeq ($(F90),flang)
   FFLAGS+=-r8
 else
   DEBUG_FFLAGS=-g -fbacktrace
+  MDBG_FFLAGS=-fsanitize=address
   OPT_FFLAGS=-O3
   # we use std=f2008ts rather than f2008 because ts removes some type checking
   # restrictions on interoperabilty routines (which were wrong anyway...)
@@ -106,7 +111,14 @@ ifeq ($(SINGLE),true)
 endif
 
 
-FFLAGS+=$(DEBUG_FFLAGS) $(OPT_FFLAGS)
+ifeq ($(DEBUG),true)
+  FFLAGS+=$(DEBUG_FFLAGS)
+  ifeq ($MDEBUG),true)
+    FFLAGS+=$(MDBG_FFLAGS
+  endif
+else
+  FFLAGS+=$(OPT_FFLAGS)
+endif
 
 OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_util.o \
@@ -163,8 +175,8 @@ distclean: clean
 	@/bin/rm -rf mod mod_s
 
 ${objdir}/%.o: ${srcdir}/%.F90 ${srcdir}/aed_core.F90 ${incdir}/aed.h
-	$(F90) $(FFLAGS) -g -c $< -o $@
+	$(F90) $(FFLAGS) -c $< -o $@
 
 ${objdir}/aed_external.o: ${srcdir}/aed_external.F90 ${objdir}/aed_core.o ${incdir}/aed.h
-	$(F90) $(FFLAGS) -DLIBDEF -g -c $< -o $@
+	$(F90) $(FFLAGS) -DLIBDEF -c $< -o $@
 ${objdir}/aed_common.o: ${srcdir}/aed_common.F90 ${srcdir}/aed_core.F90 ${objdir}/aed_external.o ${incdir}/aed.h

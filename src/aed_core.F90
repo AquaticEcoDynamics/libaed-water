@@ -232,7 +232,7 @@ SUBROUTINE display_var(var, idx)
 
    l2 = line(1:40)
    IF ( var%sheet ) THEN
-      !# IF ( ASSOCIATED(var%model) .and. var%model%aed_model_zone_avg ) THEN 
+      !# IF ( ASSOCIATED(var%model) .and. var%model%aed_model_zone_avg ) THEN
       !# The above will segfault if var%model is null - like pascal, it seems fortran
       !# also evaluates both conditions regardless
       IF ( ASSOCIATED(var%model) ) THEN
@@ -945,8 +945,8 @@ SUBROUTINE aed_calculate_column(data,column,layer_map)
 !print*,"Default aed_calculate_benthic ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_calculate_column
    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   
-   
+
+
 !###############################################################################
 SUBROUTINE aed_calculate_riparian(data,column,layer_idx, pc_wet)
 !-------------------------------------------------------------------------------

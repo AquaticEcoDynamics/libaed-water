@@ -827,7 +827,7 @@ SUBROUTINE aed_calculate_benthic_pesticides(data,column,layer_idx)
 
          IF ( diag_level >= 2 ) &
           _DIAG_VAR_S_ (data%id_tot_s(pst_i)) = PSTtot
-          
+
       ENDDO
    ELSE
       ! No sediment pool is resolved, but still predict a generic diss flux
