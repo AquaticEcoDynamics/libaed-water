@@ -524,12 +524,18 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       predation = zero_
 
       ! Natural mortality (as impacted by T, S, pH; see Hipsey et al 2008)
+      ! Hardwiring f_AOC to 1 below means that salinity (and pH) effects are turned off - is this intended?
       f_AOC = 1.0 ! aoc / (K_AOC + aoc)
       f_pH  = 1.0 ! + c_PH * ( pH_star**delta / (pH_star**delta+K_PH**delta) )
+      ! Not consistent with Hipsey et al (2008), and
+      ! Is the value of coeff_mort_c_SM already inclusive of the /35 in Hipsey et al 2008, or is this needed in the code below?
       mortality = data%pathogens(pth_i)%coef_mort_kd20  &
                 + (data%pathogens(pth_i)%coef_mort_c_SM*salinity**data%pathogens(pth_i)%coef_mort_alpha) &
                 * ((1.0-f_AOC)**data%pathogens(pth_i)%coef_mort_beta) * f_pH
       mortality = mortality * (data%pathogens(pth_i)%coef_mort_theta**(temp-20.0))
+      ! To summarise the comments above, with the hardwires set as they are, the code above reduces to
+      ! mortality = data%pathogens(pth_i)%coef_mort_kd20 * (data%pathogens(pth_i)%coef_mort_theta**(temp-20.0))
+      ! i.e. no salinity effects
 
 
       ! Sunlight inactivation (as impacted by S, DO and pH; see Hipsey et al 2008)
