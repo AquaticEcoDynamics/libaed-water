@@ -177,6 +177,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    INTEGER  :: resuspension
    LOGICAL  :: sim_sedorgs = .FALSE.
    CHARACTER(len=64)  :: oxy_variable = ''
+   CHARACTER(len=64)  :: pH_variable = ''
    CHARACTER(len=64)  :: path_particle_link=''            !   For FV API 2.0 (To be implemented)
    CHARACTER(4) :: trac_name
    CHARACTER(len=128) :: dbase='aed_pathogen_pars.nml'
@@ -211,8 +212,8 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    IF ( extra_diag ) diag_level = 10
 
    data%tau_0_min = tau_0_min
-   data%Ktau_0 = Ktau_0
-   data%att_ts = att_ts
+   data%Ktau_0    = Ktau_0
+   data%att_ts    = att_ts
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
@@ -473,13 +474,14 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
+   INTEGER  :: pth_i
    AED_REAL :: pth_f, pth_a, pth_d
    AED_REAL :: temp,salinity,oxy,pH,doc
    AED_REAL :: Io,par,uva,uvb
    AED_REAL :: growth,light,mortality, predation, attachment
-   AED_REAL :: f_AOC,f_pH,f_DO,phi,lightBW,phstar,att_frac
-
-   INTEGER  :: pth_i
+   AED_REAL :: f_AOC,f_DO,phi,lightBW,att_frac
+   AED_REAL :: f_pH, phstar, delta, c_PH, K_PH
+   AED_REAL :: theta, kd20, c_SM, alpha, beta
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -495,8 +497,13 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
    ENDIF
 
    !doc = _STATE_VAR_(data%id_doc)    ! local DOC
-   !ph = _STATE_VAR_(data%id_ph)      ! local pH
-   phstar = 0.0                       ! abs(ph-7.)
+   
+   IF (data%id_ph>0) THEN  ! & use_oxy
+      ph = _STATE_VAR_(data%id_ph)    ! local pH
+   ELSE
+      ph = 7.0        
+   ENDIF
+   phstar = abs(ph-7.)
 
    ! Get light bandwidth intensities
    Io = _STATE_VAR_S_(data%id_I_0)    ! surface short wave radiation
@@ -523,16 +530,27 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       growth    = zero_
       predation = zero_
 
-      ! Natural mortality (as impacted by T, S, pH; see Hipsey et al 2008)
-      f_AOC = 1.0 ! aoc / (K_AOC + aoc)
-      f_pH  = 1.0 ! + c_PH * ( pH_star**delta / (pH_star**delta+K_PH**delta) )
-      mortality = data%pathogens(pth_i)%coef_mort_kd20  &
-                + (data%pathogens(pth_i)%coef_mort_c_SM*salinity**data%pathogens(pth_i)%coef_mort_alpha) &
-                * ((1.0-f_AOC)**data%pathogens(pth_i)%coef_mort_beta) * f_pH
-      mortality = mortality * (data%pathogens(pth_i)%coef_mort_theta**(temp-20.0))
+      !-- Natural mortality (as impacted by T, S, pH; see Hipsey et al 2008)
+      c_PH  = data%pathogens(pth_i)%coef_mort_c_PHM 
+      K_PH  = data%pathogens(pth_i)%coef_mort_K_PHM 
+      delta = data%pathogens(pth_i)%coef_mort_delta_M 
+      theta = data%pathogens(pth_i)%coef_mort_theta
+      kd20  = data%pathogens(pth_i)%coef_mort_kd20
+      c_SM  = data%pathogens(pth_i)%coef_mort_c_SM
+      alpha = data%pathogens(pth_i)%coef_mort_alpha
+      beta  = data%pathogens(pth_i)%coef_mort_beta
+ 
+      !   First, modify default mortality by salinity modfifier. 
+      f_AOC = 0.0 ! aoc / (K_AOC + aoc). ! DOC trophic modifier of salinity sensitivity disabled.
+      mortality =  kd20 + (c_SM*salinity**alpha) * ((1.0-f_AOC)**beta)
+     
+      !   Second, modify salinity-modified mortality by temperature and pH scaling factors, 
+      f_pH  = 1.0 + c_PH * ( pH_star**delta / (pH_star**delta+K_PH**delta) )
+      mortality =  mortality * f_pH * (theta**(temp-20.0))
 
 
-      ! Sunlight inactivation (as impacted by S, DO and pH; see Hipsey et al 2008)
+
+      !-- Sunlight inactivation (as impacted by S, DO and pH; see Hipsey et al 2008)
       light     = zero_
       lightBW   = zero_
       phi  = 1e-6  ! Convert J to MJ as kb is in m2/MJ)
@@ -558,7 +576,9 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       lightBW = lightBW * uvb * f_pH * f_DO
       light   = light + lightBW
 
-      ! Attachment of free orgs to particles (as impacted by SS and desired attachment ratio)
+
+
+      !-- Attachment of free orgs to particles (as impacted by SS and desired attachment ratio)
       attachment = zero_
       IF (data%pathogens(pth_i)%coef_sett_fa > zero_ .AND. (pth_f+pth_a) > 1e-2) THEN
          ! First check if ratio at last time step is less than desired (ie coef_sett_fa)
@@ -577,6 +597,7 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
          ENDIF
       ENDIF
 
+
       !-----------------------------------------------------------------
       ! SET TEMPORAL DERIVATIVES FOR ODE SOLVER
 
@@ -587,20 +608,20 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
                                       ( ( light + mortality + predation)*pth_f)
       ! Now the separate attached pathogen fraction
       IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
-         _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) +      &
+         _FLUX_VAR_(data%id_pa(pth_i)) = _FLUX_VAR_(data%id_pa(pth_i)) +       &
                                       ( (growth - light/2. - mortality )*pth_a + attachment )
-         _FLUX_VAR_(data%id_pd(pth_i)) = _FLUX_VAR_(data%id_pd(pth_i)) +      &
+         _FLUX_VAR_(data%id_pd(pth_i)) = _FLUX_VAR_(data%id_pd(pth_i)) +       &
                                       ((light/2. + mortality)*pth_a)
       ENDIF
 
 
       !-----------------------------------------------------------------
       ! SET DIAGNOSTICS
-      _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d  ! orgs/m3/s
+      _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d                ! orgs/m3/s
       IF ( diag_level >= 10 ) THEN
-         _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a)  ! orgs/m3/s
-         _DIAG_VAR_(data%id_sunlight(pth_i)) =  light*pth_f + (light/2.)*pth_a  ! orgs/m3/s
-         _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a)  ! orgs/m3/s
+         _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a)           ! orgs/m3/s
+         _DIAG_VAR_(data%id_sunlight(pth_i)) =  light*pth_f + (light/2.)*pth_a ! orgs/m3/s
+         _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a)     ! orgs/m3/s
       ENDIF
    ENDDO
 END SUBROUTINE aed_calculate_pathogens
