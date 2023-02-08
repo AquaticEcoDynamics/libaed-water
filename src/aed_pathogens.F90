@@ -480,7 +480,7 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
    AED_REAL :: Io,par,uva,uvb
    AED_REAL :: growth,light,mortality, predation, attachment
    AED_REAL :: f_AOC,f_DO,phi,lightBW,att_frac
-   AED_REAL :: f_pH, phstar, delta, c_PH, K_PH
+   AED_REAL :: f_pH, pH_star, delta, c_PH, K_PH
    AED_REAL :: theta, kd20, c_SM, alpha, beta
 
 !-------------------------------------------------------------------------------
@@ -503,7 +503,7 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
    ELSE
       ph = 7.0        
    ENDIF
-   phstar = abs(ph-7.)
+   pH_star = abs(ph-7.)
 
    ! Get light bandwidth intensities
    Io = _STATE_VAR_S_(data%id_I_0)    ! surface short wave radiation
