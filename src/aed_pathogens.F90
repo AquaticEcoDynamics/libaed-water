@@ -526,6 +526,7 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
         pth_a = _STATE_VAR_(data%id_pa(pth_i))
       END IF
+      pth_d = _STATE_VAR_(data%id_pd(pth_i))
 
       growth    = zero_
       predation = zero_
