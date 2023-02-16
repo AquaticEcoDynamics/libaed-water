@@ -617,11 +617,11 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
 
       !-----------------------------------------------------------------
       ! SET DIAGNOSTICS
-      _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d                ! orgs/m3/s
+      _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d                                 ! orgs/m3
       IF ( diag_level >= 10 ) THEN
-         _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a)           ! orgs/m3/s
-         _DIAG_VAR_(data%id_sunlight(pth_i)) =  light*pth_f + (light/2.)*pth_a ! orgs/m3/s
-         _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a)     ! orgs/m3/s
+         _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a) * secs_per_day             ! orgs/m3/d
+         _DIAG_VAR_(data%id_sunlight(pth_i)) =  (light*pth_f + (light/2.)*pth_a) * secs_per_day ! orgs/m3/d
+         _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a) * secs_per_day       ! orgs/m3/d
       ENDIF
    ENDDO
 END SUBROUTINE aed_calculate_pathogens
