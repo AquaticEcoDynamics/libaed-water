@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2012 - 2022 -  The University of Western Australia               #
+!#  Copyright 2012 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -96,6 +96,7 @@ MODULE aed_geochemistry
          PROCEDURE :: equilibrate       => aed_equilibrate_geochemistry
 !        PROCEDURE :: mobility          => aed_mobility_geochemistry
 !        PROCEDURE :: light_extinction  => aed_light_extinction_geochemistry
+         PROCEDURE :: inflow_update     => aed_inflow_update_geochemistry
 !        PROCEDURE :: delete            => aed_delete_geochemistry
 
    END TYPE
@@ -169,14 +170,14 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
 
    CHARACTER(len=64), DIMENSION(:), ALLOCATABLE :: diagnosticList
 
-   NAMELIST /aed_geochemistry/ speciation_dt, geochem_file,                   &
+   NAMELIST /aed_geochemistry/ speciation_dt, geochem_file,                    &
                     num_components, dis_components, component_link, Fsed_gch,  &
                     dis_initial, num_minerals, the_minerals, mineral_link,     &
                     w_gch, min_initial, pH_initial, speciesOutput, simEq,      &
                     Riron_red, theta_iron_red, Kiron_red,                      &
-                    Riron_aox, Riron_box, theta_iron_ox, &
-                    Rsulf_red, theta_sulf_red, Ksulf_red, &
-                    Rsulf_ox, theta_sulf_ox, Ksulf_ox, &
+                    Riron_aox, Riron_box, theta_iron_ox,                       &
+                    Rsulf_red, theta_sulf_red, Ksulf_red,                      &
+                    Rsulf_ox, theta_sulf_ox, Ksulf_ox,                         &
                     ph_link, pco2_link, diag_level
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -629,15 +630,25 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
      _DIAG_VAR_(data%id_c_pco2) = pco2
      !_DIAG_VAR_(data%id_gcdiag(6)) = pco2
    ENDIF
-  ! IF( returnGCDerivedVector("NONCON",nc) > 0) THEN
-  !   _DIAG_VAR_(data%id_noncon) = nc
-  !   _DIAG_VAR_(data%id_gcdiag(5)) = nc
-  ! ENDIF
-
+ ! IF( returnGCDerivedVector("NONCON",nc) > 0) THEN
+ !   _DIAG_VAR_(data%id_noncon) = nc
+ !   _DIAG_VAR_(data%id_gcdiag(5)) = nc
+ ! ENDIF
 
 END SUBROUTINE aed_equilibrate_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+!###############################################################################
+SUBROUTINE aed_inflow_update_geochemistry(data, wqinf, temp, salt)
+!-------------------------------------------------------------------------------
+   CLASS (aed_geochemistry_data_t),INTENT(in) :: data
+   AED_REAL,DIMENSION(:),INTENT(inout) :: wqinf
+   AED_REAL,             INTENT(inout) :: temp, salt
+!-------------------------------------------------------------------------------
+!print*,"Empty aed_inflow_update_geochemistry"
+END SUBROUTINE aed_inflow_update_geochemistry
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################

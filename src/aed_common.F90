@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2022 -  The University of Western Australia               #
+!#  Copyright 2013 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -62,7 +62,7 @@ MODULE aed_common
    PUBLIC aed_calculate_riparian, aed_calculate_dry, aed_calculate_column
    PUBLIC aed_light_extinction, aed_light_shading
    PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
-   PUBLIC aed_bio_drag, aed_particle_bgc
+   PUBLIC aed_bio_drag, aed_particle_bgc, aed_inflow_update
 
    !#---------------------------------------------------------------------------
 
@@ -607,6 +607,23 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, partcl)
       model => model%next
    ENDDO
 END SUBROUTINE aed_particle_bgc
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_inflow_update(wqinf, temp, salt)
+!-------------------------------------------------------------------------------
+   AED_REAL,DIMENSION(:),INTENT(inout) :: wqinf
+   AED_REAL,             INTENT(inout) :: temp, salt
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%inflow_update(wqinf, temp, salt)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed_inflow_update
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2022 -  The University of Western Australia               #
+!#  Copyright 2013 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -89,6 +89,7 @@ MODULE aed_core
          procedure :: particle_bgc       => aed_particle_bgc
          procedure :: mobility           => aed_mobility
          procedure :: validate           => aed_validate
+         procedure :: inflow_update      => aed_inflow_update
          procedure :: delete             => aed_delete
       !# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    END TYPE aed_model_data_t
@@ -1078,6 +1079,18 @@ SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,partcl)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_particle_bgc ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_particle_bgc
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_inflow_update(data, wqinf, temp, salt)
+!-------------------------------------------------------------------------------
+   CLASS (aed_model_data_t),INTENT(in) :: data
+   AED_REAL,DIMENSION(:),INTENT(inout) :: wqinf
+   AED_REAL,             INTENT(inout) :: temp, salt
+!-------------------------------------------------------------------------------
+!print*,"Default aed_inflow_update ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_inflow_update
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
