@@ -101,9 +101,10 @@ MODULE aed_pathogens
 
       ! Diagnostic IDs for processes
       INTEGER,ALLOCATABLE :: id_growth(:), id_mortality(:), id_sunlight(:), id_grazing(:), id_total(:)
+      INTEGER,ALLOCATABLE :: id_pth_f_sed(:), id_pth_d_sed(:), id_pth_a_sed(:), id_attachment(:)
 
       INTEGER  :: id_oxy, id_pH,  id_doc, id_tss           ! Dependency ID
-      INTEGER  :: id_tem, id_sal                           ! Environmental IDs (3D)
+      INTEGER  :: id_tem, id_sal, id_dz                    ! Environmental IDs (3D)
       INTEGER  :: id_par, id_nir, id_uva, id_uvb           ! Environmental IDs (3D)
       INTEGER  :: id_I_0                                   ! Environmental ID (2D)
       INTEGER  :: resuspension
@@ -253,6 +254,7 @@ SUBROUTINE aed_define_pathogens(data, namlst)
    data%id_uva = aed_locate_global('uva')
    data%id_uvb = aed_locate_global('uvb')
    data%id_I_0 = aed_locate_sheet_global('par_sf')
+   data%id_dz  = aed_locate_global('layer_ht')
    IF ( resuspension > 0 ) &
       data%id_taub = aed_locate_sheet_global('taub')
 
@@ -403,6 +405,10 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
        ALLOCATE(data%id_growth(count))
        ALLOCATE(data%id_sunlight(count))
        ALLOCATE(data%id_mortality(count))
+       ALLOCATE(data%id_pth_f_sed(count))
+       ALLOCATE(data%id_pth_d_sed(count))
+       ALLOCATE(data%id_pth_a_sed(count))
+       ALLOCATE(data%id_attachment(count))
     ENDIF
 
     DO i=1,count
@@ -456,6 +462,12 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
           data%id_growth(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_g', 'orgs/m3/day', 'growth')
           data%id_sunlight(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_l', 'orgs/m3/day', 'sunlight')
           data%id_mortality(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
+          data%id_pth_f_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_f_set', 'orgs/m3/d', 'alive sedimentation')
+          data%id_pth_d_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_d_set', 'orgs/m3/d', 'dead sedimentation')
+          IF (data%pathogens(i)%coef_sett_fa > zero_) THEN
+             data%id_pth_a_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_a_set', 'orgs/m3/d', 'attached sedimentation') 
+             data%id_attachment(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_att', 'orgs/m3/d', 'attachment rate') 
+          END IF
        ENDIF
    ENDDO
    DEALLOCATE(pd)
@@ -619,9 +631,13 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       ! SET DIAGNOSTICS
       _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d                ! orgs/m3/s
       IF ( diag_level >= 10 ) THEN
-         _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a)           ! orgs/m3/s
-         _DIAG_VAR_(data%id_sunlight(pth_i)) =  light*pth_f + (light/2.)*pth_a ! orgs/m3/s
-         _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a)     ! orgs/m3/s
+         _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a) * secs_per_day             ! orgs/m3/d
+         _DIAG_VAR_(data%id_sunlight(pth_i)) =  (light*pth_f + (light/2.)*pth_a) * secs_per_day ! orgs/m3/d
+         _DIAG_VAR_(data%id_mortality(pth_i)) =  mortality*(pth_f + pth_a) * secs_per_day       ! orgs/m3/d
+         ! Attached
+         IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
+            _DIAG_VAR_(data%id_attachment(pth_i)) =  attachment * secs_per_day                  ! orgs/m3/d
+         END IF
       ENDIF
    ENDDO
 END SUBROUTINE aed_calculate_pathogens
