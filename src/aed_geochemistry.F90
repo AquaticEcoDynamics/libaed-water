@@ -74,6 +74,7 @@ MODULE aed_geochemistry
 
       !# Model parameters
       INTEGER  :: num_comp, num_mins
+      INTEGER  :: inflow_pH_update
       LOGICAL  :: component_linked(MAX_GC_COMPONENTS),mineral_linked(MAX_GC_MINERALS)
       LOGICAL  :: simEq
       AED_REAL :: Riron_red, theta_iron_red, Kiron_red
@@ -137,6 +138,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    INTEGER           :: speciation_dt
    INTEGER           :: num_components,num_minerals
    INTEGER           :: nDissTransportables, nPartTransportables
+   INTEGER           :: inflow_pH_update = 0
    LOGICAL           :: simEq = .TRUE.
    AED_REAL          :: min
    AED_REAL          :: dis_initial(MAX_GC_COMPONENTS) = 0.0
@@ -178,7 +180,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                     Riron_aox, Riron_box, theta_iron_ox,                       &
                     Rsulf_red, theta_sulf_red, Ksulf_red,                      &
                     Rsulf_ox, theta_sulf_ox, Ksulf_ox,                         &
-                    ph_link, pco2_link, diag_level
+                    ph_link, inflow_pH_update, pco2_link, diag_level
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_geochemistry configuration"
@@ -218,6 +220,8 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%Rsulf_red = Rsulf_red             ; data%Ksulf_red= Ksulf_red
    data%theta_sulf_red= theta_sulf_red    ; data%theta_sulf_ox=theta_sulf_ox
    data%Rsulf_ox=Rsulf_ox / secs_per_day
+
+   data%inflow_pH_update = inflow_pH_update
 
    speciesOutput = ''
    speciesOutput(1) = 'NONCON'
@@ -655,6 +659,7 @@ SUBROUTINE aed_inflow_update_geochemistry(data, wqinf, temp, salt)
    INTEGER  :: i
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF ( data%inflow_pH_update == 0 ) RETURN
 
    !-- Reset inflow state variable values into array for the gcsolver
    DO i=1,data%num_comp
