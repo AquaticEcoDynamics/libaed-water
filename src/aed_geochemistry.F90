@@ -646,7 +646,50 @@ SUBROUTINE aed_inflow_update_geochemistry(data, wqinf, temp, salt)
    AED_REAL,DIMENSION(:),INTENT(inout) :: wqinf
    AED_REAL,             INTENT(inout) :: temp, salt
 !-------------------------------------------------------------------------------
-!print*,"Empty aed_inflow_update_geochemistry"
+!
+!LOCALS
+   ! State
+   AED_REAL,   DIMENSION(SIZE(data%DissComp))  :: dissConcs
+   AED_REAL,   DIMENSION(SIZE(data%PartComp))  :: partConcs
+   ! Temporary variables
+   INTEGER  :: i
+!-------------------------------------------------------------------------------
+!BEGIN
+
+   !-- Reset inflow state variable values into array for the gcsolver
+   DO i=1,data%num_comp
+      IF (.NOT.data%component_linked(i)) THEN
+          dissConcs(i) = wqinf(data%id_comp(i))
+      ELSE
+          dissConcs(i) = wqinf(data%id_cdep(i))
+      ENDIF
+   ENDDO
+   DO i=1,data%num_mins
+      IF (.NOT.data%mineral_linked(i)) THEN
+          partConcs(i) = wqinf(data%id_mins(i))
+      ELSE
+          partConcs(i) = wqinf(data%id_mdep(i))
+      ENDIF
+   ENDDO
+
+   !-- Redo geochemical equilibration, now spatial initialisation is done
+   CALL InitialiseGCProperties(dissConcs, partConcs, 2, inTemp=REAL(temp))
+
+   !-- Copy back into main AED arrays
+   DO i=1,data%num_comp
+      IF (.NOT.data%component_linked(i)) THEN
+         wqinf(data%id_comp(i)) =  dissConcs(i)
+      ELSE
+         wqinf(data%id_cdep(i)) =  dissConcs(i)
+      ENDIF
+   ENDDO
+   DO i=1,data%num_mins
+      IF (.NOT.data%mineral_linked(i)) THEN
+         wqinf(data%id_mins(i)) =  partConcs(i)
+      ELSE
+         wqinf(data%id_mdep(i)) =  partConcs(i)
+      ENDIF
+   ENDDO
 END SUBROUTINE aed_inflow_update_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
