@@ -1341,7 +1341,7 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
          fI = zero_
          mpb_prod = zero_
          mpb_resp = zero_
-         mpb_burial = Psed_phy_c/secs_per_day ! all deposited material is buried
+         mpb_burial = -Psed_phy_c/secs_per_day ! set all deposited material to be buried (noting that Psed is -ve downawards)
        ENDIF
      ENDIF
      mpb_flux = (mpb_prod-mpb_resp)*mpb
