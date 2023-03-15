@@ -13,7 +13,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2022 -  The University of Western Australia               #
+!#  Copyright 2013 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -239,6 +239,42 @@ END FUNCTION char_in_str
 
 
 !###############################################################################
+SUBROUTINE strip_comments(buf)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(len=*), INTENT(inout) :: buf
+!
+!LOCALS
+   INTEGER lnt, res
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   lnt = LEN_TRIM(buf)
+   res = char_in_str('[', buf)
+
+   DO WHILE ( res .NE. 0 )
+     IF ( buf(res+1:res+1) .EQ. 'C' .AND. &
+          buf(res+2:res+2) .EQ. 'O' .AND. &
+          buf(res+3:res+3) .EQ. 'M' .AND. &
+          buf(res+4:res+4) .EQ. 'M' .AND. &
+          buf(res+5:res+5) .EQ. 'E' .AND. &
+          buf(res+6:res+6) .EQ. 'N' .AND. &
+          buf(res+7:res+7) .EQ. 'T' .AND. &
+          buf(res+8:res+8) .EQ. ']' ) THEN
+        DO WHILE ( res .LE. lnt)
+           buf(res:res) = ' '
+           res=res+1
+        ENDDO
+        res = 0
+     ELSE
+        res = char_in_str('[', buf, res+1)
+     ENDIF
+   ENDDO
+END SUBROUTINE strip_comments
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 LOGICAL FUNCTION next_symbol(aedr, sym)
 !-------------------------------------------------------------------------------
 ! get the next "symbol" from the file, if there is one
@@ -282,6 +318,7 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
          read(UNIT=aedr%lun,FMT='(A)', iostat=iostat) aedr%buf
          IF ( iostat .NE. 0) RETURN
 
+         CALL strip_comments(aedr%buf)
          aedr%buf_len=LEN_TRIM(aedr%buf)
          IF ( (aedr%buf_len .GT. 0) .AND.         &
               (aedr%buf(1:1) .NE. '#') .AND.      &
