@@ -39,7 +39,8 @@ MODULE aed_core
    PRIVATE  !# Everything defaults to private
 
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
-   PUBLIC aed_init_core, aed_get_var, aed_core_status
+   PUBLIC aed_init_core, aed_core_status
+   PUBLIC aed_get_var, aed_get_var_idx
    PUBLIC aed_set_current_model, aed_set_prefix
    PUBLIC aed_is_const_var, aed_set_const_var
 
@@ -111,6 +112,7 @@ MODULE aed_core
       LOGICAL           :: top, bot, const
       LOGICAL           :: zavg, zavg_req
       INTEGER           :: particle_link
+      INTEGER           :: index
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -312,8 +314,13 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. .NOT. all_vars(i)%diag ) THEN
          CALL display_var(all_vars(i), i)
-         IF ( all_vars(i)%sheet ) THEN ; n_sheet_vars = n_sheet_vars + 1
-         ELSE ; n_vars = n_vars + 1 ; ENDIF
+         IF ( all_vars(i)%sheet ) THEN
+            n_sheet_vars = n_sheet_vars + 1
+            all_vars(i)%index = n_sheet_vars
+         ELSE
+            n_vars = n_vars + 1
+            all_vars(i)%index = n_vars
+         ENDIF
       ENDIF
    ENDDO
 
@@ -323,8 +330,13 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
    DO i=1,n_aed_vars
       IF ( .NOT. all_vars(i)%extern .AND. all_vars(i)%diag ) THEN
          CALL display_var(all_vars(i), i)
-         IF ( all_vars(i)%sheet ) THEN ; n_sheet_diags = n_sheet_diags + 1
-         ELSE ; n_diags = n_diags + 1 ; ENDIF
+         IF ( all_vars(i)%sheet ) THEN
+            n_sheet_diags = n_sheet_diags + 1
+            all_vars(i)%index = n_sheet_diags
+         ELSE
+            n_diags = n_diags + 1
+            all_vars(i)%index = n_diags
+         ENDIF
       ENDIF
    ENDDO
    write(log, *)
@@ -404,6 +416,7 @@ SUBROUTINE extend_allocated_variables(pcount)
    all_vars(a_vars+1:a_vars+count)%diag = .false.
    all_vars(a_vars+1:a_vars+count)%extern = .false.
    all_vars(a_vars+1:a_vars+count)%found = .false.
+   all_vars(a_vars+1:a_vars+count)%index = -1
 
    all_vars(a_vars+1:a_vars+count)%top = .false.
    all_vars(a_vars+1:a_vars+count)%bot = .false.
@@ -826,6 +839,25 @@ LOGICAL FUNCTION aed_get_var(which, tvar)
    IF (which > 0 .AND. which <= n_aed_vars) THEN ; tvar => all_vars(which)
    ELSE ; aed_get_var = .FALSE. ; ENDIF
 END FUNCTION aed_get_var
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_get_var_idx(which) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in) :: which
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = -1
+   IF (which > 0 .AND. which <= n_aed_vars) THEN
+      ret = all_vars(which)%index
+   ENDIF
+END FUNCTION aed_get_var_idx
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

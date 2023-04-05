@@ -538,7 +538,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    CHARACTER(len=64)  :: si_excretion_target_variable=''
    CHARACTER(len=64)  :: si_mortality_target_variable=''
    CHARACTER(len=64)  :: si_uptake_target_variable=''
-   CHARACTER(len=128) :: dbase='aed_phyto_pars.nml'
+   CHARACTER(len=128) :: dbase='aed_phyto_pars.csv'
    AED_REAL           :: zerolimitfudgefactor = 0.9 * 3600
    AED_REAL           :: R_mpbg = 0.
    AED_REAL           :: R_mpbr = 0.
