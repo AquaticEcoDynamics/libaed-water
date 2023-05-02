@@ -462,11 +462,15 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
           data%id_growth(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_g', 'orgs/m3/day', 'growth')
           data%id_sunlight(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_l', 'orgs/m3/day', 'sunlight')
           data%id_mortality(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_m', 'orgs/m3/day', 'mortality')
-          data%id_pth_f_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_f_set', 'orgs/m3/d', 'alive sedimentation')
-          data%id_pth_d_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_d_set', 'orgs/m3/d', 'dead sedimentation')
+          data%id_pth_f_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_f_set', &
+                                                                         'orgs/m3/d', 'alive sedimentation')
+          data%id_pth_d_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_d_set', &
+                                                                         'orgs/m3/d', 'dead sedimentation')
           IF (data%pathogens(i)%coef_sett_fa > zero_) THEN
-             data%id_pth_a_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_a_set', 'orgs/m3/d', 'attached sedimentation') 
-             data%id_attachment(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_att', 'orgs/m3/d', 'attachment rate') 
+             data%id_pth_a_sed(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_a_set', &
+                                                                         'orgs/m3/d', 'attached sedimentation')
+             data%id_attachment(i) = aed_define_diag_variable( TRIM(data%pathogens(i)%p_name)//'_att', &
+                                                                         'orgs/m3/d', 'attachment rate')
           END IF
        ENDIF
    ENDDO
