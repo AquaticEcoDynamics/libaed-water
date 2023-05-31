@@ -541,6 +541,8 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       pth_f = _STATE_VAR_(data%id_pf(pth_i))
       IF (data%pathogens(pth_i)%coef_sett_fa > zero_) THEN
         pth_a = _STATE_VAR_(data%id_pa(pth_i))
+      ELSE
+        pth_a = 0.0
       END IF
 
       growth    = zero_
@@ -595,21 +597,33 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
 
 
       !-- Attachment of free orgs to particles (as impacted by SS and desired attachment ratio)
+      ! 24/02/2023
+      ! The previous formulation used _FLUX_VAR_as a test, but this is zero if resus_flux is zero
+      ! (which is common and will apply to cells away from the bed anyway)
+      ! This meant that attachment was also being set to zero in these cells
+      ! The formulation below uses existing conditions and stores to work out
+      ! attachment and detachment kinetics, assuming unlimited sediment.
+      ! For a proper balance on the availability to meet attachment, the test should be
+      ! attachment > pth_f/dt and 
+      ! attachment > pth_a/dt 
+      ! which is a comparison of two orgs/m3/s rates
+      ! but dt cannot be seen in this modulle so as a stop gap I used a typical 
+      ! dt of 15 minutes. This should be fixed by a coder who knows what they are doing!
+      
       attachment = zero_
       IF (data%pathogens(pth_i)%coef_sett_fa > zero_ .AND. (pth_f+pth_a) > 1e-2) THEN
-         ! First check if ratio at last time step is less than desired (ie coef_sett_fa)
+         ! Compute ratio at last time step for compariosn with coef_sett_fa
          att_frac = pth_a/(pth_a+pth_f)
-         IF (att_frac<data%pathogens(pth_i)%coef_sett_fa) THEN
-            ! Assume rate of attachment is slow based on att_ts (orgs/m3/s)
-            ! Small fraction, so the "attachment deficit" is redistributed each time step
-            attachment = data%att_ts * (data%pathogens(pth_i)%coef_sett_fa*pth_a - pth_f)
-            IF(attachment>zero_ .AND. attachment > _FLUX_VAR_(data%id_pf(pth_i)))THEN
-              ! proposed attachment is more than is available.
-              attachment = 0.5 * _FLUX_VAR_(data%id_pf(pth_i))
-            ELSEIF(attachment<zero_ .AND. attachment > _FLUX_VAR_(data%id_pa(pth_i)))THEN
-              ! proposed de-attachment is more than is available.
-              attachment = 0.5 * _FLUX_VAR_(data%id_pa(pth_i))
-            ENDIF
+         ! Compute attachment defecit/credit
+         ! This was: attachment = data%att_ts * (data%pathogens(pth_i)%coef_sett_fa*pth_a - pth_f)
+         attachment = data%att_ts * (data%pathogens(pth_i)%coef_sett_fa*(pth_a + pth_f) - pth_a)
+         ! Compare current frac with available pools
+         ! Not enough pth_f to meet attachment need
+         IF ((att_frac<data%pathogens(pth_i)%coef_sett_fa).AND.(attachment > pth_f/900.0)) THEN 
+            attachment = 0.5 * pth_f/900.0 
+         ! Not enough pth_a to meet detachment need
+         ELSEIF ((att_frac>data%pathogens(pth_i)%coef_sett_fa).AND.(abs(attachment) > pth_a/900.0)) THEN
+            attachment = 0.5 * pth_a/900.0 
          ENDIF
       ENDIF
 
