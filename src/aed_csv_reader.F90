@@ -87,6 +87,7 @@ MODULE aed_csv_reader
 !
 !-------------------------------------------------------------------------------
    PUBLIC aed_csv_read_header, aed_csv_read_row, aed_csv_close, AED_SYMBOL
+   PUBLIC aed_rcsv_open, aed_rcsv_read_row, aed_rcsv_close
    PUBLIC extract_double, extract_logical, extract_integer, extract_string
    PUBLIC copy_name, indexed_field
 
@@ -539,6 +540,38 @@ END SUBROUTINE copy_name
 
 
 !###############################################################################
+FUNCTION scan_rcsv_file(aedr) RESULT(count)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+    TYPE(AED_READER),POINTER,INTENT(inout) :: aedr
+!
+!LOCALS
+    TYPE(AED_SYMBOL) :: sym
+    INTEGER          :: lcount, count, i
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   NULLIFY(sym%sym)
+   count = 0
+
+   DO WHILE( next_symbol(aedr, sym) )
+      DO WHILE( next_symbol(aedr, sym) )
+         IF ( sym%sym(1) .EQ. EOLN ) THEN
+            aedr%buf_pos=-1
+            aedr%buf_len=0
+            i = 0;
+            EXIT
+         ENDIF
+         lcount=lcount+1
+      ENDDO
+      IF ( lcount > count ) count=lcount
+   ENDDO
+   REWIND(aedr%lun)
+END FUNCTION scan_rcsv_file
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 FUNCTION scan_csv_header(aedr,titles) RESULT(count)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -572,6 +605,47 @@ FUNCTION scan_csv_header(aedr,titles) RESULT(count)
       count=count+1
    ENDDO
 END FUNCTION scan_csv_header
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+INTEGER FUNCTION aed_rcsv_open(fname, ncols)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: fname
+   INTEGER,INTENT(out) :: ncols
+!
+!LOCALS
+   INTEGER :: unit, i
+   TYPE(AED_READER),POINTER :: aedr
+   LOGICAL                  :: res
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   NULLIFY(aedr)
+   unit = 0
+
+   IF ( .NOT. init_parser(fname, aedr) ) THEN
+      print*, "Failed to open file '",fname,"'"
+      aed_rcsv_open = -1
+      RETURN
+   ENDIF
+   DO i=1,10
+      IF ( .NOT. ASSOCIATED(units(i)%p) ) THEN
+         units(i)%p => aedr
+         unit = i
+         exit
+      ENDIF
+   ENDDO
+   IF ( unit == 0 ) THEN
+      res = end_parse(aedr)
+   ELSE
+      ncols = scan_rcsv_file(aedr)
+   ENDIF
+
+   aedr%n_cols = ncols
+   aed_rcsv_open = unit
+END FUNCTION aed_rcsv_open
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -618,6 +692,46 @@ END FUNCTION aed_csv_read_header
 
 
 !###############################################################################
+INTEGER FUNCTION aed_rcsv_read_row(unit, values)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in) :: unit
+   TYPE(AED_SYMBOL),DIMENSION(:),INTENT(out) :: values
+!
+!LOCALS
+   TYPE(AED_READER),POINTER :: aedr
+   INTEGER :: i, j, ncols
+   TYPE(AED_SYMBOL) :: sym
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   aedr => units(unit)%p
+   ncols = aedr%n_cols
+   NULLIFY(sym%sym)
+
+   values(1:ncols)%length = 0
+   i = 0
+   DO WHILE ( next_symbol(aedr, sym) ) !#
+      IF ( sym%length > 0 ) THEN
+         IF ( sym%sym(1) .EQ. EOLN ) EXIT
+      ENDIF
+      i = i + 1
+      IF ( i <= ncols ) THEN
+         IF ( ASSOCIATED(values(i)%sym) ) NULLIFY( values(i)%sym )
+
+         values(i) = sym
+         NULLIFY(sym%sym)
+      ENDIF
+   ENDDO
+   IF ( i > ncols ) &
+      print *, "data row had ", i, " columns : expecting ", ncols
+
+   aed_rcsv_read_row = i
+END FUNCTION aed_rcsv_read_row
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 LOGICAL FUNCTION aed_csv_read_row(unit, values)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -654,6 +768,26 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
 
    aed_csv_read_row = (i > 0)
 END FUNCTION aed_csv_read_row
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+LOGICAL FUNCTION aed_rcsv_close(unit)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in) :: unit
+!
+!LOCALS
+   TYPE(AED_READER),POINTER :: aedr
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   aed_rcsv_close = .FALSE.
+   aedr => units(unit)%p
+   IF (ASSOCIATED(aedr)) aed_rcsv_close = end_parse(aedr)
+   NULLIFY(aedr)
+   units(unit)%p => aedr
+END FUNCTION aed_rcsv_close
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
