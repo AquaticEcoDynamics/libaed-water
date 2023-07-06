@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2022 -  The University of Western Australia                      #
+!#  Copyright 2022 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -390,8 +390,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        CASE (NML_TYPE)
            print *,'NML file type for pesticides is not supported, please convert to CSV'
 !          pesticide_data%name = ''
-!          tfil = find_free_lun()
-!          open(tfil,file=dbase, status='OLD',iostat=status)
+!          open(NEWUNIT=tfil,file=dbase, status='OLD',iostat=status)
 !          IF (status /= 0) STOP 'Error opening namelist pesticide_data'
 !          read(tfil,nml=pesticide_data,iostat=status)
 !          close(tfil)

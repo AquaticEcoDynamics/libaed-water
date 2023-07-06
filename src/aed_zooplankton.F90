@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2022 -  The University of Western Australia               #
+!#  Copyright 2013 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -219,8 +219,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
            status = load_csv(dbase, zoop_param, dbsize)
        CASE (NML_TYPE)
            print*,"nml format parameter file is deprecated. Please update to CSV format"
-           tfil = find_free_lun()
-           open(tfil,file=dbase, status='OLD',iostat=status)
+           open(NEWUNIT=tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Error opening zoop_params namelist file'
            read(tfil,nml=zoop_params,iostat=status)
            close(tfil)

@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2017 - 2022 -  The University of Western Australia               #
+!#  Copyright 2017 - 2023 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -381,8 +381,7 @@ SUBROUTINE aed_pathogens_load_params(data, dbase, count, list)
            status = load_csv(dbase, pd)
        CASE (NML_TYPE)
            print*,"nml format parameter file is deprecated. Please update to CSV format"
-           tfil = find_free_lun()
-           open(tfil,file=dbase, status='OLD',iostat=status)
+           open(NEWUNIT=tfil,file=dbase, status='OLD',iostat=status)
            IF (status /= 0) STOP 'Error opening namelist pathogen_data'
            read(tfil,nml=pathogen_data,iostat=status)
            close(tfil)
