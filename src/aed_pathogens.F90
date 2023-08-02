@@ -647,7 +647,7 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
 
       !-----------------------------------------------------------------
       ! SET DIAGNOSTICS
-      _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d                ! orgs/m3/s
+      _DIAG_VAR_(data%id_total(pth_i)) =  pth_f + pth_a + pth_d                ! orgs/m3
       IF ( diag_level >= 10 ) THEN
          _DIAG_VAR_(data%id_growth(pth_i)) =  growth*(pth_f + pth_a) * secs_per_day             ! orgs/m3/d
          _DIAG_VAR_(data%id_sunlight(pth_i)) =  (light*pth_f + (light/2.)*pth_a) * secs_per_day ! orgs/m3/d
@@ -795,16 +795,24 @@ SUBROUTINE aed_mobility_pathogens(data,column,layer_idx,mobility)
    AED_REAL,INTENT(inout) :: mobility(:)
 !
 !LOCALS
-   AED_REAL :: temp, vel
+   AED_REAL :: temp, vel, dz
    INTEGER  :: ss_i,pth_i
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    temp = _STATE_VAR_(data%id_tem)
+   dz = _STATE_VAR_(data%id_dz)
+
+   _DIAG_VAR_(data%id_pth_f_sed) = zero_
+   _DIAG_VAR_(data%id_pth_d_sed) = zero_
 
    ! First set velocity for free pathogen groups
    DO pth_i=1,data%num_pathogens
       mobility(data%id_pf(pth_i)) =  data%pathogens(pth_i)%coef_sett_w_path
+      IF ( diag_level >= 10 ) THEN
+      	 _DIAG_VAR_(data%id_pth_f_sed(pth_i)) = (mobility(data%id_pf(pth_i))/dz) * _STATE_VAR_(data%id_pf(pth_i)) * secs_per_day        ! orgs/m3/d   !PRequest
+         _DIAG_VAR_(data%id_pth_d_sed(pth_i)) = (mobility(data%id_pd(pth_i))/dz) * _STATE_VAR_(data%id_pd(pth_i)) * secs_per_day        ! orgs/m3/d   !PRequest
+      END IF
    ENDDO
 
    ! Compute settling rate of particles
