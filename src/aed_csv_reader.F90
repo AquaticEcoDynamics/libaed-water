@@ -318,6 +318,7 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
       DO WHILE ( (aedr%buf_pos .LE. 0) .OR. (aedr%buf_pos .GT. aedr%buf_len) )
          read(UNIT=aedr%lun,FMT='(A)', iostat=iostat) aedr%buf
          IF ( iostat .NE. 0) RETURN
+! print*,' #scanning: "',TRIM(aedr%buf),'"'
 
          CALL strip_comments(aedr%buf)
          aedr%buf_len=LEN_TRIM(aedr%buf)
@@ -376,10 +377,13 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
       sym%sym(j:j)=aedr%buf(i:i)
       j=j+1
    ENDDO
+   IF ( sym%sym(1) == ',' .AND. sym%length == 1 ) THEN
+      sym%length=0
+   ENDIF
 
    IF (quot .NE. CNUL) e1=e1+1
 
-   if (aedr%buf(e1:e1) == ",") e1 = e1+1
+   IF (aedr%buf(e1:e1) == ",") e1 = e1+1
    aedr%buf_pos=e1
 END FUNCTION next_symbol
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -547,7 +551,7 @@ FUNCTION scan_rcsv_file(aedr) RESULT(count)
 !
 !LOCALS
     TYPE(AED_SYMBOL) :: sym
-    INTEGER          :: lcount, count, i
+    INTEGER          :: lcount, count
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -555,18 +559,21 @@ FUNCTION scan_rcsv_file(aedr) RESULT(count)
    count = 0
 
    DO WHILE( next_symbol(aedr, sym) )
-      DO WHILE( next_symbol(aedr, sym) )
-         IF ( sym%sym(1) .EQ. EOLN ) THEN
-            aedr%buf_pos=-1
-            aedr%buf_len=0
-            i = 0;
-            EXIT
-         ENDIF
-         lcount=lcount+1
-      ENDDO
-      IF ( lcount > count ) count=lcount
+      IF ( sym%sym(1) .NE. EOLN ) THEN
+         lcount = 1
+         DO WHILE( next_symbol(aedr, sym) )
+            IF ( sym%sym(1) .EQ. EOLN ) THEN
+               aedr%buf_pos=-1
+               aedr%buf_len=0
+               EXIT
+            ENDIF
+            lcount=lcount+1
+         ENDDO
+         IF ( lcount > count ) count=lcount
+      ENDIF
    ENDDO
    REWIND(aedr%lun)
+! print*,"REWIND+++++++++++++++"
 END FUNCTION scan_rcsv_file
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -624,6 +631,7 @@ INTEGER FUNCTION aed_rcsv_open(fname, ncols)
 !BEGIN
    NULLIFY(aedr)
    unit = 0
+   ncols = 0
 
    IF ( .NOT. init_parser(fname, aedr) ) THEN
       print*, "Failed to open file '",fname,"'"
@@ -643,6 +651,7 @@ INTEGER FUNCTION aed_rcsv_open(fname, ncols)
       ncols = scan_rcsv_file(aedr)
    ENDIF
 
+! print*,"file ", fname, " had ", ncols, " cols"
    aedr%n_cols = ncols
    aed_rcsv_open = unit
 END FUNCTION aed_rcsv_open
@@ -712,6 +721,7 @@ INTEGER FUNCTION aed_rcsv_read_row(unit, values)
    values(1:ncols)%length = 0
    i = 0
    DO WHILE ( next_symbol(aedr, sym) ) !#
+! print*,'sym = "', sym%sym,'"'
       IF ( sym%length > 0 ) THEN
          IF ( sym%sym(1) .EQ. EOLN ) EXIT
       ENDIF
