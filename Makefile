@@ -114,7 +114,7 @@ endif
 ifeq ($(DEBUG),true)
   FFLAGS+=$(DEBUG_FFLAGS)
   ifeq ($MDEBUG),true)
-    FFLAGS+=$(MDBG_FFLAGS
+    FFLAGS+=$(MDBG_FFLAGS)
   endif
 else
   FFLAGS+=$(OPT_FFLAGS)

@@ -891,7 +891,7 @@ SUBROUTINE aed_equilibrate_pesticides(data,column,layer_idx)
    ! Retrieve current environmental conditions for the cell.
    temp = _STATE_VAR_(data%id_tem)    ! local temperature
 
-   pest_d = zero_ ; pest_t = zero_ ; pest_s(:) = zero_
+   pest_d = zero_ ; pest_t = zero_ ; pest_s(:) = zero_ ; sorbents = zero_
 
    DO pst_i=1,data%num_pesticides
 
