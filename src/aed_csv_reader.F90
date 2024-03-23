@@ -281,8 +281,8 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
 ! get the next "symbol" from the file, if there is one
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(AED_READER),POINTER      :: aedr
-   TYPE(AED_SYMBOL),INTENT(out)  :: sym
+   TYPE(AED_READER),POINTER       :: aedr
+   TYPE(AED_SYMBOL),INTENT(inout) :: sym
 
 !LOCALS
    INTEGER :: iostat, s1, e1, i, j
