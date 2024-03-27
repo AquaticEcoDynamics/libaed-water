@@ -111,7 +111,7 @@ END FUNCTION aed_new_rip_model
 SUBROUTINE aed_print_rip_version
 !-------------------------------------------------------------------------------
 !BEGIN
-   print*,"    libaed-riparian no included "
+   print*,"    libaed-riparian not included "
 END SUBROUTINE aed_print_rip_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -153,7 +153,7 @@ END FUNCTION aed_new_dmo_model
 SUBROUTINE aed_print_dmo_version
 !-------------------------------------------------------------------------------
 !BEGIN
-   print*,"    libaed-demo no included"
+   print*,"    libaed-demo not included"
 END SUBROUTINE aed_print_dmo_version
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

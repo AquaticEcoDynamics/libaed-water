@@ -1170,7 +1170,7 @@ SUBROUTINE CO2SYS(mode,temp,salt,pres,TAin,TCin,pHin,pHout,fCO2out,TAout)
   REAL,    INTENT(IN)   :: TCin, TAin, pHin
   REAL,    INTENT(OUT)  :: fCO2out, pHout, TAout
   ! LOCAL
-  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi=0., &
+  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi, &
                            K1, K2, TB, TP, TS, TF, TSi, TC, TA
 
   !===========Initialize the conditions =========================!
@@ -1338,7 +1338,7 @@ SUBROUTINE Cal_constants(TempC, Sal, PRE, K0, KS, kF, fH, KB, KW, KP1, KP2,    &
   KP1fac = exp(lnKP1fac); KP1 = KP1*KP1fac
   KP2fac = exp(lnKP2fac); KP2 = KP2*KP2fac
   KP3fac = exp(lnKP3fac); KP3 = KP3*KP3fac
-  KSifac = exp(lnKSifac); KSi = KSi*KSifac
+  KSifac = exp(lnKSifac); KSi = KSifac
 
   SWStoTOT  = (1 + TS/KS)/(1 + TS/KS + TF/KF)
   FREEtoTOT =  1 + TS/KS

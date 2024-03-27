@@ -1119,6 +1119,7 @@ SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp,heatflux)
     ENDDO
 
     tn(0) = topTemp
+    d(1) = 0.  ! This to fix an erroneous compiler warning
     DO i=1, m
         c(i) = -k(i)*f
         a(i+1) = c(i)
