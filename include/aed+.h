@@ -30,7 +30,7 @@
 
 #include <aed.h>
 
-#define AED_PLUS_VERSION  "2.1.2"
+#define AED_PLUS_VERSION  "2.1.3"
 
 #define _FLUX_VAR_R_(id)  column(id)%flux_rip
 
