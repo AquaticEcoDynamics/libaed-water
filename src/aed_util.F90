@@ -1167,7 +1167,11 @@ LOGICAL FUNCTION make_dir_path(dir)
    INTEGER :: len, i, sys
    CHARACTER(len=128) :: d
    LOGICAL :: res = .TRUE.
+#ifdef _WIN32
+#  define DIRSEP "\\"
+#else
 #  define DIRSEP "/"
+#endif
 !BEGIN
 !-------------------------------------------------------------------------------
    len = LEN_TRIM(dir)
