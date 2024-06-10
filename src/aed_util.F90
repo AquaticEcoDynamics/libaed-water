@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2022 -  The University of Western Australia               #
+!#  Copyright 2013 - 2024 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -1119,6 +1119,7 @@ SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp,heatflux)
     ENDDO
 
     tn(0) = topTemp
+    d(1) = 0.  ! This to fix an erroneous compiler warning
     DO i=1, m
         c(i) = -k(i)*f
         a(i+1) = c(i)
@@ -1166,7 +1167,11 @@ LOGICAL FUNCTION make_dir_path(dir)
    INTEGER :: len, i, sys
    CHARACTER(len=128) :: d
    LOGICAL :: res = .TRUE.
+#ifdef _WIN32
+#  define DIRSEP "\\"
+#else
 #  define DIRSEP "/"
+#endif
 !BEGIN
 !-------------------------------------------------------------------------------
    len = LEN_TRIM(dir)

@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2022 -  The University of Western Australia               #
+!#  Copyright 2013 - 2024 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -30,7 +30,7 @@
 
 #include <aed.h>
 
-#define AED_PLUS_VERSION  "2.1.0"
+#define AED_PLUS_VERSION  "2.1.3"
 
 #define _FLUX_VAR_R_(id)  column(id)%flux_rip
 

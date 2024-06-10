@@ -13,7 +13,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2023 -  The University of Western Australia               #
+!#  Copyright 2013 - 2024 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -281,8 +281,8 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
 ! get the next "symbol" from the file, if there is one
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   TYPE(AED_READER),POINTER      :: aedr
-   TYPE(AED_SYMBOL),INTENT(out)  :: sym
+   TYPE(AED_READER),POINTER       :: aedr
+   TYPE(AED_SYMBOL),INTENT(inout) :: sym
 
 !LOCALS
    INTEGER :: iostat, s1, e1, i, j

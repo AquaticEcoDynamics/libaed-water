@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2023 -  The University of Western Australia               #
+!#  Copyright 2013 - 2024 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -28,7 +28,7 @@
 #ifndef _AED_H_
 #define _AED_H_
 
-#define AED_VERSION  "2.1.1"
+#define AED_VERSION  "2.1.3"
 
 #define MAX_MODELS 40
 

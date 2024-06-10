@@ -9,7 +9,7 @@
 #                                                                             #
 #      http://aquatic.science.uwa.edu.au/                                     #
 #                                                                             #
-#  Copyright 2013 - 2022 -  The University of Western Australia               #
+#  Copyright 2013 - 2024 -  The University of Western Australia               #
 #                                                                             #
 #   AED is free software: you can redistribute it and/or modify               #
 #   it under the terms of the GNU General Public License as published by      #
@@ -25,6 +25,16 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.     #
 #                                                                             #
 ###############################################################################
+
+ifeq ($(shell uname),Linux)
+  OSTYPE=$(shell uname -s)
+else ifeq ($(shell uname),Darwin)
+  OSTYPE=$(shell uname -s)
+else ifeq ($(shell uname),FreeBSD)
+  OSTYPE=$(shell uname -s)
+else
+  OSTYPE=$(shell uname -o)
+endif
 
 srcdir=src
 incdir=include
@@ -85,6 +95,9 @@ else
   # we use std=f2008ts rather than f2008 because ts removes some type checking
   # restrictions on interoperabilty routines (which were wrong anyway...)
   FFLAGS=-fPIC -Wall -J ${moddir} -ffree-line-length-none -std=f2008ts
+  ifeq ($(OSTYPE),Msys)
+    FFLAGS+=-D_WIN32
+  endif
   FFLAGS+=$(DEFINES) $(INCLUDES) -fall-intrinsics -Wno-unused -Wno-unused-dummy-argument
   FFLAGS+=-fno-range-check -Wno-integer-division
   ifeq ($(WITH_CHECKS),true)

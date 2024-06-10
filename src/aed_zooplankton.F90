@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2023 -  The University of Western Australia               #
+!#  Copyright 2013 - 2024 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -151,14 +151,14 @@ INTEGER FUNCTION load_csv(dbase, zoop_param, dbsize)
             CASE ('ffecal_zoo')        ; zoop_param(dcol)%ffecal_zoo     = extract_double(values(ccol))
             CASE ('fexcr_zoo')         ; zoop_param(dcol)%fexcr_zoo      = extract_double(values(ccol))
             CASE ('ffecal_sed')        ; zoop_param(dcol)%ffecal_sed     = extract_double(values(ccol))
-            CASE ('theta_resp_zoo')    ; zoop_param(dcol)%theta_resp_zoo = extract_integer(values(ccol))
-            CASE ('Tstd_zoo')          ; zoop_param(dcol)%Tstd_zoo       = extract_integer(values(ccol))
-            CASE ('Topt_zoo')          ; zoop_param(dcol)%Topt_zoo       = extract_integer(values(ccol))
-            CASE ('Tmax_zoo')          ; zoop_param(dcol)%Tmax_zoo       = extract_integer(values(ccol))
+            CASE ('theta_resp_zoo')    ; zoop_param(dcol)%theta_resp_zoo = extract_double(values(ccol))
+            CASE ('Tstd_zoo')          ; zoop_param(dcol)%Tstd_zoo       = extract_double(values(ccol))
+            CASE ('Topt_zoo')          ; zoop_param(dcol)%Topt_zoo       = extract_double(values(ccol))
+            CASE ('Tmax_zoo')          ; zoop_param(dcol)%Tmax_zoo       = extract_double(values(ccol))
             CASE ('saltfunc_zoo')      ; zoop_param(dcol)%saltfunc_zoo   = extract_integer(values(ccol))
-            CASE ('Smin_zoo')          ; zoop_param(dcol)%Smin_zoo       = extract_integer(values(ccol))
-            CASE ('Smax_zoo')          ; zoop_param(dcol)%Smax_zoo       = extract_integer(values(ccol))
-            CASE ('Sint_zoo')          ; zoop_param(dcol)%Sint_zoo       = extract_integer(values(ccol))
+            CASE ('Smin_zoo')          ; zoop_param(dcol)%Smin_zoo       = extract_double(values(ccol))
+            CASE ('Smax_zoo')          ; zoop_param(dcol)%Smax_zoo       = extract_double(values(ccol))
+            CASE ('Sint_zoo')          ; zoop_param(dcol)%Sint_zoo       = extract_double(values(ccol))
             CASE ('INC_zoo')           ; zoop_param(dcol)%INC_zoo        = extract_double(values(ccol))
             CASE ('IPC_zoo')           ; zoop_param(dcol)%IPC_zoo        = extract_double(values(ccol))
             CASE ('DOmin_zoo')         ; zoop_param(dcol)%DOmin_zoo      = extract_double(values(ccol))
