@@ -321,7 +321,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%id_par  = aed_locate_global('par')
    data%id_dz   = aed_locate_global('layer_ht')
    data%id_vel  = aed_locate_global('cell_vel')           ! needed for k600
-   data%id_depth= aed_locate_global('depth')
+   data%id_depth= aed_locate_sheet_global('col_depth')
+!   data%id_depth= aed_locate_global('depth')
 !  data%id_depth= aed_locate_global('layer_ht')
    data%id_wind = aed_locate_sheet_global('wind_speed')
    IF( data%simCH4ebb ) data%id_tau  = aed_locate_sheet_global('taub')
@@ -426,7 +427,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    wind   = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m above surface (m/s)
    temp   = _STATE_VAR_(data%id_temp)   ! Temperature (degrees Celsius)
    salt   = _STATE_VAR_(data%id_salt)   ! Salinity (psu)
-   depth  = MAX( _STATE_VAR_(data%id_depth), one_ )
+   depth  = MAX( _STATE_VAR_S_(data%id_depth), one_ )
    IF (data%id_vel > 0 ) THEN
      vel = _STATE_VAR_(data%id_vel)
    ELSE
@@ -654,7 +655,7 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    temp = _STATE_VAR_(data%id_temp) ! local temperature
    par  = _STATE_VAR_(data%id_par)  ! local par
    dz   = _STATE_VAR_(data%id_dz)   ! local layer thickness
-   depth= _STATE_VAR_(data%id_depth)! local layer depth
+   depth= _STATE_VAR_S_(data%id_depth)! local layer depth
    extc = _STATE_VAR_(data%id_extc) ! local extinction
 
     ! Retrieve current (local) state variable values.

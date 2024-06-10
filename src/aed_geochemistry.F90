@@ -660,7 +660,7 @@ SUBROUTINE aed_inflow_update_geochemistry(data, wqinf, temp, salt)
 !-------------------------------------------------------------------------------
 !BEGIN
    IF ( data%inflow_pH_update == 0 ) RETURN
-
+!print *,'wqinf',wqinf
    !-- Reset inflow state variable values into array for the gcsolver
    DO i=1,data%num_comp
       IF (.NOT.data%component_linked(i)) THEN
@@ -668,6 +668,7 @@ SUBROUTINE aed_inflow_update_geochemistry(data, wqinf, temp, salt)
       ELSE
           dissConcs(i) = wqinf(data%id_cdep(i))
       ENDIF
+  !    print *,'IN i',i,dissConcs(i),data%id_comp(i),data%id_comp(i)
    ENDDO
    DO i=1,data%num_mins
       IF (.NOT.data%mineral_linked(i)) THEN
@@ -687,6 +688,8 @@ SUBROUTINE aed_inflow_update_geochemistry(data, wqinf, temp, salt)
       ELSE
          wqinf(data%id_cdep(i)) =  dissConcs(i)
       ENDIF
+!      print *,'OUT i',i,dissConcs(i)
+
    ENDDO
    DO i=1,data%num_mins
       IF (.NOT.data%mineral_linked(i)) THEN
