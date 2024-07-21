@@ -36,6 +36,8 @@
 
 MODULE aed_csv_reader
 
+   USE aed_util
+
    IMPLICIT NONE
 
 !-------------------------------------------------------------------------------
@@ -134,28 +136,6 @@ END SUBROUTINE init_t_strs
 
 
 !###############################################################################
-INTEGER FUNCTION f_get_lun()
-!-------------------------------------------------------------------------------
-! Find the first free logical unit number
-!-------------------------------------------------------------------------------
-   INTEGER :: lun
-   LOGICAL :: opened
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   DO lun = 10,99
-      inquire(unit=lun, opened=opened)
-      IF ( .not. opened ) THEN
-         f_get_lun = lun
-         RETURN
-      ENDIF
-   ENDDO
-   f_get_lun = -1
-END FUNCTION f_get_lun
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
 INTEGER FUNCTION fopen(filename)
 !-------------------------------------------------------------------------------
 ! open a file and return it logical unit number
@@ -169,7 +149,7 @@ INTEGER FUNCTION fopen(filename)
    INTEGER :: lun=-1
 
 !BEGIN
-   lun = f_get_lun()
+   lun = find_free_lun()
    IF ( lun .GT. 0 ) open(lun, status='old', file=filename, iostat=iostat)
 
    IF (iostat .NE. 0) lun = -1
