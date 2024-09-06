@@ -45,9 +45,9 @@ incdir=include
 ifeq ($(F90),)
   F90=gfortran
 endif
-ifeq ($(MDEBUG),true)
-  DEBUG=true
-endif
+#ifeq ($(MDEBUG),true)
+#  DEBUG=true
+#endif
 
 #INCLUDES+=-I${incdir}
 MDBG_FFLAGS=""
