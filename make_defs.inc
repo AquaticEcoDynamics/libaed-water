@@ -108,6 +108,7 @@ ifeq ($(DEBUG),true)
   DEBUG_CFLAGS=-g
   OPT_CFLAGS=
   OPT_FFLAGS=
+  FFLAGS+=$(DEBUG_FFLAGS)
 else
   DEBUG_FFLAGS=
   DEBUG_CFLAGS=
@@ -115,14 +116,10 @@ else
   OPT_CFLAGS=-O3
   # OPT_CFLAGS=
   # OPT_FFLAGS=
+  FFLAGS+=$(OPT_FFLAGS)
 endif
 
-ifeq ($(DEBUG),true)
-  FFLAGS+=$(DEBUG_FFLAGS)
-  ifeq ($MDEBUG),true)
-    FFLAGS+=$(MDBG_FFLAGS)
-  endif
-else
-  FFLAGS+=$(OPT_FFLAGS)
+ifeq ($MDEBUG),true)
+  FFLAGS+=$(MDBG_FFLAGS)
 endif
 

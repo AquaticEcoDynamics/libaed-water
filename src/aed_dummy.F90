@@ -70,6 +70,7 @@ MODULE aed_dummy
                              id_dummy_sv(:), id_dummy_dsv(:)
       AED_REAL,ALLOCATABLE :: dm_max(:), dm_min(:)
       AED_REAL,ALLOCATABLE :: dm_smax(:), dm_smin(:)
+      INTEGER :: id_yd;
 
      CONTAINS
          PROCEDURE :: define            => aed_define_dummy
@@ -187,6 +188,8 @@ SUBROUTINE aed_define_dummy(data, namlst)
 
    data%id_vsine = aed_define_diag_variable('DUM_vol_sine', 'no units', 'DBG volume sine between 0.0 and 1.0')
    data%id_sine = aed_define_sheet_diag_variable('DUM_sine', 'no units', 'DBG sine wave between 0.0 and 1.0', .FALSE.)
+
+   data%id_yd = aed_locate_sheet_global('yearday')
 END SUBROUTINE aed_define_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -232,7 +235,11 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   IF (layer_idx .EQ. 1) today = today + 1.0/36.5
+   IF ( data%id_yd > 0 ) THEN
+     today = _STATE_VAR_S_(data%id_yd)
+   ELSEIF (layer_idx .EQ. 1) THEN
+     today = today + 1.0/36.5
+   ENDIF
 
    _DIAG_VAR_S_(data%id_sine) = &
         (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
