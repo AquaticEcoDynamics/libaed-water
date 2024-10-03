@@ -36,6 +36,12 @@ else
   OSTYPE=$(shell uname -o)
 endif
 
+ifeq ($(VERSION),)
+  VERSION=$(shell grep AED_VERSION ../libaed-water/include/aed.h | head -1 | cut -f2 -d\")
+endif
+SOVERS=$(shell echo $(VERSION) | cut -f1 -d\.)
+VERS=$(shell echo $(VERSION) | cut -f2- -d\.)
+
 objdir=obj
 srcdir=src
 libdir=lib
@@ -52,13 +58,20 @@ endif
 #INCLUDES+=-I${incdir}
 MDBG_FFLAGS=""
 
+ifeq ($(OSTYPE),Darwin)
+  SHARED=-dynamiclib -undefined dynamic_lookup
+  so_ext=dylib
+else
+  SHARED=-shared -Wl,-soname,$(OUTLIB).so.$(SOVERS)
+  so_ext=so
+endif
+
 ifeq ($(F90),ifort)
   INCLUDES+=-I/opt/intel/include
   DEBUG_FFLAGS=-g -traceback
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
-  FFLAGS=-g # -fpp
-  FFLAGS+=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused
+  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check all -check noarg_temp_created
   endif

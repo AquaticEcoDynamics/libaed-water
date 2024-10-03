@@ -29,9 +29,18 @@
 
 all: ${TARGET}
 
-${TARGET}: ${objdir} ${moddir} ${libdir} ${OBJS}
+${libdir}/${OUTLIB}.${so_ext}: ${libdir}/${OUTLIB}.a
+	$(F90) ${SHARED} -o $@.${SOVERS}.${VERS} ${OBJS} ${LDFLAGS} ${SOFLAGS}
+	ln -sf ${OUTLIB}.${so_ext}.${SOVERS}.${VERS} $@
+	ln -sf ${OUTLIB}.${so_ext}.${SOVERS}.${VERS} $@.${SOVERS}
+
+${libdir}/$(OUTLIB).a: ${objdir} ${moddir} ${libdir} ${OBJS}
 	ar rv $@ ${OBJS}
 	ranlib $@
+
+#${TARGET}: ${objdir} ${moddir} ${libdir} ${OBJS}
+#	ar rv $@ ${OBJS}
+#	ranlib $@
 
 ${objdir}/%.o: ${srcdir}/%.F90 ../libaed-water/${srcdir}/aed_core.F90 ../libaed-water/${incdir}/aed.h
 	$(F90) -g $(FFLAGS) -c $< -o $@
