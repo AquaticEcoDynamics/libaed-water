@@ -362,7 +362,7 @@ END SUBROUTINE aed_calculate_surface
 
 
 !###############################################################################
-SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
+SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones, zone_idx)
 !-------------------------------------------------------------------------------
 ! The benthic routine may be grouped in zones by the global do_zone_averaging
 ! flag, however a new model level flag allows us to not average in zones.
@@ -376,17 +376,24 @@ SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    LOGICAL,OPTIONAL,INTENT(in) :: do_zones
+   INTEGER,OPTIONAL,INTENT(in) :: zone_idx
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
    model => model_list
    IF ( PRESENT(do_zones) ) THEN
+      IF ( PRESENT(zone_idx) ) THEN
+         cur_zone_ = zone_idx
+      ELSE
+         cur_zone_ = layer_idx
+      ENDIF
       DO WHILE (ASSOCIATED(model))
          IF ( model%aed_model_zone_avg .EQV. do_zones ) &
             CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
+      cur_zone_ = 0
    ELSE
       DO WHILE (ASSOCIATED(model))
          CALL model%calculate_benthic(column, layer_idx)

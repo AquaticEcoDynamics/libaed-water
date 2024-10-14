@@ -230,11 +230,16 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
    INTEGER,INTENT(in) :: layer_idx
 !
 !LOCALS
-   INTEGER :: i
+   INTEGER :: i, sin_idx
    AED_REAL :: scale, offs
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   IF (cur_zone_ >  0) THEN
+      sin_idx = cur_zone_
+   ELSE
+      sin_idx = layer_idx
+   ENDIF
    IF ( data%id_yd > 0 ) THEN
      today = _STATE_VAR_S_(data%id_yd)
    ELSEIF (layer_idx .EQ. 1) THEN
@@ -242,13 +247,13 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
    ENDIF
 
    _DIAG_VAR_S_(data%id_sine) = &
-        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
+        (sin(MOD((today+(sin_idx-1)*10.),365.)/365. * 2 * 3.1415) * 0.5) + 0.5
 
    DO i=1,data%num_sv
       scale = (data%dm_smax(i) - data%dm_smin(i)) / 2.
       offs = data%dm_smin(i) + scale
       _STATE_VAR_S_(data%id_dummy_sv(i)) = &
-        (sin(MOD((today+(layer_idx-1)*10.),365.)/365. * 2 * 3.1415) * scale) + offs
+        (sin(MOD((today+(sin_idx-1)*10.),365.)/365. * 2 * 3.1415) * scale) + offs
    ENDDO
 END SUBROUTINE aed_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
