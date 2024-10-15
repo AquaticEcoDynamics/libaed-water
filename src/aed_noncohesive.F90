@@ -341,7 +341,7 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: bottom_stress, matz
+   AED_REAL :: bottom_stress = one_, matz
 
    ! State
    AED_REAL :: ss

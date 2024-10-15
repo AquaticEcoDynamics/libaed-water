@@ -694,17 +694,17 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
 !LOCALS
    AED_REAL :: poc,pon,pop
    AED_REAL :: doc,don,dop
-   AED_REAL :: docr,donr,dopr,cpom,cdom
+   AED_REAL :: docr=zero_,donr=zero_,dopr=zero_,cpom=zero_,cdom=zero_
    AED_REAL :: temp,salt,dic,amm,oxy,nit,no2,n2o,frp,feiii,so4,ch4
-   AED_REAL :: pom_hydrolysis, dom_mineralisation
-   AED_REAL :: pon_hydrolysis, don_mineralisation
-   AED_REAL :: pop_hydrolysis, dop_mineralisation
-   AED_REAL :: poc_hydrolysis, doc_mineralisation
+   AED_REAL :: pom_hydrolysis, dom_mineralisation=zero_
+   AED_REAL :: pon_hydrolysis, don_mineralisation=zero_
+   AED_REAL :: pop_hydrolysis, dop_mineralisation=zero_
+   AED_REAL :: poc_hydrolysis, doc_mineralisation=zero_
    AED_REAL :: docr_mineralisation = 0., donr_mineralisation = 0.
    AED_REAL :: dopr_mineralisation = 0., cpom_breakdown = 0.
    AED_REAL :: denitrification, denitratation = 0., denitritation = 0.
    AED_REAL :: denitrousation = 0., dnra, nitrous_denitritation, ammonium_release
-   AED_REAL :: photolysis, vis, uva, uvb, photo_fmin, cdoc, att
+   AED_REAL :: photolysis, vis=zero_, uva=zero_, uvb=zero_, photo_fmin, cdoc, att
    AED_REAL :: doc_min_aerobic, doc_min_anaerobic
    AED_REAL :: fereduction = 0., so4reduction = 0., methanogenesis = 0., fso4, fnit, ffe
    AED_REAL :: doc_floc = 0., don_floc = 0., dop_floc = 0.
@@ -1275,6 +1275,7 @@ SUBROUTINE aed_mobility_organic_matter(data,column,layer_idx,mobility)
 !BEGIN
 
      vvel = zero_
+     vvel_cpom = zero_
      dz = _STATE_VAR_(data%id_dz)
 
      ! settling = 0 : no settling

@@ -286,7 +286,7 @@ SUBROUTINE aed_calculate_benthic_tracer(data,column,layer_idx)
    AED_REAL :: temp
 
    ! State
-   AED_REAL :: ss, bottom_stress, matz
+   AED_REAL :: ss, bottom_stress=one_, matz
 
    ! Temporary variables
    AED_REAL :: ss_flux, theta_sed_ss = 1.0, resus_flux = 0.
