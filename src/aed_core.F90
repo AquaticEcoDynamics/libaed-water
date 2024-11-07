@@ -503,6 +503,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
    CHARACTER(len=64) :: tname
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = 0
    IF ( ASSOCIATED(aed_cur_prefix) .AND. .NOT. place ) THEN
       tname = TRIM(aed_cur_prefix)//"_"//name
    ELSE
@@ -791,15 +792,15 @@ FUNCTION aed_locate_global(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = -1
    IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
 
    IF ( TRIM(name) == "cell_vel" ) THEN
-       ret = -1
        IF ( .NOT. host_has_cell_vel ) RETURN
    ENDIF
 
    ret = aed_create_variable(name, '', '', .true.)
-   all_vars(ret)%extern = .true.
+   IF ( ret > 0 ) all_vars(ret)%extern = .true.
 END FUNCTION aed_locate_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -815,12 +816,15 @@ FUNCTION aed_locate_sheet_global(name) RESULT(ret)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = -1
    IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
 
    ret = aed_create_variable(name, '', '', .true.)
 
-   all_vars(ret)%sheet = .true.
-   all_vars(ret)%extern = .true.
+   IF ( ret > 0 ) THEN
+      all_vars(ret)%sheet = .true.
+      all_vars(ret)%extern = .true.
+   ENDIF
 END FUNCTION aed_locate_sheet_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
