@@ -215,7 +215,7 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
      ENDDO
 
      fish_oxy_link = 'OXY_sat'
-     data%id_l_oxys  = aed_locate_global(TRIM(fish_oxy_link))
+     data%id_l_oxys  = aed_locate_variable(TRIM(fish_oxy_link))
 
      ALLOCATE(data%fish_alpha(num_fish))
      ALLOCATE(data%fish_Tmax(num_fish))
