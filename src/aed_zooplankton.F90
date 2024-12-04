@@ -407,10 +407,9 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
      data%id_Cmorttarget = aed_locate_variable(pc_target_variable)
    ENDIF
 
-
    ! Register diagnostic variables
-   data%id_grz  = aed_define_diag_variable('grz','mmolC/m**3/d',  'net zooplankton grazing')
-   data%id_resp = aed_define_diag_variable('resp','mmolC/m**3/d',  'net zooplankton respiration')
+   data%id_grz  = aed_define_diag_variable('grz','mmolC/m**3/d', 'net zooplankton grazing')
+   data%id_resp = aed_define_diag_variable('resp','mmolC/m**3/d','net zooplankton respiration')
    data%id_mort = aed_define_diag_variable('mort','mmolC/m**3/d','net zooplankton mortality')
 
    ! Register environmental dependencies
@@ -464,19 +463,23 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
    IF (data%simPCexcr)  poc = _STATE_VAR_(data%id_Cmorttarget)
 
    DO zoop_i=1,data%num_zoops
+      ! Export diagnostic variables
+      _DIAG_VAR_(data%id_grz)  = zero_
+      _DIAG_VAR_(data%id_resp) = zero_
+      _DIAG_VAR_(data%id_mort) = zero_
 
       ! Retrieve this zooplankton group
       zoo = _STATE_VAR_(data%id_zoo(zoop_i))
-      !Retrieve prey groups
+      ! Retrieve prey groups
       Ctotal_prey   = zero_
       DO prey_i=1,data%zoops(zoop_i)%num_prey
          prey(prey_i) = _STATE_VAR_(data%zoops(zoop_i)%id_prey(prey_i))
          Ctotal_prey = Ctotal_prey + prey(prey_i)
       ENDDO
 
-      grazing       = zero_
-      respiration   = zero_
-      mortality     = zero_
+      grazing     = zero_
+      respiration = zero_
+      mortality   = zero_
 
       ! Get the grazing limitation function
        fGrazing_Limitation = fPrey_Limitation(data%zoops,zoop_i,Ctotal_prey)
@@ -498,11 +501,11 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
       ! food is total amount of food in units of mass/unit volume/unit time
       food = grazing * zoo
       IF (Ctotal_prey < data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
-          food = zero_
-          grazing = food / zoo
+         food = zero_
+         grazing = food / zoo
       ELSEIF (food > Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
-          food = Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo
-          grazing = food / zoo
+         food = Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo
+         grazing = food / zoo
       ENDIF
 
 
@@ -655,62 +658,65 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
                 +  ((data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo)
 
       IF( data%simZoopFeedback ) THEN
-      ! Now take food grazed by zooplankton from food pools in mmolC/s
-      phy_i = 0
-      DO prey_i = 1,data%zoops(zoop_i)%num_prey
-         _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) =                            &
+         ! Now take food grazed by zooplankton from food pools in mmolC/s
+         phy_i = 0
+         DO prey_i = 1,data%zoops(zoop_i)%num_prey
+            _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) =                         &
                        _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) +              &
                        ( -1.0 * grazing_prey(prey_i))
-          IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey .EQ. _OGMPOC_) THEN
-              IF (poc > zero_) THEN
-                 _FLUX_VAR_(data%id_Nmorttarget) =     &
+            IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey .EQ. _OGMPOC_) THEN
+               IF (poc > zero_) THEN
+                  _FLUX_VAR_(data%id_Nmorttarget) =     &
                           _FLUX_VAR_(data%id_Nmorttarget) + ( -1.0 * grazing_prey(prey_i) * pon/poc)
-                 _FLUX_VAR_(data%id_Pmorttarget) =     &
+                  _FLUX_VAR_(data%id_Pmorttarget) =     &
                           _FLUX_VAR_(data%id_Pmorttarget) + ( -1.0 * grazing_prey(prey_i) * pop/poc)
-              ENDIF
-          ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:_PHYLEN_).EQ. _PHYMOD_) THEN
-            phy_i = phy_i + 1
-            _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) =                         &
+               ENDIF
+            ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:_PHYLEN_).EQ. _PHYMOD_) THEN
+               phy_i = phy_i + 1
+               _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) =                      &
                       _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) +               &
                       ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i))
-            _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) =                         &
+               _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) =                      &
                       _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) +               &
                        ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i))
-         ENDIF
-      ENDDO
+            ENDIF
+         ENDDO
 
 
-      ! Now manage excretion contributions to DOM
-      IF (data%simDCexcr) THEN
-         _FLUX_VAR_(data%id_Cexctarget) = _FLUX_VAR_(data%id_Cexctarget) +     &
+         ! Now manage excretion contributions to DOM
+         IF (data%simDCexcr) THEN
+            _FLUX_VAR_(data%id_Cexctarget) = _FLUX_VAR_(data%id_Cexctarget) +     &
                         (data%zoops(zoop_i)%fexcr_zoo * respiration * zoo + doc_excr)
-      ENDIF
-      IF (data%simDNexcr) THEN
-         _FLUX_VAR_(data%id_Nexctarget) = _FLUX_VAR_(data%id_Nexctarget) + (don_excr)
-      ENDIF
-      IF (data%simDPexcr) THEN
-         _FLUX_VAR_(data%id_Pexctarget) = _FLUX_VAR_(data%id_Pexctarget) + (dop_excr)
-      ENDIF
+         ENDIF
+         IF (data%simDNexcr) THEN
+            _FLUX_VAR_(data%id_Nexctarget) = _FLUX_VAR_(data%id_Nexctarget) + (don_excr)
+         ENDIF
+         IF (data%simDPexcr) THEN
+            _FLUX_VAR_(data%id_Pexctarget) = _FLUX_VAR_(data%id_Pexctarget) + (dop_excr)
+         ENDIF
 
-      ! Now manage messy feeding, fecal pellets and mortality contributions to POM
-      IF (data%simPCexcr) THEN
-         _FLUX_VAR_(data%id_Cmorttarget) = _FLUX_VAR_(data%id_Cmorttarget) + ( poc_excr)
-      ENDIF
-      IF (data%simPNexcr) THEN
-         _FLUX_VAR_(data%id_Nmorttarget) = _FLUX_VAR_(data%id_Nmorttarget) + ( pon_excr)
-      ENDIF
-      IF (data%simPPexcr) THEN
-         _FLUX_VAR_(data%id_Pmorttarget) = _FLUX_VAR_(data%id_Pmorttarget) + ( pop_excr)
-      ENDIF
+         ! Now manage messy feeding, fecal pellets and mortality contributions to POM
+         IF (data%simPCexcr) THEN
+            _FLUX_VAR_(data%id_Cmorttarget) = _FLUX_VAR_(data%id_Cmorttarget) + ( poc_excr)
+         ENDIF
+         IF (data%simPNexcr) THEN
+            _FLUX_VAR_(data%id_Nmorttarget) = _FLUX_VAR_(data%id_Nmorttarget) + ( pon_excr)
+         ENDIF
+         IF (data%simPPexcr) THEN
+            _FLUX_VAR_(data%id_Pmorttarget) = _FLUX_VAR_(data%id_Pmorttarget) + ( pop_excr)
+         ENDIF
       ENDIF
 
       ! Export diagnostic variables
-      _DIAG_VAR_(data%id_grz )  = zoo*grazing*secs_per_day
-      _DIAG_VAR_(data%id_resp ) = zoo*respiration*secs_per_day
-      _DIAG_VAR_(data%id_mort ) = zoo*mortality*secs_per_day
-
+      _DIAG_VAR_(data%id_grz)  = _DIAG_VAR_(data%id_grz)  + zoo*grazing
+      _DIAG_VAR_(data%id_resp) = _DIAG_VAR_(data%id_resp) + zoo*respiration
+      _DIAG_VAR_(data%id_mort) = _DIAG_VAR_(data%id_mort) + zoo*mortality
    ENDDO
 
+   ! Export diagnostic variables
+   _DIAG_VAR_(data%id_grz)  = _DIAG_VAR_(data%id_grz)  * secs_per_day
+   _DIAG_VAR_(data%id_resp) = _DIAG_VAR_(data%id_resp) * secs_per_day
+   _DIAG_VAR_(data%id_mort) = _DIAG_VAR_(data%id_mort) * secs_per_day
 END SUBROUTINE aed_calculate_zooplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

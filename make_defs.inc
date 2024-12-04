@@ -76,6 +76,16 @@ ifeq ($(F90),ifort)
     FFLAGS+=-check all -check noarg_temp_created
   endif
   FFLAGS+=-real-size 64
+else ifeq ($(F90),ifx)
+# INCLUDES+=-I/opt/intel/oneapi/compiler/latest/include
+  DEBUG_FFLAGS=-g -traceback
+  OMPFLAG=-qopenmp
+  OPT_FFLAGS=-O3
+  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused
+  ifeq ($(WITH_CHECKS),true)
+    FFLAGS+=-check all -check noarg_temp_created
+  endif
+  FFLAGS+=-real-size 64
 else ifeq ($(F90),flang)
   ifeq ($(OSTYPE),FreeBSD)
     INCLUDES+=-I../ancillary/freebsd/mod
@@ -101,9 +111,10 @@ else
   endif
   FFLAGS+=-fall-intrinsics -Wno-unused -Wno-unused-dummy-argument
   FFLAGS+=-Wno-missing-include-dirs
-  FFLAGS+=-fno-range-check -Wno-integer-division
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-fcheck=all
+  else
+    FFLAGS+=-fno-range-check -Wno-integer-division
   endif
   FFLAGS+=-fdefault-real-8 -fdefault-double-8
 endif

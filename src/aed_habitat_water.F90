@@ -243,16 +243,14 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
    data%id_E_extc      = aed_locate_global('extc_coef')
    data%id_E_temp      = aed_locate_global('temperature')
    data%id_E_depth     = aed_locate_global('layer_ht')
-!   data%id_E_bathy     = aed_locate_global_sheet('bathy')
-!   data%id_E_matz      = aed_locate_global_sheet('material')
-!   data%id_E_Io        = aed_locate_global_sheet('par_sf')
-!   data%id_E_airtemp   = aed_locate_global_sheet('air_temp')
-!   data%id_E_stress    = aed_locate_global_sheet('taub')
-!   data%id_E_nearlevel = aed_locate_global_sheet('nearest_depth')
-
+!   data%id_E_bathy     = aed_locate_sheet_global('bathy')
+!   data%id_E_matz      = aed_locate_sheet_global('material')
+!   data%id_E_Io        = aed_locate_sheet_global('par_sf')
+!   data%id_E_airtemp   = aed_locate_sheet_global('air_temp')
+!   data%id_E_stress    = aed_locate_sheet_global('taub')
+!   data%id_E_nearlevel = aed_locate_sheet_global('nearest_depth')
 END SUBROUTINE aed_define_habitat_water
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
