@@ -78,7 +78,7 @@ ifeq ($(F90),ifort)
   FFLAGS+=-real-size 64
 else ifeq ($(F90),ifx)
 # INCLUDES+=-I/opt/intel/oneapi/compiler/latest/include
-  DEBUG_FFLAGS=-g -traceback
+  DEBUG_FFLAGS=-g -traceback -O0
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
   FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused

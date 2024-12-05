@@ -769,7 +769,7 @@ FUNCTION aed_locate_sheet_variable(name,update_from_zone) RESULT(ret)
    IF ( ret /= 0 ) THEN
      IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
    ENDIF
-   IF ( ret /= 0 .AND. PRESENT(update_from_zone)) THEN
+   IF ( ret /= 0 .AND. PRESENT(update_from_zone) ) THEN
      all_vars(ret)%zavg_req = .true.
    ENDIF
 !  IF ( ret /= 0 ) THEN
@@ -782,13 +782,15 @@ END FUNCTION aed_locate_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_locate_global(name) RESULT(ret)
+FUNCTION aed_locate_global(name,nr) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
+   LOGICAL, OPTIONAL       :: nr  ! not required
 !
 !LOCALS
    INTEGER :: ret
+   LOGICAL :: nrl = .FALSE.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -799,27 +801,39 @@ FUNCTION aed_locate_global(name) RESULT(ret)
        IF ( .NOT. host_has_cell_vel ) RETURN
    ENDIF
 
-   ret = aed_create_variable(name, '', '', .true.)
+   IF ( PRESENT(nr) ) nrl = nr
+   IF ( nrl ) THEN
+     ret = aed_find_variable(name)
+   ELSE
+     ret = aed_create_variable(name, '', '', .true.)
+   ENDIF
    IF ( ret > 0 ) all_vars(ret)%extern = .true.
 END FUNCTION aed_locate_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-FUNCTION aed_locate_sheet_global(name) RESULT(ret)
+FUNCTION aed_locate_sheet_global(name,nr) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
+   LOGICAL, OPTIONAL       :: nr  ! not required
 !
 !LOCALS
    INTEGER :: ret
+   LOGICAL :: nrl = .FALSE.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    ret = -1
    IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
 
-   ret = aed_create_variable(name, '', '', .true.)
+   IF ( PRESENT(nr) ) nrl = nr
+   IF ( nrl ) THEN
+     ret = aed_find_variable(name)
+   ELSE
+     ret = aed_create_variable(name, '', '', .true.)
+   ENDIF
 
    IF ( ret > 0 ) THEN
       all_vars(ret)%sheet = .true.
