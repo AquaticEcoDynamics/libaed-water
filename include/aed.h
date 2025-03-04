@@ -88,11 +88,17 @@
 
 #define _STATE_VAR_(id)   column(id)%cell(layer_idx)
 #define _STATE_VAR_S_(id) column(id)%cell_sheet
+
 #define _DIAG_VAR_(id)    column(id)%cell(layer_idx)
 #define _DIAG_VAR_S_(id)  column(id)%cell_sheet
 
 #define _FLUX_VAR_(id)    column(id)%flux_pel(layer_idx)
 #define _FLUX_VAR_T_(id)  column(id)%flux_atm
 #define _FLUX_VAR_B_(id)  column(id)%flux_ben
+
+#define _PTM_STAT_(id)    ptm%ptm_istat(id)
+#define _PTM_ENV_(id)     ptm%ptm_env(id)
+#define _PTM_STATE_(id)   ptm%ptm_state(id)
+#define _PTM_DIAG_(id)    ptm%ptm_diag(id)
 
 #endif

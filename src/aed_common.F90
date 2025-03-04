@@ -57,7 +57,7 @@ MODULE aed_common
 
    !#---------------------------------------------------------------------------
 
-   PUBLIC aed_initialize, aed_initialize_benthic
+   PUBLIC aed_initialize, aed_initialize_benthic, aed_initialize_column
    PUBLIC aed_calculate, aed_calculate_surface, aed_calculate_benthic
    PUBLIC aed_calculate_benthic_zone
    PUBLIC aed_calculate_riparian, aed_calculate_dry, aed_calculate_column
@@ -68,7 +68,7 @@ MODULE aed_common
    !#---------------------------------------------------------------------------
 
    !# Re-export these from aed_core.
-   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
+   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status, aed_get_var
    PUBLIC aed_provide_global, aed_provide_sheet_global
 
@@ -305,6 +305,24 @@ SUBROUTINE aed_initialize(column, layer_idx)
       model => model%next
    ENDDO
 END SUBROUTINE aed_initialize
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_initialize_column(column, layer_map)
+   !-------------------------------------------------------------------------------
+      TYPE (aed_column_t),INTENT(inout) :: column(:)
+      INTEGER,INTENT(in) :: layer_map(:)
+   !
+   !LOCALS
+      CLASS (aed_model_data_t),POINTER :: model
+   !-------------------------------------------------------------------------------
+      model => model_list
+      DO WHILE (ASSOCIATED(model))
+         CALL model%initialize_column(column, layer_map)
+         model => model%next
+      ENDDO
+   END SUBROUTINE aed_initialize_column
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -622,19 +640,20 @@ END SUBROUTINE aed_bio_drag
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, partcl)
+SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, ptm)
 !-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
+   TYPE (aed_ptm_t),INTENT(inout) :: ptm
+!  AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
-      CALL model%particle_bgc(column, layer_idx, ppid, partcl)
+      CALL model%particle_bgc(column, layer_idx, ppid, ptm)
       model => model%next
    ENDDO
 END SUBROUTINE aed_particle_bgc

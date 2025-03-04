@@ -802,6 +802,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    par = _STATE_VAR_(data%id_par)       ! local photosynth. active radiation
    Io = _STATE_VAR_S_(data%id_I_0)      ! surface short wave radiation
 
+   print *,'PHY PAR,',Io,par
    ! Retrieve current (local) state variable values.
    pup = 0.
    IF (data%do_Puptake)  pup = _STATE_VAR_(data%id_Pupttarget(1))
@@ -1609,3 +1610,4 @@ END SUBROUTINE aed_light_extinction_phytoplankton
 
 
 END MODULE aed_phytoplankton
+

@@ -38,7 +38,7 @@ MODULE aed_core
 
    PRIVATE  !# Everything defaults to private
 
-   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
+   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status
    PUBLIC aed_get_var, aed_get_var_idx
    PUBLIC aed_set_current_model, aed_set_prefix
@@ -75,6 +75,7 @@ MODULE aed_core
       CONTAINS
          procedure :: define             => aed_define
          procedure :: initialize         => aed_initialize
+         procedure :: initialize_column  => aed_initialize_column
          procedure :: initialize_benthic => aed_initialize_benthic
          procedure :: calculate_surface  => aed_calculate_surface
          procedure :: calculate          => aed_calculate
@@ -127,6 +128,16 @@ MODULE aed_core
       AED_REAL,             POINTER :: flux_ben
       AED_REAL,             POINTER :: flux_rip
    END TYPE aed_column_t
+   !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   
+   !#---------------------------------------------------------------------------
+   TYPE :: aed_ptm_t
+      INTEGER, DIMENSION(:),POINTER :: ptm_istat      
+      AED_REAL,DIMENSION(:),POINTER :: ptm_env        
+      AED_REAL,DIMENSION(:),POINTER :: ptm_state        
+      AED_REAL,DIMENSION(:),POINTER :: ptm_diag       
+   ENDTYPE aed_ptm_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -608,10 +619,11 @@ END FUNCTION aed_define_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname) RESULT(ret)
+FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
+   LOGICAL,INTENT(in),OPTIONAL :: zavg
 !
 !LOCALS
    INTEGER :: ret
@@ -625,6 +637,15 @@ FUNCTION aed_define_diag_variable(name, units, longname) RESULT(ret)
    all_vars(ret)%diag = .true.
 !  all_vars(ret)%extern = .false.
    all_vars(ret)%found = .true.
+
+   IF ( PRESENT(zavg) ) THEN
+      all_vars(ret)%zavg = zavg
+      all_vars(ret)%zavg_req = .FALSE.
+   ELSE
+      all_vars(ret)%zavg = .FALSE.
+      all_vars(ret)%zavg_req = .FALSE.
+   ENDIF
+   
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -940,6 +961,18 @@ END SUBROUTINE aed_initialize
 
 
 !###############################################################################
+SUBROUTINE aed_initialize_column(data,column,layer_map)
+   !-------------------------------------------------------------------------------
+      CLASS (aed_model_data_t),INTENT(in) :: data
+      TYPE (aed_column_t),INTENT(inout) :: column(:)
+      INTEGER,INTENT(in) :: layer_map(:)
+!-------------------------------------------------------------------------------
+!print*,"Default aed_calculate_benthic ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_initialize_column
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed_initialize_benthic(data,column, layer_idx)
 !-------------------------------------------------------------------------------
    CLASS (aed_model_data_t),INTENT(in) :: data
@@ -1121,12 +1154,12 @@ END SUBROUTINE aed_light_extinction
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,partcl)
+SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,ptm)
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
+   TYPE (aed_ptm_t), INTENT(inout) :: ptm
 !-------------------------------------------------------------------------------
 !print*,"Default aed_particle_bgc ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_particle_bgc

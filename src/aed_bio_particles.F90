@@ -232,15 +232,16 @@ END SUBROUTINE aed_define_bio_particles
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc_bio_particles(data,column,layer_idx,ppid,partcl)
+SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,ptm )  
 !ARGUMENTS
    CLASS (aed_bio_particles_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
+   TYPE (aed_ptm_t),INTENT(inout) :: ptm
 !
 !LOCALS
+   AED_REAL :: partcl(100)
    INTEGER :: n
    AED_REAL :: oxy_flux
    AED_REAL :: decay, area, thickness
