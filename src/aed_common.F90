@@ -461,6 +461,7 @@ SUBROUTINE aed_calculate_riparian(column, layer_idx, pc_wet)
       CALL model%calculate_riparian(column, layer_idx, pc_wet)
       model => model%next
    ENDDO
+
 END SUBROUTINE aed_calculate_riparian
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
