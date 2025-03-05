@@ -71,6 +71,7 @@ MODULE aed_geochemistry
       INTEGER  :: id_totC
       INTEGER  :: id_feii, id_feiii
       INTEGER  :: id_h2s, id_so4
+      INTEGER  :: id_tss, id_compd(MAX_GC_COMPONENTS)
 
       !# Model parameters
       INTEGER  :: num_comp, num_mins
@@ -88,6 +89,11 @@ MODULE aed_geochemistry
       AED_REAL :: w_gch(MAX_GC_MINERALS)
       AED_REAL,          DIMENSION(:), ALLOCATABLE :: DissComp,PartComp
       CHARACTER(len=64), DIMENSION(:), ALLOCATABLE :: listDissTransVars,listPartTransVars
+
+      INTEGER  :: MeAdsorptionModel(MAX_GC_COMPONENTS), resuspension
+      LOGICAL  :: simMeAdsorption, ads_use_pH, ads_use_external_tss
+      AED_REAL :: KMep(MAX_GC_COMPONENTS), Kadsratio(MAX_GC_COMPONENTS), Qmax(MAX_GC_COMPONENTS), theta_KMe, K_sal   ! Adsoprtion
+
 
      CONTAINS
          PROCEDURE :: define            => aed_define_geochemistry
@@ -162,6 +168,18 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    CHARACTER(len=64) :: ph_link = 'CAR_pH'
    CHARACTER(len=64) :: pco2_link = 'CAR_pCO2'
    CHARACTER(len=64) :: oxy_link = 'OXY_oxy'
+   ! Adsorption
+   LOGICAL           :: simMeAdsorption = .FALSE.
+   LOGICAL           :: ads_use_external_tss = .FALSE.
+   INTEGER           :: MeAdsorptionModel(MAX_GC_MINERALS) = 0
+   LOGICAL           :: ads_use_pH   = .FALSE.
+   AED_REAL          :: KMep(MAX_GC_COMPONENTS) = 1.05
+   AED_REAL          :: theta_KMe   = 1.02
+   AED_REAL          :: K_sal        = 1000
+   AED_REAL          :: Kadsratio(MAX_GC_COMPONENTS)    = 1.05
+   AED_REAL          :: Qmax(MAX_GC_COMPONENTS)         = 1.05
+   CHARACTER(len=64) :: sorption_target_variable=''
+
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
@@ -180,12 +198,21 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                     Riron_aox, Riron_box, theta_iron_ox,                       &
                     Rsulf_red, theta_sulf_red, Ksulf_red,                      &
                     Rsulf_ox, theta_sulf_ox, Ksulf_ox,                         &
-                    ph_link, inflow_pH_update, pco2_link, diag_level
+                    ph_link, inflow_pH_update, pco2_link, diag_level, &
+                    simMeAdsorption, &
+                    ads_use_external_tss, &
+                    sorption_target_variable, &
+                    MeAdsorptionModel, &
+                    KMep, &
+                    ads_use_pH, &
+                    Kadsratio, &
+                    Qmax
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_geochemistry configuration"
    print *,"         WARNING! aed_geochemistry model is under development"
 
+   
    ! MH:JOBS
    ! remove pe
    ! species outputs
@@ -226,6 +253,18 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    speciesOutput = ''
    speciesOutput(1) = 'NONCON'
    !speciesOutput(1) = 'HCO3-'
+
+   data%simMeAdsorption =  simMeAdsorption
+   data%MeAdsorptionModel = MeAdsorptionModel
+   data%KMep = KMep
+   data%ads_use_pH = ads_use_pH
+   data%Kadsratio = Kadsratio
+   data%Qmax = Qmax
+
+   print *,"simMeAdsorption",simMeAdsorption
+   print *,"MeAdsorptionModel",MeAdsorptionModel
+
+
 
    !----------------------------------------------------------------------------
    ! Now load the geochem database
@@ -279,12 +318,19 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
          min = zero_
          IF ( TRIM(data%listDissTransVars(i)) == 'ubalchg' ) min=nan_
          ! Register state variables
-         data%id_comp(i) = aed_define_variable(                               &
-          !                          TRIM(dis_components(i)),                  &
+         data%id_comp(i) = aed_define_variable(                                &
                                     TRIM(data%listDissTransVars(i)),           &
                                     'mmol/m**3','geochemistry',                &
                                     data%DissComp(i),                          &
                                     minimum=min)
+         IF ( simMeAdsorption .and. MeAdsorptionModel(i)>0 ) THEN 
+            data%id_compd(i) = aed_define_variable(                            &
+                                      TRIM(data%listDissTransVars(i))//'_ads', &
+                                      'mmol/m**3','geochemistry',              &
+                                      zero_,                                   &
+                                      minimum=min)
+         ENDIF
+
       ELSE
          ! Register external state variable dependencies
          data%id_cdep(i) = aed_locate_variable( TRIM(component_link(i)) )
@@ -327,6 +373,9 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
      ! Link to module
      data%id_pH = aed_locate_variable(ph_link)
    ENDIF
+
+   IF ( simMeAdsorption )  &
+      data%id_tss = aed_locate_variable(sorption_target_variable)
 
    ! solution to get aed_carbon's pCO2 updated for atm exchange ...
    data%id_c_pco2 = aed_locate_variable(pco2_link)
@@ -580,7 +629,7 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
    AED_REAL,   DIMENSION(SIZE(data%PartComp))  :: partConcs
    ! Temporary variables
    INTEGER  :: i
-   REAL :: pco2,nc
+   AED_REAL :: pco2,nc, tss,MeDis,MePar,inDis,inPar, KMep,pH
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -638,6 +687,52 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
  !   _DIAG_VAR_(data%id_noncon) = nc
  !   _DIAG_VAR_(data%id_gcdiag(5)) = nc
  ! ENDIF
+
+
+
+   !Adsorption
+   IF( data%simMeAdsorption )
+   ! Retrieve current environmental conditions for the cell.
+   tss = zero_
+   IF(data%id_tss>0) THEN
+     tss = _STATE_VAR_(data%id_tss) ! externally supplied total susp solids
+   END IF
+
+   DO i=1,data%num_comp
+      IF ( data%MeAdsorptionModel(i) ==0 ) CYCLE
+
+      inDis = _STATE_VAR_(data%id_comp(i)) 
+      inPar = _STATE_VAR_(data%id_compd(i))  ! no adsorped for linked component ,..!
+
+     ! Adjust local sorption coefficients for temperature or salinity  (PO4AdsorptionModel = 1 only)
+     KMep = data%KMep(i) !* KMep_fT_fSal(data%theta_KMe, data%K_sal, salt, temp)
+
+     ! Compute sorption
+     IF(data%ads_use_pH) THEN
+       pH = _STATE_VAR_(data%id_pH)
+
+     CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependencies
+                                  inDis+inPar,                          &
+                                  tss,                                 &
+                                  data%KMep(i),data%Kadsratio(i),data%Qmax(i),      &
+                                  MeDis,MePar,                       &  ! Returning variables
+                                  thepH=pH)
+
+   ELSE
+     CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependecies
+                                  inDis+inPar,                          &
+                                  tss,                                 &
+                                  data%KMep(i),data%Kadsratio(i),data%Qmax(i),      &
+                                  MeDis,MePar,                       &  ! Returning variables
+                                  temp_=temp,salt_=sal)
+   ENDIF
+
+   ! Set back to core variables
+   _STATE_VAR_(data%id_comp(i)) = MeDis 
+   _STATE_VAR_(data%id_compd(i)) = MePar 
+  ENDIF 
+ENDDO
+
 
 END SUBROUTINE aed_equilibrate_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -825,6 +920,98 @@ END SUBROUTINE aed_inflow_update_geochemistry
  END FUNCTION calcSulfurOxidation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+
+!###############################################################################
+ SUBROUTINE MetalAdsorptionFraction(MetalAdsorptionModel, &
+                                    MeTot_,               &
+                                    ParticleConc_,        &
+                                    KMep,K,Qm,            &
+                                    MeDis,MePar,          &
+                                    thepH,                &
+                                    temp_,salt_)
+!-------------------------------------------------------------------------------
+! Routine to compute fraction of Me adsorped to sediment/particulate concentration
+!-------------------------------------------------------------------------------
+INTEGER,  INTENT(IN)  :: MetalAdsorptionModel
+AED_REAL, INTENT(IN)  :: MeTot_, ParticleConc_
+AED_REAL, INTENT(IN)  :: KMep,K,Qm
+AED_REAL, INTENT(OUT) :: MeDis, MePar
+AED_REAL, INTENT(IN), OPTIONAL :: thepH
+AED_REAL, INTENT(in), OPTIONAL :: temp_
+AED_REAL, INTENT(in), OPTIONAL :: salt_
+
+!-------------------------------------------------------------------------------
+!LOCALS
+AED_REAL :: MeTot, ParticleConc
+AED_REAL :: buffer, f_pH, pH                                        ! for option 2
+AED_REAL :: parA, parB, Pexch, EPC0, Ppar, temp, salt, KMep_fT_fSal ! for option 3
+AED_REAL,PARAMETER :: one_e_neg_ten = 1e-10
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+MeDis   = zero_
+MePar   = zero_
+buffer   = zero_
+f_pH     = one_
+
+! calculate the total possible Me for sorption, and solids
+MeTot        = MAX(one_e_neg_ten, MeTot_ )        ! Co in Chao (mg)
+ParticleConc  = MAX(one_e_neg_ten, ParticleConc_ ) ! s in Chao  (mg = mol/L * g/mol * mg/g)
+
+
+IF(MetalAdsorptionModel == 1) THEN
+!-----------------------------------------------------
+! This is the model for PO4 sorption from Ji 2008:
+!
+! Ji, Z-G. 2008. Hydrodynamics and Water Quality. Wiley Press.
+
+MePar = (KMep*ParticleConc) / (one_+KMep*ParticleConc) * MeTot
+MeDis = one_ / (one_+KMep*ParticleConc) * MeTot
+
+
+ELSEIF(MetalAdsorptionModel == 2) THEN
+!-----------------------------------------------------
+! This is the model for PO4 sorption from Chao et al. 2010:
+!
+! Chao, X. et al. 2010. Three-dimensional numerical simulation of
+!   water quality and sediment associated processes with application
+!   to a Mississippi delta lake. J. Environ. Manage. 91 p1456-1466.
+IF(PRESENT(thepH)) THEN
+pH = MIN(MAX(2.0,thepH),12.0)
+
+! -0.0094x2 + 0.0428x + 0.9574
+! (ursula.salmon@uwa.edu.au: fPH for PO4 sorption to Fe in Mine Lakes)
+f_pH = -0.0094*pH*pH + 0.0428*pH + 0.9574
+ELSE
+f_pH = one_
+END IF
+
+! calculate particulate fraction based on quadratic solution
+
+! Chao Eq 16
+buffer = SQRT(((MeTot+(1./K)-(ParticleConc*Qm*f_pH)))**2. + (4.*f_pH*ParticleConc*Qm/K))
+MePar  = 0.5 * ((MeTot+(1./K)+(ParticleConc*Qm*f_pH))  - buffer  )
+
+! Check for stupid solutions
+IF(MePar > MeTot) MePar = MeTot
+IF(MePar < zero_) MePar = zero_
+
+! Now set dissolved portion
+MeDis = MeTot - MePar
+
+
+ELSE
+!-----------------------------------------------------
+! No model is selected
+
+MeDis = MeTot
+MePar = zero_
+
+END IF
+
+END SUBROUTINE MetalAdsorptionFraction
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 END MODULE aed_geochemistry

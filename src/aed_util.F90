@@ -404,7 +404,8 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
       CASE (4)
          ! CH4 one from Arianto Santoso <abs11@students.waikato.ac.nz>
          schmidt = 2039.2 - (120.31*temp) + (3.4209*temp*temp) - (0.040437*temp*temp*temp)
-         schmidt = schmidt / 600
+		 ! P. Huang comment out the following line it seems wrong
+         ! schmidt = schmidt / 600
       CASE (5)
          ! CH4 from Sturm et al. 2014 (ex Wanninkhof, 1992)
          schmidt = 1897.8 - (114.28*temp) + (3.2902*temp*temp) - (0.039061*temp*temp*temp)

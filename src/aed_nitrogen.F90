@@ -69,6 +69,7 @@ MODULE aed_nitrogen
       INTEGER  :: id_sed_amm, id_sed_nit, id_sed_n2o, id_sed_no2
       INTEGER  :: id_atm_n2o, id_atm_dep
       INTEGER  :: id_cell_vel
+      INTEGER  :: id_Fsed_n2o_dry, id_atemp
 
       !# Model parameters
       AED_REAL :: Rnitrif,Rdenit,Rn2o,Rdnra,kanammox !,Ranammox
@@ -88,11 +89,17 @@ MODULE aed_nitrogen
       INTEGER  :: oxy_lim, simN2O, n2o_piston_model, Fsed_nit_model
       INTEGER  :: sal_model
 
+      LOGICAL  :: simExposed
+      INTEGER  :: dry_model
+      AED_REAL :: Fsed_n2o_dry, theta_sed_dry
+
+
      CONTAINS
          PROCEDURE :: define            => aed_define_nitrogen
          PROCEDURE :: calculate         => aed_calculate_nitrogen
          PROCEDURE :: calculate_benthic => aed_calculate_benthic_nitrogen
          PROCEDURE :: calculate_surface => aed_calculate_surface_nitrogen
+         PROCEDURE :: calculate_dry     => aed_calculate_dry_nitrogen
 !        PROCEDURE :: mobility          => aed_mobility_nitrogen
 !        PROCEDURE :: light_extinction  => aed_light_extinction_nitrogen
 !        PROCEDURE :: delete            => aed_delete_nitrogen
@@ -188,6 +195,12 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    CHARACTER(len=64) :: Fsed_nit_variable=''
    CHARACTER(len=64) :: Fsed_n2o_variable=''
    CHARACTER(len=64) :: Fsed_no2_variable=''
+
+   LOGICAL           :: simExposed
+   INTEGER           :: dry_model        = 0
+   AED_REAL          :: theta_sed_dry    = one_
+   AED_REAL          :: Fsed_n2o_dry     = zero_
+
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
@@ -209,11 +222,15 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 simNitrfpH, simNitrfLight, simNitrfSal, K_sal, S0,             &
                 simDryDeposition, simWetDeposition, &
                 atm_din_dd, atm_din_conc, atm_pn_dd, f_dindep_nox, Fsed_nit_model, &
+                simExposed, dry_model, theta_sed_dry, Fsed_n2o_dry, &
                 diag_level
 !
 !------------------------------------------------------------------------------+
 !BEGIN
    print *,"        aed_nitrogen configuration"
+
+   !# Set defaults
+   data%simExposed    = .false.
 
    !---------------------------------------------------------------------------+
    ! Read the namelist
@@ -221,6 +238,9 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    IF (status /= 0) STOP 'Error reading namelist for &aed_nitrogen'
 
    IF(Ranammox>1e-10) STOP 'Ranammox is now deprecated; please replace with kanammox.'
+
+   !# Update configuration flags after options read in
+   IF (dry_model>0)  data%simExposed = .true.
 
    !---------------------------------------------------------------------------+
    ! Store config options and parameter values in module main data structure
@@ -273,6 +293,13 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%atm_din_conc     = MAX(zero_,atm_din_conc)
    data%f_dindep_nox     = MIN(MAX(zero_,f_dindep_nox),one_)
 
+   data%dry_model        = dry_model
+   data%simExposed       = simExposed
+   data%theta_sed_dry    = theta_sed_dry
+   data%Fsed_n2o_dry     = Fsed_n2o_dry/secs_per_day
+
+
+
    !---------------------------------------------------------------------------+
    ! Register state variables
    data%id_amm = aed_define_variable('amm','mmol N/m3','ammonium',             &
@@ -324,6 +351,10 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    IF (data%use_sed_model_no2 .and. simN2O>1 ) &
      data%id_Fsed_no2 = aed_locate_sheet_variable(Fsed_no2_variable)
 
+   IF (data%use_sed_model_n2o .and. simN2O>0 .and. simExposed ) &
+     data%id_Fsed_n2o_dry = aed_locate_sheet_variable( TRIM(Fsed_n2o_variable)//'_dry' )
+  
+
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
    data%id_sed_amm = aed_define_sheet_diag_variable('amm_dsf','mmol N/m2/d','ammonium sediment flux')
@@ -354,6 +385,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    IF( simN2O>0 )         data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
   !IF( simN2O>0 )         data%id_E_tau   = aed_locate_global('taub')    ! tau to be converted to velocity
   !IF( simN2O>0 )         data%id_E_dens  = aed_locate_global('density') ! density needed for tau-vel
+   IF( data%simExposed )  data%id_atemp =  aed_locate_sheet_global('air_temp')
+
 
 END SUBROUTINE aed_define_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -738,6 +771,55 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
 
 
 END SUBROUTINE aed_calculate_benthic_nitrogen
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+SUBROUTINE aed_calculate_dry_nitrogen(data,column,layer_idx)
+  !-------------------------------------------------------------------------------
+  ! Atmospheric component of the AED implementation of the OASIM model
+  ! Note DRY cells only refer to 2D (sheet) variables
+  !-------------------------------------------------------------------------------
+  !ARGUMENTS
+     CLASS (aed_nitrogen_data_t),INTENT(in) :: data
+     TYPE (aed_column_t),INTENT(inout) :: column(:)
+     INTEGER,INTENT(in) :: layer_idx
+  !
+  !LOCALS
+     AED_REAL :: Fsed_n2o, n2o_flux
+     AED_REAL :: temp
+  !
+  !-------------------------------------------------------------------------------
+  !BEGIN
+
+  IF (.NOT. data%simExposed ) RETURN
+
+  ! Set column time/location and environmenal properties
+  temp = _STATE_VAR_S_(data%id_atemp) ! local air temperature
+
+
+  !# CO2 exposed-sediment to air flux
+  IF(data%simN2O>0) THEN
+     
+     IF ( data%use_sed_model_n2o ) THEN
+        Fsed_n2o = _DIAG_VAR_S_(data%id_Fsed_n2o_dry) / secs_per_day
+     ELSE
+        Fsed_n2o = data%Fsed_n2o_dry
+     ENDIF
+  
+     n2o_flux = Fsed_n2o * (data%theta_sed_dry**(temp-20.0))
+
+     ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
+     IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux * secs_per_day
+  
+     !# Store N2O flux across the soil-atm interface into 
+     !  diagnostic variable (mmmol/m2/d)
+     IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_n2o) = n2o_flux * secs_per_day
+   
+  END IF
+
+END SUBROUTINE aed_calculate_dry_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
