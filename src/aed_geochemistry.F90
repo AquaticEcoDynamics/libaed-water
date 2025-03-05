@@ -691,48 +691,48 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
 
 
    !Adsorption
-   IF( data%simMeAdsorption )
+   IF( data%simMeAdsorption ) THEN
    ! Retrieve current environmental conditions for the cell.
-   tss = zero_
-   IF(data%id_tss>0) THEN
-     tss = _STATE_VAR_(data%id_tss) ! externally supplied total susp solids
-   END IF
+     tss = zero_
+     IF(data%id_tss>0) THEN
+       tss = _STATE_VAR_(data%id_tss) ! externally supplied total susp solids
+     END IF
 
-   DO i=1,data%num_comp
-      IF ( data%MeAdsorptionModel(i) ==0 ) CYCLE
+     DO i=1,data%num_comp
+        IF ( data%MeAdsorptionModel(i) ==0 ) CYCLE
 
       inDis = _STATE_VAR_(data%id_comp(i)) 
       inPar = _STATE_VAR_(data%id_compd(i))  ! no adsorped for linked component ,..!
 
-     ! Adjust local sorption coefficients for temperature or salinity  (PO4AdsorptionModel = 1 only)
-     KMep = data%KMep(i) !* KMep_fT_fSal(data%theta_KMe, data%K_sal, salt, temp)
+      ! Adjust local sorption coefficients for temperature or salinity  (PO4AdsorptionModel = 1 only)
+      KMep = data%KMep(i) !* KMep_fT_fSal(data%theta_KMe, data%K_sal, salt, temp)
 
-     ! Compute sorption
-     IF(data%ads_use_pH) THEN
-       pH = _STATE_VAR_(data%id_pH)
+      ! Compute sorption
+      IF(data%ads_use_pH) THEN
+        pH = _STATE_VAR_(data%id_pH)
 
-     CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependencies
+        CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependencies
                                   inDis+inPar,                          &
                                   tss,                                 &
                                   data%KMep(i),data%Kadsratio(i),data%Qmax(i),      &
                                   MeDis,MePar,                       &  ! Returning variables
                                   thepH=pH)
 
-   ELSE
-     CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependecies
+      ELSE
+        CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependecies
                                   inDis+inPar,                          &
                                   tss,                                 &
                                   data%KMep(i),data%Kadsratio(i),data%Qmax(i),      &
                                   MeDis,MePar,                       &  ! Returning variables
                                   temp_=temp,salt_=sal)
+      ENDIF
+
+      ! Set back to core variables
+      _STATE_VAR_(data%id_comp(i)) = MeDis 
+      _STATE_VAR_(data%id_compd(i)) = MePar 
+      !ENDIF 
+     ENDDO
    ENDIF
-
-   ! Set back to core variables
-   _STATE_VAR_(data%id_comp(i)) = MeDis 
-   _STATE_VAR_(data%id_compd(i)) = MePar 
-  ENDIF 
-ENDDO
-
 
 END SUBROUTINE aed_equilibrate_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
