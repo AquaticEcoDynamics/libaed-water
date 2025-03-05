@@ -641,12 +641,12 @@ END SUBROUTINE aed_bio_drag
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, ptm)
+SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, p)
 !-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   TYPE (aed_ptm_t),INTENT(inout) :: ptm
+   TYPE (aed_ptm_t),INTENT(inout) :: p
 !  AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
 !
 !LOCALS
@@ -654,7 +654,7 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, ptm)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
-      CALL model%particle_bgc(column, layer_idx, ppid, ptm)
+      CALL model%particle_bgc(column, layer_idx, ppid, p)
       model => model%next
    ENDDO
 END SUBROUTINE aed_particle_bgc

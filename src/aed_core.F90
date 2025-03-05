@@ -130,7 +130,7 @@ MODULE aed_core
    END TYPE aed_column_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-   
+
    !#---------------------------------------------------------------------------
    TYPE :: aed_ptm_t
       INTEGER, DIMENSION(:),POINTER :: ptm_istat      
@@ -1154,12 +1154,12 @@ END SUBROUTINE aed_light_extinction
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,ptm)
+SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,p)
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   TYPE (aed_ptm_t), INTENT(inout) :: ptm
+   TYPE (aed_ptm_t), INTENT(inout) :: p
 !-------------------------------------------------------------------------------
 !print*,"Default aed_particle_bgc ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_particle_bgc

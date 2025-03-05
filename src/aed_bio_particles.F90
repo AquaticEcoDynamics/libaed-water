@@ -62,7 +62,7 @@ MODULE aed_bio_particles
       INTEGER :: id_ptm_00
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop
-      INTEGER :: id_lht, id_larea
+      INTEGER :: id_lht, id_larea, id_dep, id_tem
 
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
@@ -85,6 +85,20 @@ MODULE aed_bio_particles
    INTEGER, PARAMETER :: PTM_BIRTH  = 17
    INTEGER, PARAMETER :: PTM_AGE    = 18
    INTEGER, PARAMETER :: PTM_STATUS = 19
+
+   ! PTM array reference index locations
+   INTEGER, PARAMETER :: STAT = 1  !#define STAT   0
+   INTEGER, PARAMETER :: IDX2 = 2  !#define IDX2   1
+   INTEGER, PARAMETER :: IDX3 = 3  !#define IDX3   2
+   INTEGER, PARAMETER :: LAYR = 4  !#define LAYR   3
+   INTEGER, PARAMETER :: FLAG = 5  !#define FLAG   4
+   
+   INTEGER, PARAMETER :: MASS = 1  !#define MASS   0
+   INTEGER, PARAMETER :: DIAM = 2  !#define DIAM   1
+   INTEGER, PARAMETER :: DENS = 3  !#define DENS   2
+   INTEGER, PARAMETER :: VVEL = 4  !#define VVEL   3
+   INTEGER, PARAMETER :: HGHT = 5  !#define HGHT   4
+
 
    LOGICAL :: extra_diag = .false.
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
@@ -224,15 +238,184 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%id_dop = aed_locate_variable('OGM_dop')
 
    ! Environment variables
-   data%id_larea = aed_locate_sheet_global('layer_area')
+   data%id_tem = aed_locate_global('temp')
    data%id_lht = aed_locate_global('layer_ht')
+   data%id_larea = aed_locate_sheet_global('layer_area')
+   data%id_dep = aed_locate_sheet_global('col_depth')
 
 END SUBROUTINE aed_define_bio_particles
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,ptm )  
+SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )  
+!ARGUMENTS
+   CLASS (aed_bio_particles_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   INTEGER,INTENT(inout) :: ppid
+   TYPE (aed_ptm_t),INTENT(inout) :: p
+!
+!LOCALS
+   INTEGER :: n
+   AED_REAL :: oxy_flux
+   AED_REAL :: decay, area, thickness
+
+   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1
+   AED_REAL :: f_T, Iz, f_I, Respiration, Mu_net
+
+   AED_REAL, PARAMETER :: buoyancy_age = 86400.
+   AED_REAL, PARAMETER :: DT           = 15.*60.
+   AED_REAL, PARAMETER :: decay_rate   = 0.15
+   AED_REAL, PARAMETER :: fres         = 0.7
+
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+
+   ! Check if we are in a new cell, to reset cumulative counters
+   IF (ppid == 0) THEN
+      _DIAG_VAR_(data%id_ptm_14) = zero_
+      _DIAG_VAR_(data%id_ptm_15) = zero_
+      _DIAG_VAR_(data%id_ptm_17) = zero_
+      _DIAG_VAR_(data%id_ptm_18) = zero_
+      _DIAG_VAR_(data%id_d_oxy) = zero_
+      _DIAG_VAR_(data%id_d_dc)  = zero_
+      _DIAG_VAR_(data%id_d_dn)  = zero_
+      _DIAG_VAR_(data%id_d_dp)  = zero_
+ 
+      IF( diag_level >= 10 ) THEN
+       _DIAG_VAR_(data%id_ptm_01) = zero_
+       _DIAG_VAR_(data%id_ptm_02) = zero_
+       _DIAG_VAR_(data%id_ptm_03) = zero_
+       _DIAG_VAR_(data%id_ptm_04) = zero_
+       _DIAG_VAR_(data%id_ptm_05) = zero_
+       _DIAG_VAR_(data%id_ptm_06) = zero_
+       _DIAG_VAR_(data%id_ptm_07) = zero_
+       _DIAG_VAR_(data%id_ptm_08) = zero_
+       _DIAG_VAR_(data%id_ptm_09) = zero_
+       _DIAG_VAR_(data%id_ptm_10) = zero_
+       _DIAG_VAR_(data%id_ptm_11) = zero_
+       _DIAG_VAR_(data%id_ptm_12) = zero_
+       _DIAG_VAR_(data%id_ptm_13) = zero_
+       _DIAG_VAR_(data%id_ptm_16) = zero_
+      ENDIF
+    ENDIF
+ 
+    ! Increment the particle count for this cell and set to diagnostic
+    ppid = ppid + 1
+    _DIAG_VAR_(data%id_ptm_00) = ppid !,AED_REAL)   ! total number of particles within a cell
+ 
+   ! Temporary settings
+   Mu_max=1.2  !maximum daily growth rate
+   Light=2000.  !surface irradiance
+   Kd=1.5  !light extinction coefficient
+   N_Limitation=0.8  !limitation by N 
+   P_Limitation=0.8  !limitation by P 
+   D0=10.  !initial size
+
+   ! Local environmental conditions in this layer
+   WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
+   Depth     = _STATE_VAR_S_(data%id_dep) -  p%ptm_env(5)  !cyanobacteria depth = water depth-cell height
+   thickness = _STATE_VAR_(data%id_lht)
+   area      = _STATE_VAR_S_(data%id_larea)
+
+   !
+
+   print *,'cell depth & temp',Depth, WaterTemperature
+
+   ! Net photosynthesis of cells
+   f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term 
+   Iz = Light * exp(-Kd * Depth)  !Lambert-Beer's law of exponential light extinction
+   f_I = (0.219 * Iz) / (0.219 * Iz + 25. + 0.001 * (0.219 * Iz)**2.)  !light limitation term 
+   Respiration = 0.1 * 1.1**(WaterTemperature - 20.)  !respiration
+   Mu_net = Mu_max * f_T * f_I * min(N_Limitation, P_Limitation) - Respiration    !net daily growth rate
+   D1 = D0 * 2.**(1. / (log10(2.) / Mu_net * 24.))  !predicted Dolichospermum size
+   
+   print *, ' D_0: ', D0 !disp(['D_0: ', num2str(D0), ' μm'])
+   print *, ' D_1: ', D1 !disp(['D_1: ', num2str(D1), ' μm'])
+
+   p%ptm_env(DIAM) = D1                  ! Set particle diameter
+
+   ! Set interactions/fluxes with water properties 
+   oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)  ! mmol C / m3/ s ! CHECK UNITS
+
+   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) - oxy_flux
+   _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + oxy_flux * data%X_nc
+   _FLUX_VAR_(data%id_frp) = _FLUX_VAR_(data%id_frp) + oxy_flux * data%X_pc
+   _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + zero_
+
+   ! DOM leakage from particles during decay
+  ! _FLUX_VAR_(data%id_doc) = _FLUX_VAR_(data%id_doc) + (1.-fres) * oxy_flux
+  ! _FLUX_VAR_(data%id_don) = _FLUX_VAR_(data%id_don) + (1.-fres) * oxy_flux * data%X_nc
+  ! _FLUX_VAR_(data%id_dop) = _FLUX_VAR_(data%id_dop) + (1.-fres) * oxy_flux * data%X_pc
+
+   ! Set diagnostics to track cumulative oxygen and nutrient fluxes into a cell
+   _DIAG_VAR_(data%id_d_oxy) = _DIAG_VAR_(data%id_d_oxy) - oxy_flux * secs_per_day    ! O2
+  ! _DIAG_VAR_(data%id_d_dc)  = _DIAG_VAR_(data%id_d_dc) - (1.-fres)* oxy_flux * secs_per_day ! DOC
+  ! _DIAG_VAR_(data%id_d_dn)  = &
+  !                          _DIAG_VAR_(data%id_d_dn) - oxy_flux * data%X_nc * secs_per_day    ! DON + NH4 + NO3
+  ! _DIAG_VAR_(data%id_d_dp)  = _DIAG_VAR_(data%id_d_dp) - oxy_flux * data%X_pc * secs_per_day ! DOP + FRP
+
+   ! Update particle bouyancy, changing with age
+   p%ptm_env(VVEL) = -1.0/86400.  
+
+   ! Set general diagnostics, summarising particles in this cell
+
+   ! 1st, Cumulate particle properties (needs to be divided by particle number for average)
+   _DIAG_VAR_(data%id_ptm_14) = _DIAG_VAR_(data%id_ptm_14) + p%ptm_env(VVEL)
+   _DIAG_VAR_(data%id_ptm_15) = &
+                  _DIAG_VAR_(data%id_ptm_15) + p%ptm_env(MASS) ! total particle mass within a cell
+   _DIAG_VAR_(data%id_ptm_17) = _DIAG_VAR_(data%id_ptm_17) !+ partcl(PTM_BIRTH)
+   _DIAG_VAR_(data%id_ptm_18) = &
+                  _DIAG_VAR_(data%id_ptm_18) !+ (partcl(PTM_AGE)-partcl(PTM_BIRTH)) /secs_per_day
+   IF( diag_level >= 10 ) THEN
+    _DIAG_VAR_(data%id_ptm_01) = _DIAG_VAR_(data%id_ptm_01) + 0. !partcl(1)
+    _DIAG_VAR_(data%id_ptm_02) = _DIAG_VAR_(data%id_ptm_02) + 0. !partcl(2)
+    _DIAG_VAR_(data%id_ptm_03) = _DIAG_VAR_(data%id_ptm_03) + 0. !partcl(3)
+    _DIAG_VAR_(data%id_ptm_04) = _DIAG_VAR_(data%id_ptm_04) + 0. !partcl(4)
+    _DIAG_VAR_(data%id_ptm_05) = _DIAG_VAR_(data%id_ptm_05) + 0. !partcl(5)
+    _DIAG_VAR_(data%id_ptm_06) = _DIAG_VAR_(data%id_ptm_06) + 0. !partcl(6)
+    _DIAG_VAR_(data%id_ptm_07) = _DIAG_VAR_(data%id_ptm_07) + 0. !partcl(7)
+    _DIAG_VAR_(data%id_ptm_08) = _DIAG_VAR_(data%id_ptm_08) + 0. !partcl(8)
+    _DIAG_VAR_(data%id_ptm_09) = _DIAG_VAR_(data%id_ptm_09) + 0. !partcl(9)
+    _DIAG_VAR_(data%id_ptm_10) = _DIAG_VAR_(data%id_ptm_10) + 0. !partcl(10)
+    _DIAG_VAR_(data%id_ptm_11) = _DIAG_VAR_(data%id_ptm_11) + 0. !partcl(11)
+    _DIAG_VAR_(data%id_ptm_12) = _DIAG_VAR_(data%id_ptm_12) + 0. !partcl(12)
+    _DIAG_VAR_(data%id_ptm_13) = _DIAG_VAR_(data%id_ptm_13) + 0. !partcl(13)
+    _DIAG_VAR_(data%id_ptm_16) = _DIAG_VAR_(data%id_ptm_16) + 0. !partcl(16)
+   ENDIF
+
+   ! 2nd, Set particle property (this will therefore remember last particle only)
+   _DIAG_VAR_(data%id_ptm114) = p%ptm_env(VVEL)
+   _DIAG_VAR_(data%id_ptm115) = 0. !partcl(PTM_MASS)
+   _DIAG_VAR_(data%id_ptm117) = 0. !partcl(PTM_BIRTH)
+   _DIAG_VAR_(data%id_ptm118) = 0. !(partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day
+   IF( diag_level >= 10 ) THEN
+    _DIAG_VAR_(data%id_ptm101) = 0. !partcl(1)
+    _DIAG_VAR_(data%id_ptm102) = 0. !partcl(2)
+    _DIAG_VAR_(data%id_ptm103) = 0. !partcl(3)
+    _DIAG_VAR_(data%id_ptm104) = 0. !partcl(4)
+    _DIAG_VAR_(data%id_ptm105) = 0. !partcl(5)
+    _DIAG_VAR_(data%id_ptm106) = 0. !partcl(6)
+    _DIAG_VAR_(data%id_ptm107) = 0. !partcl(7)
+    _DIAG_VAR_(data%id_ptm108) = 0. !partcl(8)
+    _DIAG_VAR_(data%id_ptm109) = 0. !partcl(9)
+    _DIAG_VAR_(data%id_ptm110) = 0. !partcl(10)
+    _DIAG_VAR_(data%id_ptm111) = 0. !partcl(11)
+    _DIAG_VAR_(data%id_ptm112) = 0. !partcl(12)
+    _DIAG_VAR_(data%id_ptm113) = 0. !partcl(13)
+    _DIAG_VAR_(data%id_ptm116) = 0. !partcl(16)
+   ENDIF
+
+
+END SUBROUTINE aed_particle_bgc_bio_particles
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+!###############################################################################
+SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )  
 !ARGUMENTS
    CLASS (aed_bio_particles_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
@@ -253,6 +436,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,ptm )
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+
 
    ! Check if we are in a new cell, to reset cumulative counters
    IF (ppid == 0) THEN
@@ -379,9 +563,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,ptm )
    !print *,'ptm ',ppid,(partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day,partcl(PTM_MASS), &
    !                                       decay,partcl(PTM_VVEL),_DIAG_VAR_(data%id_ptm_15)
 
-END SUBROUTINE aed_particle_bgc_bio_particles
+END SUBROUTINE aed_particle_bgc_bio_particles_og
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
 
 END MODULE aed_bio_particles
