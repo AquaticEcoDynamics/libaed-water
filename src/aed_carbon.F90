@@ -748,6 +748,8 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
+   ebb_flux = zero_
+   Fsed_ch4_ebb = zero_
 
    IF(.NOT.data%simDIC) RETURN
 

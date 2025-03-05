@@ -512,11 +512,11 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
    ENDIF
 
    !doc = _STATE_VAR_(data%id_doc)    ! local DOC
-   
+
    IF (data%id_ph>0) THEN  ! & use_oxy
       ph = _STATE_VAR_(data%id_ph)    ! local pH
    ELSE
-      ph = 7.0        
+      ph = 7.0
    ENDIF
    pH_star = abs(ph-7.)
 
@@ -549,20 +549,20 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       predation = zero_
 
       !-- Natural mortality (as impacted by T, S, pH; see Hipsey et al 2008)
-      c_PH  = data%pathogens(pth_i)%coef_mort_c_PHM 
-      K_PH  = data%pathogens(pth_i)%coef_mort_K_PHM 
-      delta = data%pathogens(pth_i)%coef_mort_delta_M 
+      c_PH  = data%pathogens(pth_i)%coef_mort_c_PHM
+      K_PH  = data%pathogens(pth_i)%coef_mort_K_PHM
+      delta = data%pathogens(pth_i)%coef_mort_delta_M
       theta = data%pathogens(pth_i)%coef_mort_theta
       kd20  = data%pathogens(pth_i)%coef_mort_kd20
       c_SM  = data%pathogens(pth_i)%coef_mort_c_SM
       alpha = data%pathogens(pth_i)%coef_mort_alpha
       beta  = data%pathogens(pth_i)%coef_mort_beta
- 
-      !   First, modify default mortality by salinity modfifier. 
+
+      !   First, modify default mortality by salinity modfifier.
       f_AOC = 0.0 ! aoc / (K_AOC + aoc). ! DOC trophic modifier of salinity sensitivity disabled.
       mortality =  kd20 + (c_SM*salinity**alpha) * ((1.0-f_AOC)**beta)
-     
-      !   Second, modify salinity-modified mortality by temperature and pH scaling factors, 
+
+      !   Second, modify salinity-modified mortality by temperature and pH scaling factors,
       f_pH  = 1.0 + c_PH * ( pH_star**delta / (pH_star**delta+K_PH**delta) )
       mortality =  mortality * f_pH * (theta**(temp-20.0))
 
@@ -604,12 +604,12 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
       ! The formulation below uses existing conditions and stores to work out
       ! attachment and detachment kinetics, assuming unlimited sediment.
       ! For a proper balance on the availability to meet attachment, the test should be
-      ! attachment > pth_f/dt and 
-      ! attachment > pth_a/dt 
+      ! attachment > pth_f/dt and
+      ! attachment > pth_a/dt
       ! which is a comparison of two orgs/m3/s rates
-      ! but dt cannot be seen in this modulle so as a stop gap I used a typical 
+      ! but dt cannot be seen in this modulle so as a stop gap I used a typical
       ! dt of 15 minutes. This should be fixed by a coder who knows what they are doing!
-      
+
       attachment = zero_
       IF (data%pathogens(pth_i)%coef_sett_fa > zero_ .AND. (pth_f+pth_a) > 1e-2) THEN
          ! Compute ratio at last time step for compariosn with coef_sett_fa
@@ -619,11 +619,11 @@ SUBROUTINE aed_calculate_pathogens(data,column,layer_idx)
          attachment = data%att_ts * (data%pathogens(pth_i)%coef_sett_fa*(pth_a + pth_f) - pth_a)
          ! Compare current frac with available pools
          ! Not enough pth_f to meet attachment need
-         IF ((att_frac<data%pathogens(pth_i)%coef_sett_fa).AND.(attachment > pth_f/900.0)) THEN 
-            attachment = 0.5 * pth_f/900.0 
+         IF ((att_frac<data%pathogens(pth_i)%coef_sett_fa).AND.(attachment > pth_f/900.0)) THEN
+            attachment = 0.5 * pth_f/900.0
          ! Not enough pth_a to meet detachment need
          ELSEIF ((att_frac>data%pathogens(pth_i)%coef_sett_fa).AND.(abs(attachment) > pth_a/900.0)) THEN
-            attachment = 0.5 * pth_a/900.0 
+            attachment = 0.5 * pth_a/900.0
          ENDIF
       ENDIF
 

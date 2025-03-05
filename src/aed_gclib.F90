@@ -43,6 +43,7 @@
 
 MODULE aed_gclib
 
+   USE aed_util
    USE aed_gctypes
 
    IMPLICIT NONE
@@ -135,7 +136,7 @@ SUBROUTINE AED_GC_Input(geoChemFile)
    AEDConst%TRA_PARS = .FALSE.
    AEDConst%BAC_PARS = .FALSE.
 
-   infile = f_get_lun()
+   infile = find_free_lun()
    OPEN(UNIT=infile,FILE=geochemFile,STATUS = "OLD",ACTION="READ",IOSTAT=status)
    IF ( status/=0) then
       print*, "Cannot open ",trim(geochemFile)
@@ -778,28 +779,6 @@ DOUBLETYPE FUNCTION antiLOG(loggedNumber, base)
 
    antiLOG = base**loggedNumber
 END FUNCTION antiLOG
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-INTEGER FUNCTION f_get_lun( )
-!-------------------------------------------------------------------------------
-! Find the first free logical unit number
-!-------------------------------------------------------------------------------
-!LOCALS
-    INTEGER  :: lun
-    LOGICAL :: opened
-!BEGIN
-    DO lun = 10,99
-      inquire(unit=lun, opened=opened)
-      IF ( .NOT. opened ) THEN
-        f_get_lun = lun
-        RETURN
-      ENDIF
-    ENDDO
-!
-    f_get_lun = lun
-END FUNCTION f_get_lun
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

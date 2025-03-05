@@ -57,8 +57,9 @@ MODULE aed_common
 
    !#---------------------------------------------------------------------------
 
-   PUBLIC aed_initialize, aed_initialize_benthic
+   PUBLIC aed_initialize, aed_initialize_benthic, aed_initialize_column
    PUBLIC aed_calculate, aed_calculate_surface, aed_calculate_benthic
+   PUBLIC aed_calculate_benthic_zone
    PUBLIC aed_calculate_riparian, aed_calculate_dry, aed_calculate_column
    PUBLIC aed_light_extinction, aed_light_shading
    PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
@@ -67,7 +68,7 @@ MODULE aed_common
    !#---------------------------------------------------------------------------
 
    !# Re-export these from aed_core.
-   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
+   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status, aed_get_var
    PUBLIC aed_provide_global, aed_provide_sheet_global
 
@@ -308,6 +309,24 @@ END SUBROUTINE aed_initialize
 
 
 !###############################################################################
+SUBROUTINE aed_initialize_column(column, layer_map)
+   !-------------------------------------------------------------------------------
+      TYPE (aed_column_t),INTENT(inout) :: column(:)
+      INTEGER,INTENT(in) :: layer_map(:)
+   !
+   !LOCALS
+      CLASS (aed_model_data_t),POINTER :: model
+   !-------------------------------------------------------------------------------
+      model => model_list
+      DO WHILE (ASSOCIATED(model))
+         CALL model%initialize_column(column, layer_map)
+         model => model%next
+      ENDDO
+   END SUBROUTINE aed_initialize_column
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed_initialize_benthic(column, layer_idx)
 !-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)
@@ -362,6 +381,36 @@ END SUBROUTINE aed_calculate_surface
 
 
 !###############################################################################
+SUBROUTINE aed_calculate_benthic_zone(column, layer_idx, zone_idx)
+!-------------------------------------------------------------------------------
+! The benthic routine may be grouped in zones by the global do_zone_averaging
+! flag, however a new model level flag allows us to not average in zones.
+! This routine takes the optional argument "do_zones" which should only be
+! passed if do_zone_averaging is on.
+! If do_zones is not present we can call every models calculate_benthic
+! routine.
+! If it IS present we pass true when called from inside the zone calculations,
+! but false when called from the normal flux calculation section.
+!-------------------------------------------------------------------------------
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   INTEGER,INTENT(in) :: zone_idx
+!
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   cur_zone_ = zone_idx
+   DO WHILE (ASSOCIATED(model))
+      CALL model%calculate_benthic(column, layer_idx)
+      model => model%next
+   ENDDO
+   cur_zone_ = 0
+END SUBROUTINE aed_calculate_benthic_zone
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
 !-------------------------------------------------------------------------------
 ! The benthic routine may be grouped in zones by the global do_zone_averaging
@@ -412,6 +461,7 @@ SUBROUTINE aed_calculate_riparian(column, layer_idx, pc_wet)
       CALL model%calculate_riparian(column, layer_idx, pc_wet)
       model => model%next
    ENDDO
+
 END SUBROUTINE aed_calculate_riparian
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -591,19 +641,20 @@ END SUBROUTINE aed_bio_drag
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, partcl)
+SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, p)
 !-------------------------------------------------------------------------------
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
+   TYPE (aed_ptm_t),INTENT(inout) :: p
+!  AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
 !
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
-      CALL model%particle_bgc(column, layer_idx, ppid, partcl)
+      CALL model%particle_bgc(column, layer_idx, ppid, p)
       model => model%next
    ENDDO
 END SUBROUTINE aed_particle_bgc

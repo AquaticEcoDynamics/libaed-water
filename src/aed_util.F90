@@ -45,13 +45,14 @@ MODULE aed_util
 
    PRIVATE
 !
-   PUBLIC find_free_lun, aed_real2str, aed_int2str, qsort, exp_integral
+   PUBLIC aed_real2str, aed_int2str, qsort, exp_integral
    PUBLIC water_viscosity
    PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC InitialTemp, SoilTemp
    PUBLIC make_dir_path, param_file_type, CSV_TYPE, NML_TYPE
+   PUBLIC find_free_lun, MYTRIM, STOPIT
 !
 
 INTEGER, PARAMETER :: CSV_TYPE = 1
@@ -60,6 +61,34 @@ INTEGER, PARAMETER :: NML_TYPE = 2
 !===============================================================================
 CONTAINS
 
+
+
+!###############################################################################
+FUNCTION MYTRIM(str) RESULT(res)
+!-------------------------------------------------------------------------------
+! Useful for passing string arguments to C functions
+!-------------------------------------------------------------------------------
+   CHARACTER(*),TARGET :: str
+   CHARACTER(:),POINTER :: res
+   INTEGER :: len
+
+   len = LEN_TRIM(str)+1
+   str(len:len) = achar(0)
+   res => str
+END FUNCTION MYTRIM
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE STOPIT(message)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*) :: message
+!-------------------------------------------------------------------------------
+   PRINT *,message
+   STOP
+END SUBROUTINE STOPIT
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################

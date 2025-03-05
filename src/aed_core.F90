@@ -38,7 +38,7 @@ MODULE aed_core
 
    PRIVATE  !# Everything defaults to private
 
-   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t
+   PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status
    PUBLIC aed_get_var, aed_get_var_idx
    PUBLIC aed_set_current_model, aed_set_prefix
@@ -51,7 +51,7 @@ MODULE aed_core
    PUBLIC aed_provide_global,          aed_provide_sheet_global
    PUBLIC aed_locate_global,           aed_locate_sheet_global
 
-   PUBLIC host_has_cell_vel
+   PUBLIC host_has_cell_vel, cur_zone_
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC model_list, last_model
    PUBLIC n_aed_models
@@ -75,6 +75,7 @@ MODULE aed_core
       CONTAINS
          procedure :: define             => aed_define
          procedure :: initialize         => aed_initialize
+         procedure :: initialize_column  => aed_initialize_column
          procedure :: initialize_benthic => aed_initialize_benthic
          procedure :: calculate_surface  => aed_calculate_surface
          procedure :: calculate          => aed_calculate
@@ -130,6 +131,16 @@ MODULE aed_core
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+   !#---------------------------------------------------------------------------
+   TYPE :: aed_ptm_t
+      INTEGER, DIMENSION(:),POINTER :: ptm_istat      
+      AED_REAL,DIMENSION(:),POINTER :: ptm_env        
+      AED_REAL,DIMENSION(:),POINTER :: ptm_state        
+      AED_REAL,DIMENSION(:),POINTER :: ptm_diag       
+   ENDTYPE aed_ptm_t
+   !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    INTEGER :: cur_mod_base = 0
@@ -137,6 +148,7 @@ MODULE aed_core
    INTEGER :: n_aed_vars = 0, a_vars = 0
    INTEGER :: n_vars = 0, n_sheet_vars = 0
    INTEGER :: n_diags = 0, n_sheet_diags = 0
+   INTEGER :: cur_zone_ = 0
 
    TYPE(aed_variable_t),DIMENSION(:),ALLOCATABLE,TARGET :: all_vars
 
@@ -502,6 +514,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
    CHARACTER(len=64) :: tname
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = 0
    IF ( ASSOCIATED(aed_cur_prefix) .AND. .NOT. place ) THEN
       tname = TRIM(aed_cur_prefix)//"_"//name
    ELSE
@@ -606,10 +619,11 @@ END FUNCTION aed_define_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname) RESULT(ret)
+FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
+   LOGICAL,INTENT(in),OPTIONAL :: zavg
 !
 !LOCALS
    INTEGER :: ret
@@ -623,6 +637,15 @@ FUNCTION aed_define_diag_variable(name, units, longname) RESULT(ret)
    all_vars(ret)%diag = .true.
 !  all_vars(ret)%extern = .false.
    all_vars(ret)%found = .true.
+
+   IF ( PRESENT(zavg) ) THEN
+      all_vars(ret)%zavg = zavg
+      all_vars(ret)%zavg_req = .FALSE.
+   ELSE
+      all_vars(ret)%zavg = .FALSE.
+      all_vars(ret)%zavg_req = .FALSE.
+   ENDIF
+   
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -767,7 +790,7 @@ FUNCTION aed_locate_sheet_variable(name,update_from_zone) RESULT(ret)
    IF ( ret /= 0 ) THEN
      IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
    ENDIF
-   IF ( ret /= 0 .AND. PRESENT(update_from_zone)) THEN
+   IF ( ret /= 0 .AND. PRESENT(update_from_zone) ) THEN
      all_vars(ret)%zavg_req = .true.
    ENDIF
 !  IF ( ret /= 0 ) THEN
@@ -780,46 +803,63 @@ END FUNCTION aed_locate_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_locate_global(name) RESULT(ret)
+FUNCTION aed_locate_global(name,nr) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
+   LOGICAL, OPTIONAL       :: nr  ! not required
 !
 !LOCALS
    INTEGER :: ret
+   LOGICAL :: nrl = .FALSE.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = -1
    IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
 
    IF ( TRIM(name) == "cell_vel" ) THEN
-       ret = -1
        IF ( .NOT. host_has_cell_vel ) RETURN
    ENDIF
 
-   ret = aed_create_variable(name, '', '', .true.)
-   all_vars(ret)%extern = .true.
+   IF ( PRESENT(nr) ) nrl = nr
+   IF ( nrl ) THEN
+     ret = aed_find_variable(name)
+   ELSE
+     ret = aed_create_variable(name, '', '', .true.)
+   ENDIF
+   IF ( ret > 0 ) all_vars(ret)%extern = .true.
 END FUNCTION aed_locate_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-FUNCTION aed_locate_sheet_global(name) RESULT(ret)
+FUNCTION aed_locate_sheet_global(name,nr) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
+   LOGICAL, OPTIONAL       :: nr  ! not required
 !
 !LOCALS
    INTEGER :: ret
+   LOGICAL :: nrl = .FALSE.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ret = -1
    IF ( TRIM(name) == '' ) THEN ; ret = 0; RETURN ; ENDIF
 
-   ret = aed_create_variable(name, '', '', .true.)
+   IF ( PRESENT(nr) ) nrl = nr
+   IF ( nrl ) THEN
+     ret = aed_find_variable(name)
+   ELSE
+     ret = aed_create_variable(name, '', '', .true.)
+   ENDIF
 
-   all_vars(ret)%sheet = .true.
-   all_vars(ret)%extern = .true.
+   IF ( ret > 0 ) THEN
+      all_vars(ret)%sheet = .true.
+      all_vars(ret)%extern = .true.
+   ENDIF
 END FUNCTION aed_locate_sheet_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -917,6 +957,18 @@ SUBROUTINE aed_initialize(data,column, layer_idx)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_initialize ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_initialize
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_initialize_column(data,column,layer_map)
+   !-------------------------------------------------------------------------------
+      CLASS (aed_model_data_t),INTENT(in) :: data
+      TYPE (aed_column_t),INTENT(inout) :: column(:)
+      INTEGER,INTENT(in) :: layer_map(:)
+!-------------------------------------------------------------------------------
+!print*,"Default aed_calculate_benthic ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_initialize_column
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -1102,12 +1154,12 @@ END SUBROUTINE aed_light_extinction
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,partcl)
+SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,p)
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
+   TYPE (aed_ptm_t), INTENT(inout) :: p
 !-------------------------------------------------------------------------------
 !print*,"Default aed_particle_bgc ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_particle_bgc
