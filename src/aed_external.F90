@@ -36,10 +36,10 @@
 ! when building in the final program we only want those for libs we dont have
 #ifdef LIBDEF
 #define NO_BENTHIC
-#define NO_RIPARIAN
 #define NO_DEMO
-#define NO_DEV
+#define NO_RIPARIAN
 #define NO_LGT
+#define NO_DEV
 #endif
 
 
