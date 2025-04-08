@@ -84,11 +84,11 @@ MODULE aed_sedflux
       AED_REAL,ALLOCATABLE :: active_zones(:)
       AED_REAL :: Fsed_oxy, Fsed_rsi, Fsed_amm, Fsed_nit, Fsed_frp, &
                   Fsed_pon, Fsed_don, Fsed_pop, Fsed_dop, &
-                  Fsed_poc, Fsed_doc, Fsed_feii, & 
+                  Fsed_poc, Fsed_doc, Fsed_feii, &
                   Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o, &
                   Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry, Fsed_n2o_dry, &
                   Fstm_ch4
-                  
+
       AED_REAL,DIMENSION(:),ALLOCATABLE :: &
                   Fsed_oxy_P, Fsed_rsi_P, Fsed_amm_P, Fsed_nit_P, Fsed_frp_P, &
                   Fsed_pon_P, Fsed_don_P, Fsed_pop_P, Fsed_dop_P,  &

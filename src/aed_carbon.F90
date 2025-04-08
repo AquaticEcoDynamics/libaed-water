@@ -328,10 +328,10 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    IF (data%use_sed_model_dic .and. simExposed ) &
       data%id_Fsed_dic_dry = aed_locate_sheet_variable( TRIM(Fsed_dic_variable)//'_dry' )
-   
+
    IF (data%use_sed_model_ch4 .and. simExposed ) &
       data%id_Fsed_ch4_dry = aed_locate_sheet_variable( TRIM(Fsed_ch4_variable)//'_dry' )
- 
+
    IF (data%use_sed_model_ebb .and. simExposed ) &
       data%id_Fsed_ch4_ebb_dry = aed_locate_sheet_variable( TRIM(Fsed_ebb_variable)//'_dry' )
 
@@ -349,8 +349,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
       !data%id_wettime = aed_define_sheet_diag_variable('wettime','d','time cell has been innundated')
       data%id_drytime = aed_define_sheet_diag_variable('drytime','d','time cell has been exposed')
     ENDIF
- 
-         
+
+
 
    !# Register diagnostic variables
    data%id_pco2 = aed_define_diag_variable('pCO2', 'atm', 'pCO2')
@@ -511,7 +511,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    ENDIF
 
    Tabs = temp + 273.15
-   
+
    ! P. Huang add the calculation of CO2 solubility, Ko
    !# Solubility, Ko (mol/L/atm)
    Ko = -58.0931+90.5069*(100.0/Tabs) + 22.294*log(Tabs/100.0) &
@@ -527,7 +527,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
       !# Retrieve current (local) state variable values.
      dic  = _STATE_VAR_(data%id_dic)! Concentration of carbon in surface layer
      pH = _STATE_VAR_(data%id_pH)  ! Concentration of carbon in surface layer
-     
+
 
      IF ( data%co2_model == 1 ) THEN
        !# Use the CO2SYS code for computing pCO2 & pH
@@ -541,7 +541,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
        IF( data%alk_mode == 0 ) THEN
          ! Freshwater system - carbonate alkalinity assumed
-		 !pH = pHin
+         !pH = pHin
          deltapH = 5.
          ! As carbonate alkalinity depends on H+, lets iterate
          iter = 0
@@ -598,7 +598,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
         ELSEIF( data%alk_mode == 5 ) THEN ! best-fit for Brisbane from Naomi data
           ! P. Huang update the coefficients from old binary
-		 ! p00 =       157.7
+         ! p00 =       157.7
          ! p10 =       4.298
          ! p01 =      0.6448
          ! p20 =      0.2107
@@ -612,8 +612,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
          p02 =    5.63e-05
           talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
           talk = talk / 1.0D6      ! change unit to mol/kgSW
-		  
-		  TCO2 = TCO2 * dcf
+
+          TCO2 = TCO2 * dcf
 
        ENDIF
 
@@ -621,10 +621,10 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
        !CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
        ! Return pH and pCO2 based on TA (alkalinity)
-	   ! P. Huang to change the phdum to pHin
+       ! P. Huang to change the phdum to pHin
        !CALL CO2SYS(0,T,S,zero_,talk,TCO2,phdum,pHout,pCO2,tadum)
-	   !CALL CO2SYS(0,T,S,zero_,talk,TCO2,pHin,pHout,pCO2,tadum)
-	   CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
+       !CALL CO2SYS(0,T,S,zero_,talk,TCO2,pHin,pHout,pCO2,tadum)
+       CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
        _DIAG_VAR_(data%id_pco2) = pCO2
        ! _STATE_VAR_(data%id_talk) = talk*(1.0D6)           ! total alkalinity (umol/kg)
@@ -636,12 +636,12 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
        !# Solubility, Ko (mol/L/atm)
        ! P. Huang comment out the Ko calculate, done above this module
-	   !Ko = -58.0931+90.5069*(100.0/Tabs) + 22.294*log(Tabs/100.0) &
+       !Ko = -58.0931+90.5069*(100.0/Tabs) + 22.294*log(Tabs/100.0) &
        !                                 + 0.027766*salt - 0.025888*salt*(Tabs/100.0)
        !Ko = Ko + 0.0050578*salt*(Tabs/100.0)*(Tabs/100.0)
        !Ko = exp(Ko)
        ! end of P. Huang edit
-	   
+
        pCO2 = aed_carbon_co2(data%ionic,temp,dic,ph)*1e-6 / Ko  !(=atm), use Yanti's script for pCO2
        _DIAG_VAR_(data%id_pco2) = pCO2
 
@@ -652,7 +652,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
      ENDIF
 
      !# Now compute piston velocity, k
-	 ! P. Huang changed the schmidt_model from 2 to 5, consistent to Brisbane GHG model
+     ! P. Huang changed the schmidt_model from 2 to 5, consistent to Brisbane GHG model
      kCO2 = aed_gas_piston_velocity(windHt,wind,temp,salt,                     &
          vel=vel,depth=depth,schmidt_model=5,piston_model=data%co2_piston_model)
 
@@ -683,8 +683,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
      ch4 = _STATE_VAR_(data%id_ch4)
 
      ! Piston velocity for CH4
-	 ! P. Huang changed the schmidt_model from 2 to 5, consistent to Brisbane GHG model
-	 ! the schmidt model 4 has an error by /600; has been corrected in aed_util.F90
+     ! P. Huang changed the schmidt_model from 2 to 5, consistent to Brisbane GHG model
+     ! the schmidt model 4 has an error by /600; has been corrected in aed_util.F90
      kCH4 = aed_gas_piston_velocity(windHt,wind,temp,salt, &
          vel=vel,depth=depth,schmidt_model=5,piston_model=data%ch4_piston_model)
 
@@ -881,28 +881,28 @@ SUBROUTINE aed_calculate_dry_carbon(data,column,layer_idx)
 
    !# CO2 exposed-sediment to air flux
    IF(data%simDIC) THEN
-      
+
       IF ( data%use_sed_model_dic ) THEN
          Fsed_dic = _DIAG_VAR_S_(data%id_Fsed_dic_dry) / secs_per_day
       ELSE
          Fsed_dic = data%Fsed_dic_dry
       ENDIF
-   
+
       co2_flux = Fsed_dic * (data%theta_sed_dry**(temp-20.0))
 
       ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
       IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_dic) = co2_flux * secs_per_day
-   
-      !# Store CO2 flux across the soil-atm interface into 
+
+      !# Store CO2 flux across the soil-atm interface into
       !  diagnostic variable (mmmol/m2/d)
       IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_co2) = co2_flux * secs_per_day
-    
+
    END IF
 
 
    !# CH4 exposed-sediment to air flux
    IF(data%simCH4) THEN
-      
+
       IF ( data%use_sed_model_ch4 ) THEN
          Fsed_ch4 = _DIAG_VAR_S_(data%id_Fsed_ch4_dry) / secs_per_day
          IF( data%simCH4ebb ) Fsed_ch4_ebb = _DIAG_VAR_S_(data%id_Fsed_ch4_ebb_dry) / secs_per_day
@@ -910,30 +910,30 @@ SUBROUTINE aed_calculate_dry_carbon(data,column,layer_idx)
          Fsed_ch4 = data%Fsed_ch4_dry
          IF( data%simCH4ebb ) Fsed_ch4_ebb = data%Fsed_ch4_ebb_dry
       ENDIF
-   
+
       fU = wind/(wind+2.0)
-      fDry = 2.0/(dry+2.0) 
+      fDry = 2.0/(dry+2.0)
       ch4_flux = Fsed_ch4 * (data%theta_sed_dry**(temp-20.0)) * fU * fDry
       IF( data%simCH4ebb ) THEN
            ebb_flux = Fsed_ch4_ebb * (data%theta_sed_dry**(temp-20.0))
       ENDIF
-   
+
       ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
       IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
       IF ( diag_level>0 .and. data%simCH4ebb ) _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
-   
-      !# Store CH4 flux across the soil-atm interface into 
+
+      !# Store CH4 flux across the soil-atm interface into
       !  diagnostic variable (mmmol/m2/d)
       !print *,'CHECKKKK', data%use_sed_model_ch4 , ch4_flux * secs_per_day
 
       IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_ch4) = ch4_flux * secs_per_day
       IF ( diag_level>0 .and. data%simCH4ebb ) _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * secs_per_day
-    
+
    END IF
-   
+
 END SUBROUTINE aed_calculate_dry_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-   
+
 
 !###############################################################################
 SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
@@ -952,7 +952,7 @@ SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   
+
    ! Inundation time counter and wetness checker
    IF( pc_wet < 0.1 ) THEN
       _DIAG_VAR_S_(data%id_drytime) = _DIAG_VAR_S_(data%id_drytime) + DDT
@@ -962,7 +962,7 @@ SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
       !IF( _DIAG_VAR_S_(data%id_wettime)>2. )_DIAG_VAR_S_(data%id_drytime) = zero_
       _DIAG_VAR_S_(data%id_drytime) = zero_
     ENDIF
-   
+
    IF (.NOT. data%simStemCH4 ) RETURN
 
    ! Set column time/location and environmenal properties
@@ -1003,7 +1003,7 @@ SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
    IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_stw_ch4) = stm_flux * secs_per_day
 
 
-      
+
 END SUBROUTINE aed_calculate_riparian_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1123,9 +1123,9 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
          p02 =   0.0001239
          talk = p00 + p10*S + p01*dic + p20*S**2 + p11*dic*S + p02*dic**2
          talk = talk / 1.0D6      ! change unit to mol/kgSW
-		 
-		 ! P. Huang add to match old version
-		 TCO2 = TCO2 * dcf
+
+         ! P. Huang add to match old version
+         TCO2 = TCO2 * dcf
 
       ENDIF
 
@@ -1133,11 +1133,11 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
       !CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
       ! Return pH and pCO2 based on TA (alkalinity)
-	  ! P. Huang to change phdum to pHin and comment out pHout
+      ! P. Huang to change phdum to pHin and comment out pHout
       !CALL CO2SYS(0,T,S,zero_,talk,TCO2,phdum,pHout,pCO2,tadum)
       !pH = pHout
-	  !CALL CO2SYS(0,T,S,zero_,talk,TCO2,pHin,pHout,pCO2,tadum)
-	  CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
+      !CALL CO2SYS(0,T,S,zero_,talk,TCO2,pHin,pHout,pCO2,tadum)
+      CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
   !    print *,'pH',pH,talk,pCO2
 

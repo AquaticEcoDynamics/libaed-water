@@ -353,7 +353,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
    IF (data%use_sed_model_n2o .and. simN2O>0 .and. simExposed ) &
      data%id_Fsed_n2o_dry = aed_locate_sheet_variable( TRIM(Fsed_n2o_variable)//'_dry' )
-  
+
 
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
@@ -801,22 +801,22 @@ SUBROUTINE aed_calculate_dry_nitrogen(data,column,layer_idx)
 
   !# CO2 exposed-sediment to air flux
   IF(data%simN2O>0) THEN
-     
+
      IF ( data%use_sed_model_n2o ) THEN
         Fsed_n2o = _DIAG_VAR_S_(data%id_Fsed_n2o_dry) / secs_per_day
      ELSE
         Fsed_n2o = data%Fsed_n2o_dry
      ENDIF
-  
+
      n2o_flux = Fsed_n2o * (data%theta_sed_dry**(temp-20.0))
 
      ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
      IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux * secs_per_day
-  
-     !# Store N2O flux across the soil-atm interface into 
+
+     !# Store N2O flux across the soil-atm interface into
      !  diagnostic variable (mmmol/m2/d)
      IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_n2o) = n2o_flux * secs_per_day
-   
+
   END IF
 
 END SUBROUTINE aed_calculate_dry_nitrogen

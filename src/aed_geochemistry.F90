@@ -212,7 +212,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    print *,"        aed_geochemistry configuration"
    print *,"         WARNING! aed_geochemistry model is under development"
 
-   
+
    ! MH:JOBS
    ! remove pe
    ! species outputs
@@ -323,7 +323,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                                     'mmol/m**3','geochemistry',                &
                                     data%DissComp(i),                          &
                                     minimum=min)
-         IF ( simMeAdsorption .and. MeAdsorptionModel(i)>0 ) THEN 
+         IF ( simMeAdsorption .and. MeAdsorptionModel(i)>0 ) THEN
             data%id_compd(i) = aed_define_variable(                            &
                                       TRIM(data%listDissTransVars(i))//'_ads', &
                                       'mmol/m**3','geochemistry',              &
@@ -701,7 +701,7 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
      DO i=1,data%num_comp
         IF ( data%MeAdsorptionModel(i) ==0 ) CYCLE
 
-      inDis = _STATE_VAR_(data%id_comp(i)) 
+      inDis = _STATE_VAR_(data%id_comp(i))
       inPar = _STATE_VAR_(data%id_compd(i))  ! no adsorped for linked component ,..!
 
       ! Adjust local sorption coefficients for temperature or salinity  (PO4AdsorptionModel = 1 only)
@@ -728,9 +728,9 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
       ENDIF
 
       ! Set back to core variables
-      _STATE_VAR_(data%id_comp(i)) = MeDis 
-      _STATE_VAR_(data%id_compd(i)) = MePar 
-      !ENDIF 
+      _STATE_VAR_(data%id_comp(i)) = MeDis
+      _STATE_VAR_(data%id_compd(i)) = MePar
+      !ENDIF
      ENDDO
    ENDIF
 

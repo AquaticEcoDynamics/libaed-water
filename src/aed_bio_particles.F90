@@ -92,7 +92,7 @@ MODULE aed_bio_particles
    INTEGER, PARAMETER :: IDX3 = 3  !#define IDX3   2
    INTEGER, PARAMETER :: LAYR = 4  !#define LAYR   3
    INTEGER, PARAMETER :: FLAG = 5  !#define FLAG   4
-   
+
    INTEGER, PARAMETER :: MASS = 1  !#define MASS   0
    INTEGER, PARAMETER :: DIAM = 2  !#define DIAM   1
    INTEGER, PARAMETER :: DENS = 3  !#define DENS   2
@@ -248,7 +248,7 @@ END SUBROUTINE aed_define_bio_particles
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )  
+SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 !ARGUMENTS
    CLASS (aed_bio_particles_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
@@ -283,7 +283,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
       _DIAG_VAR_(data%id_d_dc)  = zero_
       _DIAG_VAR_(data%id_d_dn)  = zero_
       _DIAG_VAR_(data%id_d_dp)  = zero_
- 
+
       IF( diag_level >= 10 ) THEN
        _DIAG_VAR_(data%id_ptm_01) = zero_
        _DIAG_VAR_(data%id_ptm_02) = zero_
@@ -301,17 +301,17 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
        _DIAG_VAR_(data%id_ptm_16) = zero_
       ENDIF
     ENDIF
- 
+
     ! Increment the particle count for this cell and set to diagnostic
     ppid = ppid + 1
     _DIAG_VAR_(data%id_ptm_00) = ppid !,AED_REAL)   ! total number of particles within a cell
- 
+
    ! Temporary settings
    Mu_max=1.2  !maximum daily growth rate
    Light=2000.  !surface irradiance
    Kd=1.5  !light extinction coefficient
-   N_Limitation=0.8  !limitation by N 
-   P_Limitation=0.8  !limitation by P 
+   N_Limitation=0.8  !limitation by N
+   P_Limitation=0.8  !limitation by P
    D0=10.  !initial size
 
    ! Local environmental conditions in this layer
@@ -325,19 +325,19 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    print *,'cell depth & temp',Depth, WaterTemperature
 
    ! Net photosynthesis of cells
-   f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term 
+   f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term
    Iz = Light * exp(-Kd * Depth)  !Lambert-Beer's law of exponential light extinction
-   f_I = (0.219 * Iz) / (0.219 * Iz + 25. + 0.001 * (0.219 * Iz)**2.)  !light limitation term 
+   f_I = (0.219 * Iz) / (0.219 * Iz + 25. + 0.001 * (0.219 * Iz)**2.)  !light limitation term
    Respiration = 0.1 * 1.1**(WaterTemperature - 20.)  !respiration
    Mu_net = Mu_max * f_T * f_I * min(N_Limitation, P_Limitation) - Respiration    !net daily growth rate
    D1 = D0 * 2.**(1. / (log10(2.) / Mu_net * 24.))  !predicted Dolichospermum size
-   
+
    print *, ' D_0: ', D0 !disp(['D_0: ', num2str(D0), ' μm'])
    print *, ' D_1: ', D1 !disp(['D_1: ', num2str(D1), ' μm'])
 
    p%ptm_env(DIAM) = D1                  ! Set particle diameter
 
-   ! Set interactions/fluxes with water properties 
+   ! Set interactions/fluxes with water properties
    oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)  ! mmol C / m3/ s ! CHECK UNITS
 
    _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) - oxy_flux
@@ -358,7 +358,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
   ! _DIAG_VAR_(data%id_d_dp)  = _DIAG_VAR_(data%id_d_dp) - oxy_flux * data%X_pc * secs_per_day ! DOP + FRP
 
    ! Update particle bouyancy, changing with age
-   p%ptm_env(VVEL) = -1.0/86400.  
+   p%ptm_env(VVEL) = -1.0/86400.
 
    ! Set general diagnostics, summarising particles in this cell
 
@@ -415,7 +415,7 @@ END SUBROUTINE aed_particle_bgc_bio_particles
 
 
 !###############################################################################
-SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )  
+SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
 !ARGUMENTS
    CLASS (aed_bio_particles_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)

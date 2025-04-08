@@ -133,10 +133,10 @@ MODULE aed_core
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_ptm_t
-      INTEGER, DIMENSION(:),POINTER :: ptm_istat      
-      AED_REAL,DIMENSION(:),POINTER :: ptm_env        
-      AED_REAL,DIMENSION(:),POINTER :: ptm_state        
-      AED_REAL,DIMENSION(:),POINTER :: ptm_diag       
+      INTEGER, DIMENSION(:),POINTER :: ptm_istat
+      AED_REAL,DIMENSION(:),POINTER :: ptm_env
+      AED_REAL,DIMENSION(:),POINTER :: ptm_state
+      AED_REAL,DIMENSION(:),POINTER :: ptm_diag
    ENDTYPE aed_ptm_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -645,7 +645,7 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
       all_vars(ret)%zavg = .FALSE.
       all_vars(ret)%zavg_req = .FALSE.
    ENDIF
-   
+
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
