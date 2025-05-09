@@ -51,7 +51,7 @@ MODULE aed_core
    PUBLIC aed_provide_global,          aed_provide_sheet_global
    PUBLIC aed_locate_global,           aed_locate_sheet_global
 
-   PUBLIC host_has_cell_vel, cur_zone_
+   PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC model_list, last_model
    PUBLIC n_aed_models
@@ -148,7 +148,6 @@ MODULE aed_core
    INTEGER :: n_aed_vars = 0, a_vars = 0
    INTEGER :: n_vars = 0, n_sheet_vars = 0
    INTEGER :: n_diags = 0, n_sheet_diags = 0
-   INTEGER :: cur_zone_ = 0
 
    TYPE(aed_variable_t),DIMENSION(:),ALLOCATABLE,TARGET :: all_vars
 
@@ -1022,14 +1021,14 @@ END SUBROUTINE aed_calculate_benthic
 
 !###############################################################################
 SUBROUTINE aed_calculate_column(data,column,layer_map)
-   !-------------------------------------------------------------------------------
-      CLASS (aed_model_data_t),INTENT(in) :: data
-      TYPE (aed_column_t),INTENT(inout) :: column(:)
-      INTEGER,INTENT(in) :: layer_map(:)
+!-------------------------------------------------------------------------------
+   CLASS (aed_model_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_map(:)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_calculate_benthic ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_calculate_column
-   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################

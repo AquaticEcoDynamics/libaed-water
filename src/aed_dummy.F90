@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2024 -  The University of Western Australia               #
+!#  Copyright 2013 - 2025 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -70,7 +70,7 @@ MODULE aed_dummy
                              id_dummy_sv(:), id_dummy_dsv(:)
       AED_REAL,ALLOCATABLE :: dm_max(:), dm_min(:)
       AED_REAL,ALLOCATABLE :: dm_smax(:), dm_smin(:)
-      INTEGER :: id_yd;
+      INTEGER :: id_yd, id_sz;
 
      CONTAINS
          PROCEDURE :: define            => aed_define_dummy
@@ -190,6 +190,7 @@ SUBROUTINE aed_define_dummy(data, namlst)
    data%id_sine = aed_define_sheet_diag_variable('DUM_sine', 'no units', 'DBG sine wave between 0.0 and 1.0', .FALSE.)
 
    data%id_yd = aed_locate_sheet_global('yearday')
+   data%id_sz = aed_locate_sheet_global('sed_zone')
 END SUBROUTINE aed_define_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -232,14 +233,14 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
 !LOCALS
    INTEGER :: i, sin_idx
    AED_REAL :: scale, offs
+   AED_REAL :: sz = -1.
 
 !-------------------------------------------------------------------------------
 !BEGIN
-   IF (cur_zone_ >  0) THEN
-      sin_idx = cur_zone_
-   ELSE
-      sin_idx = layer_idx
-   ENDIF
+   IF ( data%id_sz > 0) sz = _STATE_VAR_S_(data%id_sz)
+   sin_idx=INT(sz)
+   IF (sin_idx <= 0) sin_idx = layer_idx
+
    IF ( data%id_yd > 0 ) THEN
      today = _STATE_VAR_S_(data%id_yd)
    ELSEIF (layer_idx .EQ. 1) THEN
@@ -257,6 +258,5 @@ SUBROUTINE aed_calculate_benthic_dummy(data,column,layer_idx)
    ENDDO
 END SUBROUTINE aed_calculate_benthic_dummy
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 END MODULE aed_dummy
