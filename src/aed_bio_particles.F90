@@ -238,7 +238,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%id_dop = aed_locate_variable('OGM_dop')
 
    ! Environment variables
-   data%id_tem = aed_locate_global('temp')
+   data%id_tem = aed_locate_global('temperature')
    data%id_lht = aed_locate_global('layer_ht')
    data%id_larea = aed_locate_sheet_global('layer_area')
    data%id_dep = aed_locate_sheet_global('col_depth')

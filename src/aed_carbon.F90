@@ -178,7 +178,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: maxMPBProdn      =  40.0   ! mmolC/m2/day
    AED_REAL          :: IkMPB            = 180.0   ! Light sensitivity of MPB
 
-   LOGICAL           :: simExposed
+   LOGICAL           :: simExposed       = .false.
    INTEGER           :: dry_model        = 0
    AED_REAL          :: theta_sed_dry    = one_
    AED_REAL          :: Fsed_dic_dry     = zero_
@@ -240,7 +240,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    !# Update configuration flags after options read in
    IF (ebb_model>0)  data%simCH4ebb = .true.
-   IF (dry_model>0)  data%simExposed = .true.
+   IF (dry_model>0)  data%simExposed = .true.     ! MH in wrong location?
    IF (stem_model>0) data%simStemCH4 = .true.
 
    !# Store parameter values in modules own derived type
