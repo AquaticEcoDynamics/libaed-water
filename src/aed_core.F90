@@ -46,6 +46,7 @@ MODULE aed_core
 
    PUBLIC aed_define_variable,         aed_define_sheet_variable
    PUBLIC aed_define_diag_variable,    aed_define_sheet_diag_variable
+   PUBLIC aed_define_ptm_variable
    PUBLIC aed_locate_variable,         aed_locate_sheet_variable
 
    PUBLIC aed_provide_global,          aed_provide_sheet_global
@@ -55,6 +56,8 @@ MODULE aed_core
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC model_list, last_model
    PUBLIC n_aed_models
+
+   PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_prefix_list_t
@@ -109,8 +112,16 @@ MODULE aed_core
       AED_REAL          :: maximum
       AED_REAL          :: mobility
       AED_REAL          :: light_extinction
-      LOGICAL           :: sheet, diag, extern, found
-      LOGICAL           :: top, bot, const
+      LOGICAL           :: diag, extern  !# deprecated
+      !# NB var_type replaces diag/extern booleans because this was becoming
+      !#    difficult when particle type was added. The var_type can be :
+      !#    V_STATE, V_DIAGNOSTIC, V_EXTERNAL or V_PARTICLE so we now have
+      !#    an explicit V_STATE rather than implied by !(diag || extern)
+      INTEGER           :: var_type
+      LOGICAL           :: sheet
+      LOGICAL           :: found
+      LOGICAL           :: top, bot
+      LOGICAL           :: const
       LOGICAL           :: zavg, zavg_req
       INTEGER           :: particle_link
       INTEGER           :: index
@@ -148,6 +159,7 @@ MODULE aed_core
    INTEGER :: n_aed_vars = 0, a_vars = 0
    INTEGER :: n_vars = 0, n_sheet_vars = 0
    INTEGER :: n_diags = 0, n_sheet_diags = 0
+   INTEGER :: n_ptm_vars = 0
 
    TYPE(aed_variable_t),DIMENSION(:),ALLOCATABLE,TARGET :: all_vars
 
@@ -181,6 +193,9 @@ MODULE aed_core
 
    AED_REAL,PARAMETER :: nan_ = zero_ / zero_
 
+   INTEGER,PARAMETER :: V_STATE = 1, V_DIAGNOSTIC = 2, V_EXTERNAL = 3, V_PARTICLE = 4
+
+
 !===============================================================================
 CONTAINS
 
@@ -203,6 +218,7 @@ INTEGER FUNCTION aed_init_core(dname,have_cell_vel)
    n_aed_vars = 0 ; a_vars = 0
    n_vars = 0;  n_sheet_vars = 0
    n_diags = 0; n_sheet_diags = 0
+   n_ptm_vars = 0
    IF (PRESENT(have_cell_vel)) host_has_cell_vel = have_cell_vel
    aed_init_core = 0
 END FUNCTION aed_init_core
@@ -264,7 +280,7 @@ SUBROUTINE display_var(var, idx)
 
    req => var%req
 
-   IF ( var%extern ) THEN
+   IF (var%var_type == V_EXTERNAL ) THEN
       line = TRIM(line) // '   ---'
    ELSE IF ( ASSOCIATED(req) ) THEN
       line = TRIM(line) // '   ' // req%aed_model_prefix
@@ -297,13 +313,13 @@ END SUBROUTINE display_var
 
 
 !###############################################################################
-INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
+INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, n_p)
 !-------------------------------------------------------------------------------
 ! Status of the aed model library core routines
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(out) :: n_v, n_sv, n_d, n_sd
-   LOGICAL,INTENT(in),OPTIONAL :: logit
+   INTEGER,INTENT(out),OPTIONAL :: n_p
 !
 !LOCALS
    INTEGER :: i
@@ -316,14 +332,14 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
    write(log, *)
    write(log, *) 'ENVIRONMENT:'
    DO i=1,n_aed_vars
-      IF ( all_vars(i)%extern ) CALL display_var(all_vars(i), i)
+      IF ( all_vars(i)%var_type == V_EXTERNAL ) CALL display_var(all_vars(i), i)
    ENDDO
 
    write(log, *)
    write(log, *) 'STATE:'
    n_vars = 0 ; n_sheet_vars = 0
    DO i=1,n_aed_vars
-      IF ( .NOT. all_vars(i)%extern .AND. .NOT. all_vars(i)%diag ) THEN
+      IF ( all_vars(i)%var_type == V_STATE ) THEN
          CALL display_var(all_vars(i), i)
          IF ( all_vars(i)%sheet ) THEN
             n_sheet_vars = n_sheet_vars + 1
@@ -334,12 +350,13 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
          ENDIF
       ENDIF
    ENDDO
+   IF (n_sheet_vars + n_vars <= 0 ) write(log, *) "  No state variables"
 
    write(log, *)
    write(log, *) 'DIAGNOSTIC:'
    n_diags = 0 ; n_sheet_diags = 0;
    DO i=1,n_aed_vars
-      IF ( .NOT. all_vars(i)%extern .AND. all_vars(i)%diag ) THEN
+      IF ( all_vars(i)%var_type == V_DIAGNOSTIC ) THEN
          CALL display_var(all_vars(i), i)
          IF ( all_vars(i)%sheet ) THEN
             n_sheet_diags = n_sheet_diags + 1
@@ -350,12 +367,27 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, logit)
          ENDIF
       ENDIF
    ENDDO
+   IF (n_sheet_diags + n_diags <= 0 ) write(log, *) "  No diagnostic variables"
+
+   write(log, *)
+   write(log, *) 'PARTICLES:'
+   n_ptm_vars = 0
+   DO i=1,n_aed_vars
+      IF ( all_vars(i)%var_type == V_PARTICLE ) THEN
+         CALL display_var(all_vars(i), i)
+         n_ptm_vars = n_ptm_vars + 1
+         all_vars(i)%index = n_ptm_vars
+      ENDIF
+   ENDDO
+   IF (n_ptm_vars <= 0 ) write(log, *) "  No particle variables"
+
    write(log, *)
    write(log, *) ' -------------------------------------------------------------------'
    write(log, *)
 
    n_v = n_vars;  n_sv = n_sheet_vars
    n_d = n_diags; n_sd = n_sheet_diags
+   IF ( PRESENT(n_p) ) n_p = n_ptm_vars
    aed_core_status = n_aed_vars
 END FUNCTION aed_core_status
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -426,6 +458,7 @@ SUBROUTINE extend_allocated_variables(pcount)
    all_vars(a_vars+1:a_vars+count)%sheet = .false.
    all_vars(a_vars+1:a_vars+count)%diag = .false.
    all_vars(a_vars+1:a_vars+count)%extern = .false.
+   all_vars(a_vars+1:a_vars+count)%var_type = V_STATE
    all_vars(a_vars+1:a_vars+count)%found = .false.
    all_vars(a_vars+1:a_vars+count)%index = -1
 
@@ -539,6 +572,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%sheet = .false.
       all_vars(ret)%diag = .false.
       all_vars(ret)%extern = .false.
+      all_vars(ret)%var_type = V_STATE
       all_vars(ret)%found = .false.
       all_vars(ret)%zavg = .false.
       all_vars(ret)%zavg_req = .false.
@@ -570,14 +604,13 @@ FUNCTION aed_define_variable(name, units, longname, initial, minimum, maximum, m
 !BEGIN
    ret = aed_create_variable(name, longname, units, .false.)
 
-   if ( present(initial) ) all_vars(ret)%initial = initial
-   if ( present(minimum) ) all_vars(ret)%minimum = minimum
-   if ( present(maximum) ) all_vars(ret)%maximum = maximum
-   if ( present(mobility) ) all_vars(ret)%mobility = mobility
+   IF ( PRESENT(initial) ) all_vars(ret)%initial = initial
+   IF ( PRESENT(minimum) ) all_vars(ret)%minimum = minimum
+   IF ( PRESENT(maximum) ) all_vars(ret)%maximum = maximum
+   IF ( PRESENT(mobility) ) all_vars(ret)%mobility = mobility
 
 !  all_vars(ret)%sheet = .false.
-!  all_vars(ret)%diag = .false.
-!  all_vars(ret)%extern = .false.
+!  all_vars(ret)%var_type = V_STATE
    all_vars(ret)%found = .true.
 END FUNCTION aed_define_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -603,8 +636,7 @@ FUNCTION aed_define_sheet_variable(name, units, longname, initial, minimum, maxi
    if ( present(maximum) ) all_vars(ret)%maximum = maximum
 
    all_vars(ret)%sheet = .true.
-!  all_vars(ret)%diag = .false.
-!  all_vars(ret)%extern = .false.
+!  all_vars(ret)%var_type = V_STATE
    all_vars(ret)%found = .true.
 
    IF ( PRESENT(surf) ) THEN
@@ -635,6 +667,7 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
 !  all_vars(ret)%sheet = .false.
    all_vars(ret)%diag = .true.
 !  all_vars(ret)%extern = .false.
+   all_vars(ret)%var_type = V_DIAGNOSTIC
    all_vars(ret)%found = .true.
 
    IF ( PRESENT(zavg) ) THEN
@@ -669,6 +702,7 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
    all_vars(ret)%sheet = .true.
    all_vars(ret)%diag = .true.
 !  all_vars(ret)%extern = .false.
+   all_vars(ret)%var_type = V_DIAGNOSTIC
    all_vars(ret)%found = .true.
 
    IF ( PRESENT(surf) ) THEN
@@ -692,6 +726,27 @@ END FUNCTION aed_define_sheet_diag_variable
 
 
 !###############################################################################
+FUNCTION aed_define_ptm_variable(name, units, longname) RESULT(ret)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(*),INTENT(in) :: name, longname, units
+!
+!LOCALS
+   INTEGER :: ret
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   ret = aed_create_variable(name, longname, units, .FALSE.)
+
+!  all_vars(ret)%sheet = .FALSE.
+   all_vars(ret)%var_type = V_PARTICLE
+   all_vars(ret)%found = .TRUE.
+
+END FUNCTION aed_define_ptm_variable
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 FUNCTION aed_provide_global(name, longname, units) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
@@ -707,6 +762,7 @@ FUNCTION aed_provide_global(name, longname, units) RESULT(ret)
 !  all_vars(ret)%sheet = .false.
 !  all_vars(ret)%diag = .false.
    all_vars(ret)%extern = .true.
+   all_vars(ret)%var_type = V_EXTERNAL
    all_vars(ret)%found = .true.
 END FUNCTION aed_provide_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -729,6 +785,7 @@ FUNCTION aed_provide_sheet_global(name, longname, units, surf) RESULT(ret)
    all_vars(ret)%sheet = .true.
 !  all_vars(ret)%diag = .false.
    all_vars(ret)%extern = .true.
+   all_vars(ret)%var_type = V_EXTERNAL
    all_vars(ret)%found = .true.
 
    IF ( PRESENT(surf) ) THEN
@@ -759,7 +816,7 @@ FUNCTION aed_locate_variable(name) RESULT(ret)
    ret = aed_create_variable(name, '', '', .true.)
 
    IF ( ret /= 0 ) THEN
-     IF ( all_vars(ret)%extern .OR. all_vars(ret)%sheet ) ret = 0
+     IF ( all_vars(ret)%var_type == V_EXTERNAL .OR. all_vars(ret)%sheet ) ret = 0
    ENDIF
 !  IF ( ret /= 0 ) THEN
 !    print*,"VARIABLE ",TRIM(name)," LOCATED at ",ret
@@ -787,7 +844,7 @@ FUNCTION aed_locate_sheet_variable(name,update_from_zone) RESULT(ret)
    ret = aed_create_variable(name, '', '', .true.)
 
    IF ( ret /= 0 ) THEN
-     IF ( all_vars(ret)%extern .OR. .NOT. all_vars(ret)%sheet ) ret = 0
+     IF ( all_vars(ret)%var_type == V_EXTERNAL .OR. .NOT. all_vars(ret)%sheet ) ret = 0
    ENDIF
    IF ( ret /= 0 .AND. PRESENT(update_from_zone) ) THEN
      all_vars(ret)%zavg_req = .true.
@@ -827,7 +884,10 @@ FUNCTION aed_locate_global(name,nr) RESULT(ret)
    ELSE
      ret = aed_create_variable(name, '', '', .true.)
    ENDIF
-   IF ( ret > 0 ) all_vars(ret)%extern = .true.
+   IF ( ret > 0 ) THEN
+      all_vars(ret)%extern = .TRUE.
+      all_vars(ret)%var_type = V_EXTERNAL
+   ENDIF
 END FUNCTION aed_locate_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -856,8 +916,9 @@ FUNCTION aed_locate_sheet_global(name,nr) RESULT(ret)
    ENDIF
 
    IF ( ret > 0 ) THEN
-      all_vars(ret)%sheet = .true.
-      all_vars(ret)%extern = .true.
+      all_vars(ret)%sheet = .TRUE.
+      all_vars(ret)%extern = .TRUE.
+      all_vars(ret)%var_type = V_EXTERNAL
    ENDIF
 END FUNCTION aed_locate_sheet_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

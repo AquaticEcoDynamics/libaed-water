@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2024 -  The University of Western Australia               #
+!#  Copyright 2013 - 2025 -  The University of Western Australia               #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -71,6 +71,7 @@ MODULE aed_common
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status, aed_get_var
    PUBLIC aed_provide_global, aed_provide_sheet_global
+   PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
 
    !#---------------------------------------------------------------------------
 
@@ -236,7 +237,7 @@ LOGICAL FUNCTION aed_requested_zones(n_aed_vars)
          DO i=1, n_aed_vars
             IF ( aed_get_var(i, tvar) ) THEN
 
-               IF (tvar%extern) CYCLE  ! external (environment) not currently able to be updated from zones
+               IF (tvar%var_type == V_EXTERNAL) CYCLE  ! external (environment) not currently able to be updated from zones
 
                IF ( tvar%model%aed_model_id .EQ. model%aed_model_id ) THEN
                   ! sheet variables in a zone averaged model must have zavg=T
