@@ -178,6 +178,9 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%X_nc           = X_nc
    data%X_pc           = X_pc
 
+   ! Register particel state variables
+   !data%id_ptm_00 = aed_define_diag_variable('total_count', '#', 'particle count')
+
    ! Diagnostic outputs for particle properties
    data%id_ptm_00 = aed_define_diag_variable('total_count', '#', 'particle count')
    data%id_ptm_14 = aed_define_diag_variable('total_vvel', 'm/s', 'sum of particle vvel')
@@ -273,6 +276,8 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 !-------------------------------------------------------------------------------
 !BEGIN
 
+  print *, 'Particle BGC Bio'
+  
    ! Check if we are in a new cell, to reset cumulative counters
    IF (ppid == 0) THEN
       _DIAG_VAR_(data%id_ptm_14) = zero_
@@ -312,17 +317,19 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    Kd=1.5  !light extinction coefficient
    N_Limitation=0.8  !limitation by N
    P_Limitation=0.8  !limitation by P
-   D0=10.  !initial size
+   D0= p%ptm_env(DIAM) !10.  !initial size
 
    ! Local environmental conditions in this layer
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
    Depth     = _STATE_VAR_S_(data%id_dep) -  p%ptm_env(5)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
-   area      = _STATE_VAR_S_(data%id_larea)
+   area      = 1000. !_STATE_VAR_S_(data%id_larea)
 
    !
 
    print *,'cell depth & temp',Depth, WaterTemperature
+
+print *,'p%ptm_env(5),',p%ptm_env(5)
 
    ! Net photosynthesis of cells
    f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term
