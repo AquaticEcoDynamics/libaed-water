@@ -193,9 +193,9 @@ MODULE aed_core
 
    AED_REAL,PARAMETER :: nan_ = zero_ / zero_
 
-   INTEGER,PARAMETER :: V_STATE = 1, V_DIAGNOSTIC = 2, V_EXTERNAL = 3, V_PARTICLE = 4
+   INTEGER,PARAMETER  :: V_STATE = 1, V_DIAGNOSTIC = 2, V_EXTERNAL = 3, V_PARTICLE = 4
 
-
+   INTEGER            :: ptm_counter = 0
 !===============================================================================
 CONTAINS
 
@@ -255,7 +255,7 @@ SUBROUTINE display_var(var, idx)
    IF ( var%found .AND. ASSOCIATED(var%model) ) THEN
       line = l2(1:20) // ' ' // var%model%aed_model_name
    ELSE
-      line = l2(1:20) // ' ???'
+      line = l2(1:20) // ' AED'
 !     print log,'Requested variable ', TRIM(var%name), ' not defined.'
    ENDIF
    line = TRIM(line) // '             '
@@ -726,12 +726,13 @@ END FUNCTION aed_define_sheet_diag_variable
 
 
 !###############################################################################
-FUNCTION aed_define_ptm_variable(name, units, longname) RESULT(ret)
+FUNCTION aed_define_ptm_variable(name, units, longname) RESULT(ptm_counter_)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
 !
 !LOCALS
+   INTEGER :: ptm_counter_
    INTEGER :: ret
 !
 !-------------------------------------------------------------------------------
@@ -741,6 +742,9 @@ FUNCTION aed_define_ptm_variable(name, units, longname) RESULT(ret)
 !  all_vars(ret)%sheet = .FALSE.
    all_vars(ret)%var_type = V_PARTICLE
    all_vars(ret)%found = .TRUE.
+
+   ptm_counter_ = ptm_counter + 1
+   ptm_counter  = ptm_counter_
 
 END FUNCTION aed_define_ptm_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

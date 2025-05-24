@@ -60,6 +60,7 @@ MODULE aed_bio_particles
                  id_ptm113, id_ptm114, id_ptm115, id_ptm116,   &
                  id_ptm117, id_ptm118
       INTEGER :: id_ptm_00
+      INTEGER :: ip_ptm_c
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop
       INTEGER :: id_lht, id_larea, id_dep, id_tem
@@ -87,17 +88,17 @@ MODULE aed_bio_particles
    INTEGER, PARAMETER :: PTM_STATUS = 19
 
    ! PTM array reference index locations
-   INTEGER, PARAMETER :: STAT = 1  !#define STAT   0
-   INTEGER, PARAMETER :: IDX2 = 2  !#define IDX2   1
-   INTEGER, PARAMETER :: IDX3 = 3  !#define IDX3   2
-   INTEGER, PARAMETER :: LAYR = 4  !#define LAYR   3
-   INTEGER, PARAMETER :: FLAG = 5  !#define FLAG   4
+   INTEGER, PARAMETER :: STAT = 1  !#define STAT   0 _PTM_STAT_
+   INTEGER, PARAMETER :: IDX2 = 2  !#define IDX2   1 _PTM_STAT_
+   INTEGER, PARAMETER :: IDX3 = 3  !#define IDX3   2 _PTM_STAT_
+   INTEGER, PARAMETER :: LAYR = 4  !#define LAYR   3 _PTM_STAT_
+   INTEGER, PARAMETER :: FLAG = 5  !#define FLAG   4 _PTM_STAT_
 
-   INTEGER, PARAMETER :: MASS = 1  !#define MASS   0
-   INTEGER, PARAMETER :: DIAM = 2  !#define DIAM   1
-   INTEGER, PARAMETER :: DENS = 3  !#define DENS   2
-   INTEGER, PARAMETER :: VVEL = 4  !#define VVEL   3
-   INTEGER, PARAMETER :: HGHT = 5  !#define HGHT   4
+   INTEGER, PARAMETER :: MASS = 1  !#define MASS   0 _PTM_ENV_
+   INTEGER, PARAMETER :: DIAM = 2  !#define DIAM   1 _PTM_ENV_
+   INTEGER, PARAMETER :: DENS = 3  !#define DENS   2 _PTM_ENV_
+   INTEGER, PARAMETER :: VVEL = 4  !#define VVEL   3 _PTM_ENV_
+   INTEGER, PARAMETER :: HGHT = 5  !#define HGHT   4 _PTM_ENV_
 
 
    LOGICAL :: extra_diag = .false.
@@ -179,7 +180,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%X_pc           = X_pc
 
    ! Register particel state variables
-   !data%id_ptm_00 = aed_define_diag_variable('total_count', '#', 'particle count')
+   data%ip_ptm_c = aed_define_ptm_variable('cell_c', 'mmol C/particle', 'particle C concentration')
 
    ! Diagnostic outputs for particle properties
    data%id_ptm_00 = aed_define_diag_variable('total_count', '#', 'particle count')
@@ -321,7 +322,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 
    ! Local environmental conditions in this layer
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
-   Depth     = _STATE_VAR_S_(data%id_dep) -  p%ptm_env(5)  !cyanobacteria depth = water depth-cell height
+   Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(HGHT)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
    area      = 1000. !_STATE_VAR_S_(data%id_larea)
 
@@ -329,7 +330,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 
    print *,'cell depth & temp',Depth, WaterTemperature
 
-print *,'p%ptm_env(5),',p%ptm_env(5)
+   print *,'p%ptm_env(5),',p%ptm_env(5)
 
    ! Net photosynthesis of cells
    f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term
@@ -342,7 +343,11 @@ print *,'p%ptm_env(5),',p%ptm_env(5)
    print *, ' D_0: ', D0 !disp(['D_0: ', num2str(D0), ' μm'])
    print *, ' D_1: ', D1 !disp(['D_1: ', num2str(D1), ' μm'])
 
-   p%ptm_env(DIAM) = D1                  ! Set particle diameter
+   _PTM_ENV_(DIAM) = D1                  ! Set particle diameter
+
+   _PTM_VAR_(data%ip_ptm_c) = 0.2       ! Set particle diameter
+
+   print *, ' _PTM_VAR_: ', _PTM_VAR_(data%ip_ptm_c)
 
    ! Set interactions/fluxes with water properties
    oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)  ! mmol C / m3/ s ! CHECK UNITS
