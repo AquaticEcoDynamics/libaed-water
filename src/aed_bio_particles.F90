@@ -60,10 +60,10 @@ MODULE aed_bio_particles
                  id_ptm113, id_ptm114, id_ptm115, id_ptm116,   &
                  id_ptm117, id_ptm118
       INTEGER :: id_ptm_00
-      INTEGER :: ip_ptm_c
+      INTEGER :: ip_ptm_c, ip_ptm_par
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop
-      INTEGER :: id_lht, id_larea, id_dep, id_tem
+      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0
 
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
@@ -93,6 +93,7 @@ MODULE aed_bio_particles
    INTEGER, PARAMETER :: IDX3 = 3  !#define IDX3   2 _PTM_STAT_
    INTEGER, PARAMETER :: LAYR = 4  !#define LAYR   3 _PTM_STAT_
    INTEGER, PARAMETER :: FLAG = 5  !#define FLAG   4 _PTM_STAT_
+   INTEGER, PARAMETER :: PTID = 6  !#define PTID   5 _PTM_STAT_
 
    INTEGER, PARAMETER :: MASS = 1  !#define MASS   0 _PTM_ENV_
    INTEGER, PARAMETER :: DIAM = 2  !#define DIAM   1 _PTM_ENV_
@@ -181,6 +182,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 
    ! Register particel state variables
    data%ip_ptm_c = aed_define_ptm_variable('cell_c', 'mmol C/particle', 'particle C concentration')
+   data%ip_ptm_par = aed_define_ptm_variable('cell_par', 'ummol m2 sec/particle', 'particle PAR exposure')
 
    ! Diagnostic outputs for particle properties
    data%id_ptm_00 = aed_define_diag_variable('total_count', '#', 'particle count')
@@ -246,6 +248,8 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    data%id_lht = aed_locate_global('layer_ht')
    data%id_larea = aed_locate_sheet_global('layer_area')
    data%id_dep = aed_locate_sheet_global('col_depth')
+   data%id_par = aed_locate_global('par')
+   data%id_I0  = aed_locate_sheet_global('par_sf')
 
 END SUBROUTINE aed_define_bio_particles
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -261,11 +265,11 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    TYPE (aed_ptm_t),INTENT(inout) :: p
 !
 !LOCALS
-   INTEGER :: n
+   INTEGER :: n, status
    AED_REAL :: oxy_flux
    AED_REAL :: decay, area, thickness
 
-   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1
+   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par
    AED_REAL :: f_T, Iz, f_I, Respiration, Mu_net
 
    AED_REAL, PARAMETER :: buoyancy_age = 86400.
@@ -314,7 +318,6 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 
    ! Temporary settings
    Mu_max=1.2  !maximum daily growth rate
-   Light=2000.  !surface irradiance
    Kd=1.5  !light extinction coefficient
    N_Limitation=0.8  !limitation by N
    P_Limitation=0.8  !limitation by P
@@ -325,16 +328,25 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(HGHT)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
    area      = 1000. !_STATE_VAR_S_(data%id_larea)
+!   par = _STATE_VAR_(data%id_par)       ! local photosynth. active radiation
+   par = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation
+
 
    !
 
-   print *,'cell depth & temp',Depth, WaterTemperature
+   print *,'cell depth & temp & par',Depth, WaterTemperature, par
 
    print *,'p%ptm_env(5),',p%ptm_env(5)
 
+   status=p%ptm_istat(STAT) ! get cell status
+   print *,'p%ptm_istat(STAT),',p%ptm_istat(STAT)
+   print *,'p%ptm_istat(PTID),',p%ptm_istat(PTID)
+
+   IF( status == 0 ) RETURN
+
    ! Net photosynthesis of cells
    f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term
-   Iz = Light * exp(-Kd * Depth)  !Lambert-Beer's law of exponential light extinction
+   Iz = par * exp(-Kd * Depth)  !Lambert-Beer's law of exponential light extinction
    f_I = (0.219 * Iz) / (0.219 * Iz + 25. + 0.001 * (0.219 * Iz)**2.)  !light limitation term
    Respiration = 0.1 * 1.1**(WaterTemperature - 20.)  !respiration
    Mu_net = Mu_max * f_T * f_I * min(N_Limitation, P_Limitation) - Respiration    !net daily growth rate
@@ -345,9 +357,10 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 
    _PTM_ENV_(DIAM) = D1                  ! Set particle diameter
 
-   _PTM_VAR_(data%ip_ptm_c) = 0.2       ! Set particle diameter
+   _PTM_VAR_(data%ip_ptm_c) = 0.2       ! Set particle C concentration
+   _PTM_VAR_(data%ip_ptm_par) = par       ! Set particle C concentration
 
-   print *, ' _PTM_VAR_: ', _PTM_VAR_(data%ip_ptm_c)
+   ! print *, ' _PTM_VAR_: ', _PTM_VAR_(data%ip_ptm_par)
 
    ! Set interactions/fluxes with water properties
    oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)  ! mmol C / m3/ s ! CHECK UNITS
