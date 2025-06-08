@@ -282,7 +282,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 !BEGIN
 
   print *, 'Particle BGC Bio'
-  
+
    ! Check if we are in a new cell, to reset cumulative counters
    IF (ppid == 0) THEN
       _DIAG_VAR_(data%id_ptm_14) = zero_

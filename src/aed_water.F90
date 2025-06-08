@@ -45,6 +45,7 @@ MODULE aed_water
    USE aed_phosphorus
    USE aed_organic_matter
    USE aed_phytoplankton
+   USE aed_phyto_abm
    USE aed_zooplankton
    USE aed_tracer
    USE aed_noncohesive
@@ -93,6 +94,7 @@ FUNCTION aed_new_wat_model(modelname) RESULT(model)
       CASE ('aed_phosphorus');     prefix = 'PHS'; ALLOCATE(aed_phosphorus_data_t::model)
       CASE ('aed_organic_matter'); prefix = 'OGM'; ALLOCATE(aed_organic_matter_data_t::model)
       CASE ('aed_phytoplankton');  prefix = 'PHY'; ALLOCATE(aed_phytoplankton_data_t::model)
+      CASE ('aed_phyto_abm');      prefix = 'PAM'; ALLOCATE(aed_phyto_abm_data_t::model)
       CASE ('aed_zooplankton');    prefix = 'ZOO'; ALLOCATE(aed_zooplankton_data_t::model)
       CASE ('aed_tracer');         prefix = 'TRC'; ALLOCATE(aed_tracer_data_t::model)
       CASE ('aed_noncohesive');    prefix = 'NCS'; ALLOCATE(aed_noncohesive_data_t::model)
