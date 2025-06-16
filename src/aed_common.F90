@@ -622,7 +622,7 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, p)
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   TYPE (aed_ptm_t),INTENT(inout) :: p
+   TYPE (aed_ptm_t),INTENT(inout) :: p(:)
 !  AED_REAL,DIMENSION(:),INTENT(inout) :: partcl
 !
 !LOCALS
@@ -635,7 +635,6 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, p)
    ENDDO
 END SUBROUTINE aed_particle_bgc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 !###############################################################################
 SUBROUTINE aed_inflow_update(wqinf, temp, salt)
