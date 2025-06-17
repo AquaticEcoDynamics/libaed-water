@@ -585,34 +585,34 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_phyn = aed_define_diag_variable('mean_N', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
 
    !real      ::    CHL(nlev) = 0d0
-   data%id_chl = aed_define_diag_variable('mean_Chl', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
+   data%id_chl = aed_define_diag_variable('mean_Chl', 'mmol/m3', 'mean Eulerian concentration of phyto particle Chl')
 
    !real      ::   mTopt_(nlev) = 0d0
-   data%id_mTopt = aed_define_diag_variable('mean_Topt', 'degrees C', 'mean layer particle optimal temperature')
+   data%id_mTopt = aed_define_diag_variable('mean_Topt', 'degrees C/pmol C', 'carbon-weighted mean layer optimal temperature')
 
    !real      ::   vTopt_(nlev) = 0d0
-   data%id_vTopt = aed_define_diag_variable('var_Topt', 'degrees C', 'layer particle optimal temperature variance')
+   data%id_vTopt = aed_define_diag_variable('var_Topt', 'degrees C/pmol C', 'carbon-weighted layer optimal temperature variance')
 
    !real      ::   mCDiv_(nlev) = 0d0                                                                                                 !#ML check units here
-   data%id_mCDiv = aed_define_diag_variable('mean_CDiv', 'pmol/cell', 'mean layer cellular carbon content threshold for division')
+   data%id_mCDiv = aed_define_diag_variable('mean_CDiv', 'log(pmol C/cell)/pmol C', 'carbon-weighted log mean layer cellular carbon content threshold for division')
 
    !real      ::   vCDiv_(nlev) = 0d0                                                                                                 !#ML check units here
-   data%id_vCDiv = aed_define_diag_variable('var_CDiv', 'pmol/cell', 'layer cellular carbon content threshold for division variance')
+   data%id_vCDiv = aed_define_diag_variable('var_CDiv', 'log(pmol C/cell)/pmol C', 'carbon-weighted log layer cellular carbon content threshold for division variance')
 
    !real      ::   mlnalpha_(nlev) = 0d0
-   data%id_mlnalpha = aed_define_diag_variable('mean_lnalpha', '(W m-2)-1 (gChl molC)-1 d-1', 'mean layer slope of the P-I curve')
+   data%id_mlnalpha = aed_define_diag_variable('mean_lnalpha', 'log((W m-2)-1 (gChl molC)-1 d-1)/pmol C', 'carbon-weighted mean layer log slope of the P-I curve')
 
    !real      ::   vlnalpha_(nlev) = 0d0
-   data%id_vlnalpha = aed_define_diag_variable('var_lnalpha', '(W m-2)-1 (gChl molC)-1 d-1', 'layer slope of the P-I curve variance')
+   data%id_vlnalpha = aed_define_diag_variable('var_lnalpha', 'log((W m-2)-1 (gChl molC)-1 d-1)/pmol C', 'carbon-weighted layer log slope of the P-I curve variance')
 
    !real      ::   cov_TA(nlev) = 0d0
-   data%id_cov_TA = aed_define_diag_variable('cov_TA', 'degrees C * ((W m-2)-1 (gChl molC)-1 d-1)', 'covariance between Topt and ln(alpha Chl)')
+   data%id_cov_TA = aed_define_diag_variable('cov_TA', 'degrees C/pmol C * log(((W m-2)-1 (gChl molC)-1 d-1))/pmol C', 'covariance between Topt and ln(alpha Chl)')
 
    !real      ::   cov_TL(nlev) = 0d0
-   data%id_cov_TL = aed_define_diag_variable('cov_TL', 'degrees C * (pmol/cell)', 'covariance between Topt and Cdiv')
+   data%id_cov_TL = aed_define_diag_variable('cov_TL', 'degrees C/pmol C * log(pmol/cell)/pmol C', 'covariance between Topt and Cdiv')
 
    !real      ::   cov_AL(nlev) = 0d0
-   data%id_cov_AL = aed_define_diag_variable('cov_AL', '((W m-2)-1 (gChl molC)-1 d-1) * (pmol/cell)', 'covariance between ln(alpha Chl) and Cdiv')
+   data%id_cov_AL = aed_define_diag_variable('cov_AL', 'log((W m-2)-1 (gChl molC)-1 d-1))/pmol C * log(pmol/cell)/pmol C', 'covariance between ln(alpha Chl) and Cdiv')
 
 
    !FROM PIBM Par2PHY
@@ -653,7 +653,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! Additional diagnostics from PIBM Geider_Lag.F90
    data%id_IPAR = aed_define_diag_variable('IPAR', 'umol/m2/s', 'daily integrated PAR at each depth')
    data%id_NPPc = aed_define_diag_variable('NPPc', '(mg C m-3 d-1)', 'C-based phytoplankton production')
-   data%id_cells = aed_define_diag_variable('id_cells', 'number', 'cells/layer') !ML could be divided by Hz to get cells/m3
+   data%id_cells = aed_define_diag_variable('id_cells', 'number', 'cells/m3') 
    data%id_d_nit = aed_define_diag_variable('id_d_nit', 'mmol N/m3/day', 'daily flux of NO3 from particles in a layer')
    data%id_d_pon = aed_define_diag_variable('id_d_pon', 'mmol N/m3/day', 'daily flux of PON from particles in a layer')
 
@@ -679,7 +679,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_tem   = aed_locate_global('temperature')
    data%id_lht   = aed_locate_global('layer_ht')
    data%id_par   = aed_locate_global('par')
-   data%id_larea = aed_locate_sheet_global('layer_area')
+   data%id_larea = aed_locate_sheet_global('layer_area') ! ML currently state var s; use this for now but is only top layer
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
 
@@ -758,7 +758,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    integer, parameter :: ialphaChl = 3    !Trait index for optimal light
 
    !Additional variables declared from PIBM grid.F90 file
-   real     ::   Hz = 1.
+   real     ::   Hz = 9962463.581
 
 
 integer, parameter :: nzoo = 0        
@@ -856,9 +856,11 @@ i=1 !ML need to remove this later
    !ML Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    !ML thickness = _STATE_VAR_(data%id_lht)
    !ML area      = 1000. !_STATE_VAR_S_(data%id_larea)
-   !ML par = _STATE_VAR_(data%id_par)       ! local photosynth. active radiation
-   par = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
-   no3 = _STATE_VAR_(data%id_nit)        ! local nitrate
+   par = _STATE_VAR_S_(data%id_I0)       ! local photosynth. active radiation
+   !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
+   !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
+   no3 = _STATE_VAR_(data%id_nit)  
+   !no3 = 300.      ! local nitrate
    !ML frp = _STATE_VAR_(data%id_frp)        ! local frp
 
    !print *,'cell depth & temp & par',Depth, WaterTemperature, par
@@ -1012,7 +1014,6 @@ Nt_min = 0.d0
       !ML if (p_PHY(i)%iz == k .and. p_PHY(i)%alive) then !Ignore dead super-individuals
       if (_PTM_STAT_(i,STAT) == 1) then !Ignore dead super-individuals
          N_ = N_ + 1
-
          if (N_ == 1) then
 	         allocate(scratch(1), stat=Allocatestatus)
 	         IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
@@ -1034,9 +1035,11 @@ Nt_min = 0.d0
 
    !print *, 'N_', N_
 
+   !Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_S_(data%id_larea) this was causing a segmentation fault so wait until layer_area properly defined
+
    !Save number of super-individuals per m3
    !ML Varout(oN_ind, k) = dble(N_)/Hz(k)
-   _DIAG_VAR_(data%id_count) = dble(N_)
+   _DIAG_VAR_(data%id_count) = N_ !ML
    
    !Reset total abundance
    Abun_ = 0d0
@@ -1058,22 +1061,16 @@ Nt_min = 0.d0
       IF (AllocateStatus /= 0) STOP "*** Problem in allocating BC***"
       BC(:) = 0d0
 
-
-      !DO m = 1, N_
-      !
-      !enddo
-      !RETURN
-
       ! calculate the amount of nitrogen and total abundances (cells/m3) in each super-individual
       DO m = 1, N_  !ML come back to this and uncomment loop when we can handle more than one particle at a time
 
          i = index_(m)
 
-         !The amount of N in the super-individual m
-         BN(m) = p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz
+         !The amount of N in the super-individual m                                    ML: looks like pmol to mmol conversion then to m3
+         BN(m) = p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BN is only used in zooplankton module
 
          !The amount of C in the super-individual m
-         BC(m) = p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz
+         BC(m) = p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BC is used to calculate fitness
 
          !Count the number of cells in each layer
          Abun_ = Abun_ + p(i)%ptm_state(data%ip_num)
@@ -1081,7 +1078,7 @@ Nt_min = 0.d0
    ENDIF
 
    !ML Varout(oN_cell, k) = Abun_/Hz(k) !Abundances (cells m-3)
-   _DIAG_VAR_(data%id_cells) = Abun_ !ML/ Hz !Abundances (cells m-3)
+   _DIAG_VAR_(data%id_cells) = Abun_ / Hz !Abundances (cells m-3)
 
 
 !ML #ifdef 0
@@ -1361,7 +1358,7 @@ DO i = 1, N_PAR  ! # ML come back to this once we can have more than 1 particle 
    !Handle cell division and mutation
    ! If cellular carbon is above the division threshold, it divides
    IF (p(i)%ptm_state(data%ip_c) >= p(i)%ptm_state(data%ip_cdiv)) THEN  !Divide
-      print *, 'I divided!'
+      !print *, 'I divided!'
       _DIAG_VAR_(data%id_N_birth) = _DIAG_VAR_(data%id_N_birth) + 1.
       p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)/2d0
       p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)/2d0
@@ -1383,7 +1380,7 @@ DO i = 1, N_PAR  ! # ML come back to this once we can have more than 1 particle 
                case(iTopt)
                    oldtt(1) = p(i)%ptm_state(data%ip_Topt)
                case(iSize)
-                   oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv))
+                   oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv)) !ML I could understand CDiv being logged to avoid too-big changes in division threshold but why logged below?
                case(ialphaChl)
                    oldtt(1) = p(i)%ptm_state(data%ip_LnalphaChl)
                case DEFAULT
@@ -1440,7 +1437,7 @@ _DIAG_VAR_(data%id_cov_AL)   = 0d0
 _DIAG_VAR_(data%id_cov_TA)   = 0d0
 _DIAG_VAR_(data%id_cov_TL)   = 0d0
 
-DO i = 1, N_PAR
+DO i = 1, N_PAR !ML removing logs from ip_cdiv here too - pretty sure this is a typo given how it is handled in GMK routine OR should be logged everywhere
    _DIAG_VAR_(data%id_vcdiv)    = _DIAG_VAR_(data%id_vcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
    _DIAG_VAR_(data%id_vtopt)    = _DIAG_VAR_(data%id_vtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
    _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))**2
