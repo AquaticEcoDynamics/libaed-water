@@ -67,13 +67,13 @@ MODULE aed_phyto_abm
                  id_ptm113, id_ptm114, id_ptm115, id_ptm116,   &
                  id_ptm117, id_ptm118
       INTEGER :: id_count
-      INTEGER :: id_phyc, id_phyn, id_chl, id_mtopt, id_vtopt, &
+      INTEGER :: id_phyc, id_phyn, id_phyp, id_chl, id_mtopt, id_vtopt, &
                  id_mcdiv, id_vcdiv, id_mlnalpha, id_vlnalpha, &
                  id_cov_ta, id_cov_tl, id_cov_al, id_N_birth,  &
                  id_N_mutate, id_IPAR, id_NPPc, id_cells,      &
                  id_N_death
-      INTEGER :: ip_c, ip_n, ip_par, ip_tem, ip_no3, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl, ip_mu_C, ip_fit
-      INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon
+      INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl, ip_mu_C, ip_fit
+      INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0
 
@@ -85,16 +85,17 @@ MODULE aed_phyto_abm
       TYPE(phyto_data_t),DIMENSION(:),ALLOCATABLE :: phytos
 
       CONTAINS
-         PROCEDURE :: define             => aed_define_phyto_abm
-!        PROCEDURE :: calculate          => aed_calculate_phyto_abm
-!        PROCEDURE :: calculate_benthic  => aed_calculate_benthic_phyto_abm
-!        PROCEDURE :: calculate_riparian => aed_calculate_riparian_phyto_abm
-!        PROCEDURE :: calculate_dry      => aed_calculate_dry_phyto_abm
-!        PROCEDURE :: equilibrate        => aed_equilibrate_phyto_abm
-!        PROCEDURE :: mobility           => aed_mobility_phyto_abm
-!        PROCEDURE :: light_extinction   => aed_light_extinction_phyto_abm
-!        PROCEDURE :: delete             => aed_delete_phyto_abm
-         PROCEDURE :: particle_bgc       => aed_particle_bgc_phyto_abm
+         PROCEDURE :: define              => aed_define_phyto_abm
+!        PROCEDURE :: calculate           => aed_calculate_phyto_abm
+!        PROCEDURE :: calculate_benthic   => aed_calculate_benthic_phyto_abm
+!        PROCEDURE :: calculate_riparian  => aed_calculate_riparian_phyto_abm
+!        PROCEDURE :: calculate_dry       => aed_calculate_dry_phyto_abm
+!        PROCEDURE :: equilibrate         => aed_equilibrate_phyto_abm
+         PROCEDURE :: initialize_particle => aed_particle_initialize_phyto_abm
+         PROCEDURE :: particle_bgc        => aed_particle_bgc_phyto_abm
+!        PROCEDURE :: mobility            => aed_mobility_phyto_abm
+!        PROCEDURE :: light_extinction    => aed_light_extinction_phyto_abm
+!        PROCEDURE :: delete              => aed_delete_phyto_abm
    END TYPE
 
    INTEGER, PARAMETER :: PTM_MASS   = 15    ! TBD
@@ -507,13 +508,17 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    !real    :: NO3 = 0.1   associated nutrient                                  _PTM_VAR_        
    data%ip_no3 = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_no3', 'mmol N', 'particle layer NO3')
 
-   
+   !real    :: FRP = 0.1   associated nutrient                                  _PTM_VAR_        
+   data%ip_frp = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_frp', 'mmol P', 'particle layer FRP')
    
    !real    :: C   = 0.02          ! cellular carbon content (pmol; assuming a 1 micron cell)
    data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',0.02)
    
    !real    :: N   = 0.02/106.*16. ! cellular nitrogen content (pmol per cell; assuming a 1 micron cell)
    data%ip_n = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_n', 'pmol N/cell', 'cell N concentration',initial=0.02/106.*16.)
+
+   !real    :: P   = 0.02/106.*1. ! cellular phosphorus content (pmol per cell; assuming a 1 micron cell)
+   data%ip_p = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_p', 'pmol P/cell', 'cell P concentration',initial=0.02/106.*1.)
 
    !real    :: Chl = 0.02 * 12/50  ! Cellular Chl content (pg Chl)
    data%ip_chl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_chl', 'pg Chl', 'cell Chl concentration',initial = 0.02 * 12/50)
@@ -583,6 +588,9 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
    !real      ::    PHY(nlev) = 0d0
    data%id_phyn = aed_define_diag_variable('mean_N', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
+
+   !real      ::    PHY(nlev) = 0d0
+   data%id_phyp = aed_define_diag_variable('mean_P', 'mmol/m3', 'mean Eulerian concentration of phyto particle P')
 
    !real      ::    CHL(nlev) = 0d0
    data%id_chl = aed_define_diag_variable('mean_Chl', 'mmol/m3', 'mean Eulerian concentration of phyto particle Chl')
@@ -656,6 +664,8 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_cells = aed_define_diag_variable('id_cells', 'number', 'cells/m3') 
    data%id_d_nit = aed_define_diag_variable('id_d_nit', 'mmol N/m3/day', 'daily flux of NO3 from particles in a layer')
    data%id_d_pon = aed_define_diag_variable('id_d_pon', 'mmol N/m3/day', 'daily flux of PON from particles in a layer')
+   data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP from particles in a layer')
+   data%id_d_pop = aed_define_diag_variable('id_d_pop', 'mmol P/m3/day', 'daily flux of POP from particles in a layer')
 
    ! Diagnostic outputs for fluxes to and from layers
    !ML data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O2/m3/day','oxygen consumption')
@@ -684,6 +694,79 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_I0    = aed_locate_sheet_global('par_sf')
 
 END SUBROUTINE aed_define_phyto_abm
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+!###############################################################################
+SUBROUTINE aed_particle_initialize_phyto_abm( data,ppid,p )
+
+use params,          only : NTrait, nu, sigma 
+use mGf90,           only : srand_mtGaus
+
+!ARGUMENTS
+   CLASS (aed_phyto_abm_data_t),INTENT(in) :: data
+   TYPE(aed_ptm_t), DIMENSION(:), INTENT(inout) :: p
+   INTEGER,INTENT(inout) :: ppid
+
+!
+!LOCALS
+real      :: nu_ = 0d0   !Basic Mutation rate
+real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
+real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
+real      :: vartt(1,1) = 0.   !Variance of the mutating trait
+INTEGER   :: i, v
+
+!Number of traits
+integer, parameter :: iTopt = 1        !Trait index for Topt
+integer, parameter :: iSize = 2        !Trait index for Size (ESD)
+integer, parameter :: ialphaChl = 3    !Trait index for optimal light
+
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+DO i = 1, ppid
+   If (NTrait > 0) Then
+      DO v = 1, Ntrait
+         !nu_ = p(i)%ptm_state(data%ip_num)*nu(m)
+         !call random_number(cff)
+
+         ! IF (cff < nu_) THEN Mutation occurs
+            !_DIAG_VAR_(data%id_N_mutate) = _DIAG_VAR_(data%id_N_mutate) + 1.
+
+            select case(v)
+            case(iTopt)
+               oldtt(1) = p(i)%ptm_state(data%ip_Topt)
+            case(iSize)
+               oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv)) 
+            case(ialphaChl)
+               oldtt(1) = p(i)%ptm_state(data%ip_LnalphaChl)
+            case DEFAULT
+               stop "Trait index wrong!"
+            end select
+
+            vartt(1,1)= sigma(v)**2   !Construct the covariance matrix for the selected trait
+
+            !A new Topt is randomly sampled from a Gaussian distribution with mean of previous Topt and SD of sigma
+            newtt = srand_mtGaus(1, oldtt, vartt)
+            select case(v)
+            case(iTopt)
+               p(i)%ptm_state(data%ip_Topt) = newtt(1)
+            case(iSize)
+               p(i)%ptm_state(data%ip_Cdiv) = exp(newtt(1))
+            case(ialphaChl)
+               p(i)%ptm_state(data%ip_LnalphaChl) = newtt(1)
+            case DEFAULT
+               stop "Trait index wrong!"
+            end select
+         !ENDIF
+      ENDDO !End of looping through Traits
+   ENDIF !End of if (NTrait > 0)
+ENDDO ! End of looping through superindividuals
+
+
+END SUBROUTINE aed_particle_initialize_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -732,6 +815,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real       :: PHYC = 0d0
    !real      ::    PHY(nlev) = 0d0
    real       :: PHYN = 0d0
+   real       :: PHYP = 0d0
    !real      ::    CHL(nlev) = 0d0
    real       :: CHL = 0d0
    !real      ::   mTopt_(nlev) = 0d0
@@ -762,7 +846,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
 
 integer, parameter :: nzoo = 0        
-INTEGER :: j, zz
+INTEGER :: j, zz, v
 INTEGER :: N_ = 0   !Number of particles in each grid
 real    :: Abun_ = 0   !Total abundance in each grid
 !real    :: NO3 = 0.
@@ -772,31 +856,39 @@ real    :: tf_z  = 0.
 real    :: Graz  = 0.
 real    :: dC_   = 0.
 real    :: dN_   = 0.
+real    :: dP_   = 0.
 real    :: dChl_ = 0.
 real    :: uptake= 0.   !Total NO3 uptake
+real    :: uptake_P = 0.   !Total FRP uptake
 !ML real    :: NPPc_(nlev)  = 0.  !C-based phytoplankton production (mg C m-3 d-1)
 !ML real    ::  IPAR(nlev)  = 0.  !Daily integrated PAR at each depth
 real    :: pp_DZ = 0.   
-real    :: pp_ND = 0.   
-real    :: Pmort = 0.   
+real    :: pp_DZP = 0.   
+real    :: pp_ND = 0. 
+real    :: pp_PD = 0.   
+real    :: Pmort = 0.  
+real    :: Pmort_P = 0.   
 real    :: Cmin  = 0. !Phytoplankton subsistence carbon quota below which the cell will die   
 real    :: FZoo(NZOO) = 0.   !The total amount of palatable prey (in Nitrogen)
                              !for each zooplankton size class
 real    :: phyV = 0.   !Phytoplankton cell volume
-real    :: RES     = 0.   
+real    :: RES     = 0. 
+real    :: RES_P   = 0.   
 real    :: EGES  = 0.   
 real    :: gbar  = 0.   
 real    :: INGES(NZOO) = 0.   
 real    :: Zmort = 0.   
 real    :: Gmatrix(NZOO,NZOO) = 0.d0     !Grazer biomass specific grazing rate matrix
 real,    allocatable :: BN(:)            !The amount of nitrogen in each super-individual
+real,    allocatable :: BP(:)            !The amount of phosphorus in each super-individual
 real,    allocatable :: BC(:)            !The amount of carbon in each super-individual
 real,    allocatable :: Pmatrix(:,:)     !Phytoplankton mortality rates by each zooplankton size class for each superindividual
 real,    parameter   :: eta    = -1.d0*6.6  !Prey refuge parameter for nitrogen
 real,    parameter   :: A_g    = 21.9   !Intercept of the allometric equation of maximal zooplankton grazing rate (Ward et al. 2012)
 real,    parameter   :: B_g    = -0.16  !Slope of the allometric equation of maximal zooplankton grazing rate (Ward et al. 2012)
 real,    parameter   :: mz_g   = 0.d0  !Power of zooplankton mortality following Ward et al. (2013)
-real   :: Nt_min = 0.0 !Minimal amount carbon of each super-individual (number of cells * N content per cell)
+real   :: Nt_min = 0.0 !Minimal amount nitrogen of each super-individual (number of cells * N content per cell)
+real   :: P_min = 0.0 !Minimal amount phosphorus of each super-individual (number of cells * P content per cell)
 integer:: N_PAR = 0
 
 ! cellular carbon content threshold for division (pmol)
@@ -861,7 +953,7 @@ i=1 !ML need to remove this later
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
    no3 = _STATE_VAR_(data%id_nit)  
    !no3 = 300.      ! local nitrate
-   !ML frp = _STATE_VAR_(data%id_frp)        ! local frp
+   frp = _STATE_VAR_(data%id_frp)        ! local frp
 
    !print *,'cell depth & temp & par',Depth, WaterTemperature, par
 
@@ -973,6 +1065,7 @@ i=1 !ML need to remove this later
 !Minimal N of each superindividual should be 0.1% of the average
 !ML Nt_min = PHY_t*1d9/dble(N_PAR) * 0.001
 Nt_min = 0.d0
+P_min = 0.d0
 
 !Eulerian model for NO3, ZOO and DET and lagrangian model for PHY
 !MLDO k = nlev, 1, -1
@@ -1001,6 +1094,8 @@ Nt_min = 0.d0
 
    _DIAG_VAR_(data%id_d_pon) = zero_
    _DIAG_VAR_(data%id_d_nit) = zero_
+   _DIAG_VAR_(data%id_d_pop) = zero_
+   _DIAG_VAR_(data%id_d_frp) = zero_
 
    !Calculate the number of super-individuals (N_) in this vertical layer and obtain their indexes (index_)
    N_PAR = ppid
@@ -1061,6 +1156,10 @@ Nt_min = 0.d0
       IF (AllocateStatus /= 0) STOP "*** Problem in allocating BC***"
       BC(:) = 0d0
 
+      allocate(BP(N_), stat=AllocateStatus)
+      IF (AllocateStatus /= 0) STOP "*** Problem in allocating BP***"
+      BP(:) = 0d0
+
       ! calculate the amount of nitrogen and total abundances (cells/m3) in each super-individual
       DO m = 1, N_  !ML come back to this and uncomment loop when we can handle more than one particle at a time
 
@@ -1072,10 +1171,14 @@ Nt_min = 0.d0
          !The amount of C in the super-individual m
          BC(m) = p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BC is used to calculate fitness
 
+         !The amount of P in the super-individual m                                    ML: looks like pmol to mmol conversion then to m3
+         BP(m) = p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BP is not currently used but including here for symmetry in case we add zoops later
+
          !Count the number of cells in each layer
          Abun_ = Abun_ + p(i)%ptm_state(data%ip_num)
-      ENDDO
-   ENDIF
+
+      ENDDO !End of looping through superindividuals
+   ENDIF ! if N_ > 0
 
    !ML Varout(oN_cell, k) = Abun_/Hz(k) !Abundances (cells m-3)
    _DIAG_VAR_(data%id_cells) = Abun_ / Hz !Abundances (cells m-3)
@@ -1230,12 +1333,17 @@ Nt_min = 0.d0
 !ML #endif
 
    RES   = 0d0  !Total amount of nitrogen that is excreted by zooplankton and becomes DIN
+   RES_P = 0d0  !Total amount of phosphorus that is excreted by zooplankton and becomes DIP
    EGES  = 0d0  !Total egestion by zooplankton to detritus
-   pp_DZ = 0d0  !Flux from ZOO to DET 
+   pp_DZ = 0d0  !Nitrogen Flux from ZOO to DET 
+   pp_DZP = 0d0 !Phosphorus Flux from ZOO to DET 
 
    ! Calculate total phytoplankton nitrogen uptake, mortality, and PP (must after calculation of num(t+dt))
    uptake  = 0d0
+   uptake_P  = 0d0
    Pmort   = 0d0
+   Pmort_P   = 0d0
+
    if (N_ > 0) then
       do j = 1, N_
          i = index_(j) !ML come back to this when we can handle more than one particle
@@ -1244,6 +1352,7 @@ Nt_min = 0.d0
          p(i)%ptm_state(data%ip_par) = par
          p(i)%ptm_state(data%ip_tem) = WaterTemperature
          p(i)%ptm_state(data%ip_no3) = no3
+         p(i)%ptm_state(data%ip_frp) = frp
 
          !ML SELECTCASE (Model_ID)
          !ML CASE(GMK98_simple)
@@ -1268,14 +1377,15 @@ Nt_min = 0.d0
          !ML    call GMK98_Ind_TempSize(p_PHY(i)%Temp, p_PHY(i)%PAR, p_PHY(i)%NO3,  p_PHY(i)%Topt,&
          !ML                   p_PHY(i)%C, p_PHY(i)%N, p_PHY(i)%Chl, p_PHY(i)%CDiv, dC_, dN_, dChl_)
          !ML CASE(GMK98_ToptSizeLight)
-            call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem), p(i)%ptm_state(data%ip_par), p(i)%ptm_state(data%ip_no3), p(i)%ptm_state(data%ip_Topt),&
-                 p(i)%ptm_state(data%ip_c), p(i)%ptm_state(data%ip_n), p(i)%ptm_state(data%ip_chl), p(i)%ptm_state(data%ip_cdiv), exp(p(i)%ptm_state(data%ip_LnalphaChl)),&
-                 dC_, dN_, dChl_)
+            call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem), p(i)%ptm_state(data%ip_par), p(i)%ptm_state(data%ip_no3), p(i)%ptm_state(data%ip_frp), p(i)%ptm_state(data%ip_Topt),&
+                 p(i)%ptm_state(data%ip_c), p(i)%ptm_state(data%ip_n), p(i)%ptm_state(data%ip_p), p(i)%ptm_state(data%ip_chl), p(i)%ptm_state(data%ip_cdiv), exp(p(i)%ptm_state(data%ip_LnalphaChl)),&
+                 dC_, dN_, dP_, dChl_)
          !ML CASE DEFAULT
          !ML    stop "Model choice is wrong!!"
          !ML ENDSELECT
 
          uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) 
+         uptake_P =   uptake_P + dP_ * p(i)%ptm_state(data%ip_num) 
          !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1
          _DIAG_VAR_(data%id_NPPc) = _DIAG_VAR_(data%id_NPPc) + dC_ * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz * 12.d0 * dtdays !Unit: mgC m-3 d-1
 
@@ -1285,18 +1395,21 @@ Nt_min = 0.d0
          ! Update cellular C, N, and Chl
          p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)   + dC_   * dtdays
          p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)   + dN_   * dtdays
+         p(i)%ptm_state(data%ip_p)   = p(i)%ptm_state(data%ip_p)   + dP_   * dtdays
          p(i)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl) + dChl_ * dtdays
 
          ! If celular carbon is lower than the susbsistence threshold (Cmin), it dies:
          Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv)
 
-         if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min) then  ! The superindividual Dies
+         if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
             print *, 'I died!'
             _DIAG_VAR_(data%id_N_mutate) = _DIAG_VAR_(data%id_N_mutate) + 1
             Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
 
             p(i)%ptm_state(data%ip_c)   = 0d0
             p(i)%ptm_state(data%ip_n)   = 0d0
+            p(i)%ptm_state(data%ip_p)   = 0d0
             p(i)%ptm_state(data%ip_chl) = 0d0
             p(i)%ptm_state(data%ip_num) = 0d0
             _PTM_STAT_(i,STAT) = 0
@@ -1309,19 +1422,27 @@ Nt_min = 0.d0
   endif !End if of N_ > 0
 
   uptake = uptake*1d-9/Hz !Convert uptake to mmol N m-3
+  uptake_P = uptake_P*1d-9/Hz !Convert uptake_P to mmol P m-3
   Pmort  =  Pmort*1d-9/Hz !Convert Pmort to mmol N m-3
+  Pmort_P  =  Pmort_P*1d-9/Hz !Convert Pmort_P to mmol P m-3
 
   ! Now increment water column properties based on particle fluxes
   !Now calculate NO3 and DET
   !ML t(iNO3,k) = NO3 + dtdays*(pp_ND + RES - uptake)
   _FLUX_VAR_(data%id_nit)   = _FLUX_VAR_(data%id_nit) + (pp_ND + RES - uptake)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds
   _DIAG_VAR_(data%id_d_nit) = (pp_ND + RES - uptake)  * secs_per_day    ! mmol/m3/day
+  _FLUX_VAR_(data%id_frp)   = _FLUX_VAR_(data%id_frp) + (pp_PD + RES_P - uptake_P)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds
+  _DIAG_VAR_(data%id_d_frp) = (pp_PD + RES_P - uptake_P)  * secs_per_day    ! mmol/m3/day
+
 
   !ML Varout(iNO3, k) = t(iNO3, k)
 
   !ML t(iDET,k) = DET + Pmort + dtdays*(pp_DZ - pp_ND)
   _FLUX_VAR_(data%id_pon) = _FLUX_VAR_(data%id_pon)  + Pmort + (pp_DZ - pp_ND) ! mmol/m3/s CHECK
   _DIAG_VAR_(data%id_d_pon) = Pmort + (pp_DZ - pp_ND) * secs_per_day ! mmol/m3/day
+  _FLUX_VAR_(data%id_pop) = _FLUX_VAR_(data%id_pop)  + Pmort_P + (pp_DZP - pp_PD) ! mmol/m3/s CHECK
+  _DIAG_VAR_(data%id_d_pop) = Pmort_P + (pp_DZP - pp_PD) * secs_per_day ! mmol/m3/day
+
 
 
   !ML Varout(iDET,k) = t(iDET,k)
@@ -1329,6 +1450,7 @@ Nt_min = 0.d0
   if (allocated(index_))  deallocate(index_)
   if (allocated(Pmatrix)) deallocate(Pmatrix)
   if (allocated(BN))      deallocate(BN)
+  if (allocated(BP))      deallocate(BP)
   if (allocated(BC))      deallocate(BC)
 !MLENDDO !End of looping across different depths
 
@@ -1343,6 +1465,8 @@ Nt_min = 0.d0
 _DIAG_VAR_(data%id_phyc) = 0.
 !PHY(:) = 0.d0
 _DIAG_VAR_(data%id_phyn) = 0.
+!PHYP(:) = 0.d0
+_DIAG_VAR_(data%id_phyp) = 0.
 !CHL(:) = 0.d0
 _DIAG_VAR_(data%id_chl) = 0.
 !mCDiv_(:) = 0d0
@@ -1362,6 +1486,7 @@ DO i = 1, N_PAR  ! # ML come back to this once we can have more than 1 particle 
       _DIAG_VAR_(data%id_N_birth) = _DIAG_VAR_(data%id_N_birth) + 1.
       p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)/2d0
       p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)/2d0
+      p(i)%ptm_state(data%ip_p)   = p(i)%ptm_state(data%ip_p)/2d0
       p(i)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl)/2d0
       p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num)*2d0
 
@@ -1408,7 +1533,8 @@ DO i = 1, N_PAR  ! # ML come back to this once we can have more than 1 particle 
 
    !Calculate Eulerian concentrations of phyto C, N, and Chl, mean trait  for each layer
    PHYC = PHYC + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) 
-   PHYN = PHYN + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_n) 
+   PHYN = PHYN + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_n)
+   PHYP = PHYP + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_p)  
    CHL  = CHL  + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_chl) 
 
    _DIAG_VAR_(data%id_mcdiv)    = _DIAG_VAR_(data%id_mcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * log(p(i)%ptm_state(data%ip_cdiv))
@@ -1419,6 +1545,7 @@ ENDDO !End of iterating over all super-individuals
 !DO k = 1, nlev   
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
+  _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mmol/m^3
 
   if (PHYC > 0.) then   !  # ML come back to this b/c need to make sure we are preventing dividing by 0 (case when there are no particles in layer)

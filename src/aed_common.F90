@@ -63,7 +63,8 @@ MODULE aed_common
    PUBLIC aed_calculate_riparian, aed_calculate_dry, aed_calculate_column
    PUBLIC aed_light_extinction, aed_light_shading
    PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
-   PUBLIC aed_bio_drag, aed_particle_bgc, aed_inflow_update
+   PUBLIC aed_bio_drag, aed_inflow_update
+   PUBLIC aed_particle_bgc, aed_initialize_particle
 
    !#---------------------------------------------------------------------------
 
@@ -635,6 +636,25 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, p)
    ENDDO
 END SUBROUTINE aed_particle_bgc
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_initialize_particle(ppid, p)
+!-------------------------------------------------------------------------------
+   INTEGER,INTENT(inout) :: ppid
+   TYPE (aed_ptm_t),INTENT(inout) :: p(:)
+!
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      CALL model%initialize_particle(ppid, p)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed_initialize_particle
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 !###############################################################################
 SUBROUTINE aed_inflow_update(wqinf, temp, salt)

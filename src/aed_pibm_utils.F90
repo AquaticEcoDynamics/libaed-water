@@ -38,6 +38,7 @@ implicit NONE
 real :: mu0     =  5.00  !Maximal growth rate normalized to 15 C (d-1)
 real :: aI0     =  1.20  !Chl-specific Slope of P-I curve ((W m-2)-1 (gChl molC)-1 d-1)
 real :: KN      =  0.50  !Half saturation constant of phytoplankton growth on N
+real :: KPho    =  0.50  !Half saturation constant of phytoplankton growth on P
 real :: gmax    =  2.00  !Maximal zooplankton grazing rate
 real :: Kp      =  0.15  !Half saturation constant of zooplankton grazing
 real :: mz      =  0.002  !Zooplankton mortality grazing coefficient
@@ -61,6 +62,9 @@ real, parameter :: Ez  = 0.65d0
 ! Maixmal Chl:N ratio (g:mol) for phytoplankton
 real, parameter :: thetaNmax = 3d0
 
+! Maixmal Chl:P ratio (g:mol) for phytoplankton
+real, parameter :: thetaPmax = 3d0/16.*1.
+
 !the value of rhochl before last sunset
 real            :: rhochl_L  = 0d0
 
@@ -70,9 +74,20 @@ real, parameter   :: QNmin_b = -0.17d0    !Allometric exponent for QNmin
 real, parameter   :: QNmax_a = 0.166d0    !Normalization constant for QNmax [molN:molC]
 real, parameter   :: QNmax_b = 0.0d0      !Allometric exponent for QNmax which is independent from size
 
+!QPmin and QPmax are allometric functions of Vol (Ward et al. 2012) [mol N: mol P]:
+real, parameter   :: QPmin_a = 0.07d0     !Normalization constant for QPmin [molP:molC]
+real, parameter   :: QPmin_b = -0.17d0    !Allometric exponent for QPmin
+real, parameter   :: QPmax_a = 0.166d0    !Normalization constant for QPmax [molP:molC]
+real, parameter   :: QPmax_b = 0.0d0      !Allometric exponent for QPmax which is independent from size
+
+
 !Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
 real, parameter   :: KN_a   = 0.14d0      !Normalization constant for KN
 real, parameter   :: KN_b   = 0.33d0      !Allometric exponent for KN
+
+!KPho is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
+real, parameter   :: KPho_a   = 0.14d0      !Normalization constant for KPho
+real, parameter   :: KPho_b   = 0.33d0      !Allometric exponent for KPho
 
 real, parameter   :: pi= 3.1415926535
 
@@ -319,7 +334,7 @@ END FUNCTION alloscale
 !Han (2001) (J. Theor. Biol.)
 !Assuming that acclimation to photoinhibition is at the time-scale of ms.
 !------------------------------------------------------------------------------------------------
-PURE REAL FUNCTION Ainf(PAR_, alpha_, QN_, QNmin_, QNmax_, theta_)
+PURE REAL FUNCTION Ainf(PAR_, alpha_, QN_, QNmin_, QNmax_, QP_, QPmin_, QPmax_, theta_)
 
 implicit none
 
@@ -329,6 +344,10 @@ real, intent(in) :: alpha_         !Slope of the P-I curve [Unit: molC/gChl m2/u
 real, intent(in) :: QN_            !N:C ratio of the phyto. super-individual [mol N mol C-1]
 real, intent(in) :: QNmin_         !Minimal N:C ratio
 real, intent(in) :: QNmax_         !Maximal N:C ratio
+real, intent(in) :: QP_            !P:C ratio of the phyto. super-individual [mol P mol C-1]
+real, intent(in) :: QPmin_         !Minimal P:C ratio
+real, intent(in) :: QPmax_         !Maximal P:C ratio
+
 real, intent(in) :: theta_         !Chl:C ratio [mg Chl mmol C]
 
 real, parameter  :: Tau   = 5.5d-3 !Turnover time of the electron transport chain [s]
@@ -347,7 +366,8 @@ real             :: Sigma          !Effective cross-section of the PSU [m2 uE-1]
 
 real             :: thetaA         !Chl:C ratio (g Chl g C-1) to be consistent with Han (2001)
 real             :: PARWm2
-real             :: Lno3           !Nutrient limitation index
+real             :: Lno3           !Nutrient limitation index for nitrogen
+real             :: Lfrp           !Nutrient limitation index for phosphorus
 real             :: alpha_new      !alphaChl with the correct unit
 !End of declaration
 
@@ -367,11 +387,12 @@ Sigma = Beta * thetaA**Kappa
 
 !Nutrient limitation index
 Lno3 = (QN_ - QNmin_) / (QNmax_ - QNmin_)
+Lfrp = (QP_ - QPmin_) / (QPmax_ - QPmin_)
 
 !Kr0 depends on alpha_ using an empirical equation
 Kr0 = a_ * (alpha_new / b_)**v_
 
-Kr = Kr0 * Lno3
+Kr = Kr0 * min(Lno3,Lfrp)
 
 if (Kr < 1d-10) then
   Ainf = 0.d0
@@ -408,7 +429,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, Topt_, C, N, Chl, Cdiv, alphaChl_, dC, dN, dChl)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -419,19 +440,23 @@ implicit none
 
 ! ML took from state_variables.f90
 real,    parameter :: NO3_min = 0.01  !Minimal NO3 concentration
+real,    parameter :: FRP_min = 0.01/16.*1.  !Minimal NO3 concentration
 
 !Declaration on variables:
 real, intent(in)  :: Temp             !Associated temperarure [degree C]
 real, intent(in)  :: PAR              !Associated PAR [W m-2]
 real, intent(in)  :: NO3              !Associated NO3 concentration [mmol N m-3]
+real, intent(in)  :: FRP              !Associated FRP concentration [mmol P m-3]
 real, intent(in)  :: C                !Current cellular carbon [pmol C cell-1]
 real, intent(in)  :: N                !Current cellular nitrogen [pmol N cell-1]
+real, intent(in)  :: P                !Current cellular phosphorus [pmol P cell-1]
 real, intent(in)  :: Chl              !Current cellular Chl [pg C cell-1]
 real, intent(in)  :: Cdiv             !Cellular carbon content threshold for division [pmol cell-1]
 
 real, intent(in)  :: Topt_            !Optimal temperature [degree C]
 real, intent(in)  :: alphaChl_        !Slope of the P-I curve [Unit the same as aI0]
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
+real, intent(out) :: dP               !Changes in the cellular phosphorus content [pmol P cell-1 d-1]
 real, intent(out) :: dC               !Changes in the cellular carbon content [pmol C cell-1 d-1]
 real, intent(out) :: dChl             !Changes in the cellular Chl content [pg Chl cell-1 d-1]
 real              :: Vol    = 0d0     !Cell volume of phytoplankton [um3]
@@ -440,11 +465,17 @@ real              :: QNmin  = 0.05    !Minimal N:C ratio [mmol N mmol C]
 real              :: QNmax  = 0.18    !Maximal N:C ratio [mmol N mmol C]
 real              :: dQN    = 0.13    !(Qmax - Qmin) [mmol N mmol C]
 real              :: QN     = 0.      !Current N:C ratio [mmol N mmol C]
+real              :: QPmin  = 0.001   !Minimal P:C ratio [mmol P mmol C]
+real              :: QPmax  = 0.01    !Maximal P:C ratio [mmol N mmol C]
+real              :: dQP    = 0.009   !(Qmax - Qmin) [mmol P mmol C]
+real              :: QP     = 0.      !Current P:C ratio [mmol P mmol C]
 real              :: theta  = 0.      !Current Chl:C ratio [mg Chl mmol C]
 real              :: VCN    = 0.      !DIN uptake rate by phytoplankton [mol N mol C-1 d-1]
+real              :: VCP    = 0.      !FRP uptake rate by phytoplankton [mol P mol C-1 d-1]
 real              :: Lno3   = 0.      !Nutrient limitation [pmol N m-3]
+real              :: Lfrp   = 0.      !Nutrient limitation [pmol P m-3]
 real              :: SI     = 0.      !Light limitation index [fpar]
-real              :: PCmax  = 0.      !Maximal photosynthesis rate (regulated by QN) [d-1]
+real              :: PCmax  = 0.      !Maximal photosynthesis rate (regulated by QN and QP) [d-1]
 real              :: PC     = 0.      !Carbon specific rate of photosynthesis [d-1]
 real              :: rhoChl = 0.      !Phyto C production devoted to Chl synthesis [mg Chl mmol C-1]
 real              :: Ik     = 0.      !Saturation parameter for the PI curve [W m-2 s-1]
@@ -452,21 +483,25 @@ real              :: A      = 0.      !Photoinhibition, following Nikolau et al.
 
 real, parameter   :: RC     = 0.1d0   !Basic C respiration rate [d-1]
 real, parameter   :: RN     = 0.1d0   !Basic N respiration rate [d-1]
+real, parameter   :: RP     = 0.1d0   !Basic P respiration rate [d-1]
 real, parameter   :: RChl   = 0.1d0   !Basic Chl respiration rate [d-1]
 real              :: RcT    = 0.d0    !Temperature dependent C-based respiration rate [d-1]
 real              :: RNT    = 0.d0    !Temperature dependent N-based respiration rate [d-1]
+real              :: RPT    = 0.d0    !Temperature dependent P-based respiration rate [d-1]
 real              :: RChlT  = 0.d0    !Temperature dependent Chl-based respiration rate [d-1]
 
 real, parameter   :: zeta   = 3.0d0   !Cost of biosynthesis [mol C mol N-1]
 
 ! Maximal specific N uptake as a function of temp. under resource (nutrient and light) replete conditions [mol N mol C-1 d-1]:
 real              :: Vcref  = 0.
+real              :: Vcrefp  = 0.
 
 !Maximal growth rate as a function of temperature under resource (nutrient and light) replete conditions [uM]:
 real              :: muT    = 0.
 
 !Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
-real              :: KN     = 0.      !Half-saturation constant [uM]
+real              :: KN     = 0.      !Half-saturation constant for N [uM]
+real              :: KPho     = 0.    !Half-saturation constant for P [uM]
 real, parameter   :: a1 = 0.d0        !Allometric exponent between mumax and alphaChl
 real              :: CDiv1 = 0.       !CDiv value with ug C per cell
 !End of declaration
@@ -474,6 +509,7 @@ real              :: CDiv1 = 0.       !CDiv value with ug C per cell
 if (C .le. 0d0) then
   print *, 'C was 0 and I returned!'
    dN   = 0.d0
+   dP   = 0.d0
    dC   = 0.d0
    dChl = 0.d0
    return
@@ -481,6 +517,9 @@ endif
 
 !Current N:C ratio [mmol N mmol C]:
 QN = N/C
+
+!Current P:C ratio [mmol P mmol C]:
+QP = P/C
 
 !Current Chl:C ratio [mg Chl mmol C]
 theta = Chl/C
@@ -492,19 +531,32 @@ Vol = PHY_C2Vol(CDiv)
 ESD_ = (6.d0*Vol/pi)**0.3333333 
 
 !Nitrate half-saturation constant of phyto growth based on cell volume [uM]:
-KN = KN_a * Vol**KN_b
+KN   = KN_a * Vol**KN_b
+KPho = KPho_a * Vol**KPho_b
 
 !Minimal N:C ratio [mmol N mmol C] following Ward et al. (2012):
 QNmin = QNmin_a * Vol**QNmin_b
 
+!Minimal P:C ratio [mmol P mmol C] following Ward et al. (2012):
+QPmin = QPmin_a * Vol**QPmin_b
+
 !Maximal N:C ratio [mmol N mmol C] following Maranon et al. (2013)
 QNmax = QNmax_a * Vol**QNmax_b
+
+!Maximal P:C ratio [mmol P mmol C] following Maranon et al. (2013)
+QPmax = QPmax_a * Vol**QPmax_b
 
 !Constrain QN between QNmin and QNmax due to numerical issues
 QN = max(min(QN, QNmax), QNmin)
 
+!Constrain QP between QPmin and QPmax due to numerical issues
+QP = max(min(QP, QPmax), QPmin)
+
 !(Qmax - Qmin) [mmol N mmol C]:
 dQN = QNmax - QNmin
+
+!(Qmax - Qmin) [mmol P mmol C]:
+dQP = QPmax - QPmin
 
 !Maximal growth rate as a function of temperature under resource (nutrient and light) replete conditions:
 !mu0 should be a function of alphaChl
@@ -519,6 +571,7 @@ muT = Pmax_size(ESD_, muT)
 !Assuming the same temperature dependence of nutrient uptake rate as on photosynthesis rate.
 !QNmax/QNmin may be also a function of temperature which needs being further investigated.
 Vcref  = muT * QNmax
+Vcrefp  = muT * QPmax
 
 !Assume the same temperature dependence of respiration as on photosynthetic rate (long-term adaptation; Barton et al. 2020):
 RcT   = temp_Topt(Temp, Rc,   Topt_)
@@ -527,24 +580,28 @@ RcT   = respiration(ESD_, RcT)
 RNT   = temp_Topt(Temp, RN,   Topt_)
 RNT   = respiration(ESD_, RNT)
 
+RPT   = temp_Topt(Temp, RP,   Topt_)
+RPT   = respiration(ESD_, RPT)
+
 RChlT = temp_Topt(Temp, RChl, Topt_)
 RChlT = respiration(ESD_, RChlT)
 
 !Nutrient limitation [nd]:
 Lno3 = (QN - QNmin) / dQN
+Lfrp = (QP - QPmin) / dQP
 
-if (Lno3 .le. 0d0) then
+if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then
    PC = 0d0
 else
-   !Maximal photosynthesis rate (regulated by QN) [d-1]:
-   PCmax = muT * Lno3
+   !Maximal photosynthesis rate (regulated by QN and QP) [d-1]:
+   PCmax = muT * min(Lno3,Lfrp)
 
    !Light saturation parameter [W m-2 d-1]:
    Ik = PCmax / alphachl_ / theta
 
    !Calculate the fraction of open PSU [nd]:
    if (PAR > 0.) then !Photoinhibition
-      A = Ainf(PAR, alphachl_, QN, QNmin, QNmax, theta)
+      A = Ainf(PAR, alphachl_, QN, QNmin, QNmax, QP, QPmin, QPmax, theta)
    else
       A = 1d0
    endif
@@ -567,7 +624,7 @@ Endif
 if (PAR <= 0d0) then
    rhochl   = rhoChl_L
 else
-   rhochl   = thetaNmax * PC / alphachl_ / theta / PAR
+   rhochl   = thetaNmax * PC / alphachl_ / theta / PAR ! ML not sure how to include P in this at the moment
    rhoChl_L = rhochl
 endif
 
@@ -575,12 +632,19 @@ endif
 VCN = Vcref * (NO3 - NO3_min)/ (NO3 + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
 VCN = max(VCN, 0d0)
 
+!FRP uptake rate by phytoplankton [mol P mol C-1 d-1]:
+VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp already temperature dependent
+VCP = max(VCP, 0d0)
+
 !Changes of cellular carbon [d-1]:
 dC = C * (PC - zeta*VCN - RcT)
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell
 dN = N * (VCN/QN - RNT)
+
+!Changes of cellular phosphorus [pmol P cell-1 d-1]:
+dP = P * (VCP/QP - RPT)
 
 !Changes of cellular Chl [d-1]:
 dChl = Chl * (rhochl*VCN / theta - RChlT)
