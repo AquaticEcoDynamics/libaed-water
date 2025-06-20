@@ -91,6 +91,7 @@ MODULE aed_core
          procedure :: rain_loss          => aed_rain_loss
          procedure :: light_shading      => aed_light_shading
          procedure :: bio_drag           => aed_bio_drag
+         procedure :: initialize_particle=> aed_initialize_particle  
          procedure :: particle_bgc       => aed_particle_bgc
          procedure :: mobility           => aed_mobility
          procedure :: validate           => aed_validate
@@ -726,10 +727,11 @@ END FUNCTION aed_define_sheet_diag_variable
 
 
 !###############################################################################
-FUNCTION aed_define_ptm_variable(name, units, longname) RESULT(ptm_counter_)
+FUNCTION aed_define_ptm_variable(name, units, longname, initial) RESULT(ptm_counter_)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
+   AED_REAL,INTENT(in),OPTIONAL :: initial 
 !
 !LOCALS
    INTEGER :: ptm_counter_
@@ -738,8 +740,9 @@ FUNCTION aed_define_ptm_variable(name, units, longname) RESULT(ptm_counter_)
 !-------------------------------------------------------------------------------
 !BEGIN
    ret = aed_create_variable(name, longname, units, .FALSE.)
-
-!  all_vars(ret)%sheet = .FALSE.
+   
+   all_vars(ret)%initial = -9999.
+   if ( present(initial) ) all_vars(ret)%initial = initial
    all_vars(ret)%var_type = V_PARTICLE
    all_vars(ret)%found = .TRUE.
 
@@ -1223,10 +1226,22 @@ SUBROUTINE aed_particle_bgc(data,column,layer_idx,ppid,p)
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   TYPE (aed_ptm_t), INTENT(inout) :: p
+   TYPE (aed_ptm_t), INTENT(inout) :: p(:)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_particle_bgc ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_particle_bgc
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_initialize_particle(data,ppid,p)
+!-------------------------------------------------------------------------------
+   CLASS (aed_model_data_t),INTENT(in) :: data
+   INTEGER,INTENT(inout) :: ppid
+   TYPE (aed_ptm_t), INTENT(inout) :: p(:)
+!-------------------------------------------------------------------------------
+!print*,"Default aed_initialize_particle ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_initialize_particle
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

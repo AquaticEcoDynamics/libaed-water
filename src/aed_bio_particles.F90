@@ -258,10 +258,10 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    TYPE (aed_column_t),INTENT(inout) :: column(:)
    INTEGER,INTENT(in) :: layer_idx
    INTEGER,INTENT(inout) :: ppid
-   TYPE (aed_ptm_t),INTENT(inout) :: p
+   TYPE (aed_ptm_t),INTENT(inout) :: p(:)
 !
 !LOCALS
-   INTEGER :: n
+   INTEGER :: n, i
    AED_REAL :: oxy_flux
    AED_REAL :: decay, area, thickness
 
@@ -278,6 +278,8 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 !BEGIN
 
   print *, 'Particle BGC Bio'
+
+  i = 1
 
    ! Check if we are in a new cell, to reset cumulative counters
    IF (ppid == 0) THEN
@@ -318,19 +320,19 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    Kd=1.5  !light extinction coefficient
    N_Limitation=0.8  !limitation by N
    P_Limitation=0.8  !limitation by P
-   D0= p%ptm_env(DIAM) !10.  !initial size
+   D0= p(i)%ptm_env(DIAM) !10.  !initial size
 
    ! Local environmental conditions in this layer
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
-   Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(HGHT)  !cyanobacteria depth = water depth-cell height
+   Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
    area      = 1000. !_STATE_VAR_S_(data%id_larea)
 
    !
 
-   print *,'cell depth & temp',Depth, WaterTemperature
+   !print *,'cell depth & temp',Depth, WaterTemperature
 
-   print *,'p%ptm_env(5),',p%ptm_env(5)
+   !print *,'p(i)%ptm_env(5),',p(i)%ptm_env(5)
 
    ! Net photosynthesis of cells
    f_T = exp(-((WaterTemperature - 22.) / 5.)**2) ! %temperature limitation term
@@ -340,14 +342,14 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    Mu_net = Mu_max * f_T * f_I * min(N_Limitation, P_Limitation) - Respiration    !net daily growth rate
    D1 = D0 * 2.**(1. / (log10(2.) / Mu_net * 24.))  !predicted Dolichospermum size
 
-   print *, ' D_0: ', D0 !disp(['D_0: ', num2str(D0), ' μm'])
-   print *, ' D_1: ', D1 !disp(['D_1: ', num2str(D1), ' μm'])
+   !print *, ' D_0: ', D0 !disp(['D_0: ', num2str(D0), ' μm'])
+   !print *, ' D_1: ', D1 !disp(['D_1: ', num2str(D1), ' μm'])
 
-   _PTM_ENV_(DIAM) = D1                  ! Set particle diameter
+   _PTM_ENV_(i,DIAM) = D1                  ! Set particle diameter
 
-   _PTM_VAR_(data%ip_ptm_c) = 0.2       ! Set particle diameter
+   _PTM_VAR_(i,data%ip_ptm_c) = 0.2       ! Set particle diameter
 
-   print *, ' _PTM_VAR_: ', _PTM_VAR_(data%ip_ptm_c)
+   !print *, ' _PTM_VAR_: ', _PTM_VAR_(i,data%ip_ptm_c)
 
    ! Set interactions/fluxes with water properties
    oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)  ! mmol C / m3/ s ! CHECK UNITS
@@ -370,14 +372,14 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
   ! _DIAG_VAR_(data%id_d_dp)  = _DIAG_VAR_(data%id_d_dp) - oxy_flux * data%X_pc * secs_per_day ! DOP + FRP
 
    ! Update particle bouyancy, changing with age
-   p%ptm_env(VVEL) = -1.0/86400.
+   p(i)%ptm_env(VVEL) = -1.0/86400.
 
    ! Set general diagnostics, summarising particles in this cell
 
    ! 1st, Cumulate particle properties (needs to be divided by particle number for average)
-   _DIAG_VAR_(data%id_ptm_14) = _DIAG_VAR_(data%id_ptm_14) + p%ptm_env(VVEL)
+   _DIAG_VAR_(data%id_ptm_14) = _DIAG_VAR_(data%id_ptm_14) + p(i)%ptm_env(VVEL)
    _DIAG_VAR_(data%id_ptm_15) = &
-                  _DIAG_VAR_(data%id_ptm_15) + p%ptm_env(MASS) ! total particle mass within a cell
+                  _DIAG_VAR_(data%id_ptm_15) + p(i)%ptm_env(MASS) ! total particle mass within a cell
    _DIAG_VAR_(data%id_ptm_17) = _DIAG_VAR_(data%id_ptm_17) !+ partcl(PTM_BIRTH)
    _DIAG_VAR_(data%id_ptm_18) = &
                   _DIAG_VAR_(data%id_ptm_18) !+ (partcl(PTM_AGE)-partcl(PTM_BIRTH)) /secs_per_day
@@ -399,7 +401,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    ENDIF
 
    ! 2nd, Set particle property (this will therefore remember last particle only)
-   _DIAG_VAR_(data%id_ptm114) = p%ptm_env(VVEL)
+   _DIAG_VAR_(data%id_ptm114) = p(i)%ptm_env(VVEL)
    _DIAG_VAR_(data%id_ptm115) = 0. !partcl(PTM_MASS)
    _DIAG_VAR_(data%id_ptm117) = 0. !partcl(PTM_BIRTH)
    _DIAG_VAR_(data%id_ptm118) = 0. !(partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day
