@@ -73,9 +73,9 @@ MODULE aed_phyto_abm
                  id_N_mutate, id_IPAR, id_NPPc, id_cells,      &
                  id_N_death
       INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl, ip_mu_C, ip_fit
-      INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop
+      INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
-      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0
+      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens
 
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
@@ -94,8 +94,9 @@ MODULE aed_phyto_abm
          PROCEDURE :: initialize_particle => aed_particle_initialize_phyto_abm
          PROCEDURE :: particle_bgc        => aed_particle_bgc_phyto_abm
 !        PROCEDURE :: mobility            => aed_mobility_phyto_abm
-!        PROCEDURE :: light_extinction    => aed_light_extinction_phyto_abm
+         PROCEDURE :: light_extinction    => aed_light_extinction_phyto_abm
 !        PROCEDURE :: delete              => aed_delete_phyto_abm
+
    END TYPE
 
    INTEGER, PARAMETER :: PTM_MASS   = 15    ! TBD
@@ -593,7 +594,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_phyp = aed_define_diag_variable('mean_P', 'mmol/m3', 'mean Eulerian concentration of phyto particle P')
 
    !real      ::    CHL(nlev) = 0d0
-   data%id_chl = aed_define_diag_variable('mean_Chl', 'mmol/m3', 'mean Eulerian concentration of phyto particle Chl')
+   data%id_chl = aed_define_diag_variable('mean_Chl', 'mg/m3', 'mean Eulerian concentration of phyto particle Chl')
 
    !real      ::   mTopt_(nlev) = 0d0
    data%id_mTopt = aed_define_diag_variable('mean_Topt', 'degrees C/pmol C', 'carbon-weighted mean layer optimal temperature')
@@ -666,9 +667,10 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_d_pon = aed_define_diag_variable('id_d_pon', 'mmol N/m3/day', 'daily flux of PON from particles in a layer')
    data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP from particles in a layer')
    data%id_d_pop = aed_define_diag_variable('id_d_pop', 'mmol P/m3/day', 'daily flux of POP from particles in a layer')
+   data%id_d_poc = aed_define_diag_variable('id_d_poc', 'mmol C/m3/day', 'daily flux of POC from particles in a layer')
 
    ! Diagnostic outputs for fluxes to and from layers
-   !ML data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O2/m3/day','oxygen consumption')
+   data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O2/m3/day','oxygen production')
    !ML data%id_d_dc  = aed_define_diag_variable('dc_flux', 'mmol DOC/m3/day','dissolved C release')
    !ML data%id_d_dn  = aed_define_diag_variable('dn_flux', 'mmol N/m3/day','dissolved N release')
    !ML data%id_d_dp  = aed_define_diag_variable('dp_flux', 'mmol P/m3/day','dissolved P release')
@@ -687,6 +689,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
    ! Environment variables
    data%id_tem   = aed_locate_global('temperature')
+   data%id_dens  = aed_locate_global('density')
    data%id_lht   = aed_locate_global('layer_ht')
    data%id_par   = aed_locate_global('par')
    data%id_larea = aed_locate_sheet_global('layer_area') ! ML currently state var s; use this for now but is only top layer
@@ -702,7 +705,7 @@ END SUBROUTINE aed_define_phyto_abm
 !###############################################################################
 SUBROUTINE aed_particle_initialize_phyto_abm( data,ppid,p )
 
-use params,          only : NTrait, nu, sigma 
+use params,          only : NInit, sigma_init 
 use mGf90,           only : srand_mtGaus
 
 !ARGUMENTS
@@ -712,7 +715,6 @@ use mGf90,           only : srand_mtGaus
 
 !
 !LOCALS
-real      :: nu_ = 0d0   !Basic Mutation rate
 real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
 real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
 real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -722,13 +724,18 @@ INTEGER   :: i, v
 integer, parameter :: iTopt = 1        !Trait index for Topt
 integer, parameter :: iSize = 2        !Trait index for Size (ESD)
 integer, parameter :: ialphaChl = 3    !Trait index for optimal light
+integer, parameter :: iC = 4           !Trait index for Topt
+integer, parameter :: iNO3 = 5         !Trait index for Size (ESD)
+integer, parameter :: iP = 6    !Trait index for optimal light
+integer, parameter :: iChl = 7        !Trait index for Topt
+integer, parameter :: iNum = 8        !Trait index for Size (ESD)
 
 !
 !-------------------------------------------------------------------------------
 !BEGIN
 DO i = 1, ppid
-   If (NTrait > 0) Then
-      DO v = 1, Ntrait
+   If (NInit > 0) Then
+      DO v = 1, NInit
          !nu_ = p(i)%ptm_state(data%ip_num)*nu(m)
          !call random_number(cff)
 
@@ -742,11 +749,21 @@ DO i = 1, ppid
                oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv)) 
             case(ialphaChl)
                oldtt(1) = p(i)%ptm_state(data%ip_LnalphaChl)
+            case(iC)
+               oldtt(1) = log(p(i)%ptm_state(data%ip_c))
+            case(iNO3)
+               oldtt(1) = log(p(i)%ptm_state(data%ip_n))
+            case(iP)
+               oldtt(1) = log(p(i)%ptm_state(data%ip_p))
+            case(iChl)
+               oldtt(1) = log(p(i)%ptm_state(data%ip_chl))
+            case(iNum)
+               oldtt(1) = log(p(i)%ptm_state(data%ip_num))
             case DEFAULT
                stop "Trait index wrong!"
             end select
 
-            vartt(1,1)= sigma(v)**2   !Construct the covariance matrix for the selected trait
+            vartt(1,1)= sigma_init(v)**2   !Construct the covariance matrix for the selected trait
 
             !A new Topt is randomly sampled from a Gaussian distribution with mean of previous Topt and SD of sigma
             newtt = srand_mtGaus(1, oldtt, vartt)
@@ -757,6 +774,16 @@ DO i = 1, ppid
                p(i)%ptm_state(data%ip_Cdiv) = exp(newtt(1))
             case(ialphaChl)
                p(i)%ptm_state(data%ip_LnalphaChl) = newtt(1)
+            case(iC)
+               p(i)%ptm_state(data%ip_c) = exp(newtt(1))
+            case(iNO3)
+               p(i)%ptm_state(data%ip_n) = exp(newtt(1))
+            case(iP)
+               p(i)%ptm_state(data%ip_p) = exp(newtt(1))
+            case(iChl)
+               p(i)%ptm_state(data%ip_chl) = exp(newtt(1))
+            case(iNum)
+               p(i)%ptm_state(data%ip_num) = exp(newtt(1))
             case DEFAULT
                stop "Trait index wrong!"
             end select
@@ -798,13 +825,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    AED_REAL :: oxy_flux
    AED_REAL :: decay, area, thickness
 
-   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, frp
+   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, frp, pw, mu
    AED_REAL :: f_T, Iz, f_I, Respiration, Mu_net
 
    AED_REAL, PARAMETER :: buoyancy_age = 86400.
    AED_REAL, PARAMETER :: DT           = 15.*60.
    AED_REAL, PARAMETER :: decay_rate   = 0.15
    AED_REAL, PARAMETER :: fres         = 0.7
+
 
 ! ADDITIONAL DECLARATIONS FROM PIBM
 
@@ -858,6 +886,7 @@ real    :: dC_   = 0.
 real    :: dN_   = 0.
 real    :: dP_   = 0.
 real    :: dChl_ = 0.
+real    :: ESD_ = 0.    ! equivalent spherical diameter (micron)
 real    :: uptake= 0.   !Total NO3 uptake
 real    :: uptake_P = 0.   !Total FRP uptake
 !ML real    :: NPPc_(nlev)  = 0.  !C-based phytoplankton production (mg C m-3 d-1)
@@ -868,6 +897,7 @@ real    :: pp_ND = 0.
 real    :: pp_PD = 0.   
 real    :: Pmort = 0.  
 real    :: Pmort_P = 0.   
+real    :: Pmort_C = 0.   
 real    :: Cmin  = 0. !Phytoplankton subsistence carbon quota below which the cell will die   
 real    :: FZoo(NZOO) = 0.   !The total amount of palatable prey (in Nitrogen)
                              !for each zooplankton size class
@@ -904,6 +934,11 @@ integer  :: sec_of_day   = 0
 ! more declarations to get things working
 integer  :: chk_lyr_new  = 0.
 integer  :: chk_lyr_old  = 0.
+real     :: p_vvel = 0. !vertical velocity calculated in AED (m/s)
+real     :: min_rho = 900.
+real     :: max_rho = 1200.
+integer  :: phy_i = 1.
+real     :: dens_flux = 0.
 
 !End of declaration
 !
@@ -1096,6 +1131,9 @@ P_min = 0.d0
    _DIAG_VAR_(data%id_d_nit) = zero_
    _DIAG_VAR_(data%id_d_pop) = zero_
    _DIAG_VAR_(data%id_d_frp) = zero_
+   _DIAG_VAR_(data%id_d_poc) = zero_
+   _DIAG_VAR_(data%id_d_oxy) = zero_
+
 
    !Calculate the number of super-individuals (N_) in this vertical layer and obtain their indexes (index_)
    N_PAR = ppid
@@ -1343,6 +1381,8 @@ P_min = 0.d0
    uptake_P  = 0d0
    Pmort   = 0d0
    Pmort_P   = 0d0
+   Pmort_C   = 0d0
+   oxy_flux = 0d0
 
    if (N_ > 0) then
       do j = 1, N_
@@ -1379,33 +1419,63 @@ P_min = 0.d0
          !ML CASE(GMK98_ToptSizeLight)
             call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem), p(i)%ptm_state(data%ip_par), p(i)%ptm_state(data%ip_no3), p(i)%ptm_state(data%ip_frp), p(i)%ptm_state(data%ip_Topt),&
                  p(i)%ptm_state(data%ip_c), p(i)%ptm_state(data%ip_n), p(i)%ptm_state(data%ip_p), p(i)%ptm_state(data%ip_chl), p(i)%ptm_state(data%ip_cdiv), exp(p(i)%ptm_state(data%ip_LnalphaChl)),&
-                 dC_, dN_, dP_, dChl_)
+                 dC_, dN_, dP_, dChl_, ESD_)
          !ML CASE DEFAULT
          !ML    stop "Model choice is wrong!!"
          !ML ENDSELECT
 
-         uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) 
-         uptake_P =   uptake_P + dP_ * p(i)%ptm_state(data%ip_num) 
-         !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1
-         _DIAG_VAR_(data%id_NPPc) = _DIAG_VAR_(data%id_NPPc) + dC_ * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz * 12.d0 * dtdays !Unit: mgC m-3 d-1
+         uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
+         uptake_P =   uptake_P + dP_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol P d-1
+         oxy_flux =   oxy_flux + dC_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol C d-1 (assuming 1:1 stoichiometry with O2)
+         !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1 
+         _DIAG_VAR_(data%id_NPPc) = _DIAG_VAR_(data%id_NPPc) + dC_ * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz * 12.d0 * dtdays !Unit: mgC m-3 d-1 ML why multiplied by 12? and also multiplying by dtdays means this is hr-1 (timestep) not d-1
 
          ! Save carbon-specific growth rate
          p(i)%ptm_state(data%ip_mu_C) = dC_ / p(i)%ptm_state(data%ip_c)
 
          ! Update cellular C, N, and Chl
-         p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)   + dC_   * dtdays
-         p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)   + dN_   * dtdays
-         p(i)%ptm_state(data%ip_p)   = p(i)%ptm_state(data%ip_p)   + dP_   * dtdays
-         p(i)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl) + dChl_ * dtdays
+         p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)   + dC_   * dtdays !Unit: pmol C cell-1 hr-1
+         p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)   + dN_   * dtdays !Unit: pmol N cell-1 hr-1
+         p(i)%ptm_state(data%ip_p)   = p(i)%ptm_state(data%ip_p)   + dP_   * dtdays !Unit: pmol P cell-1 hr-1
+         p(i)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl) + dChl_ * dtdays !Unit: pg Chl cell-1 hr-1
+
+         !# PHYTOPLANKTON CELL DENSITY
+         ! density increases during carbohydrate creation (daytime)
+         dens_flux = zero_
+         IF( par>zero_ ) THEN
+            dens_flux = data%phytos(phy_i)%c1 * &
+            (one_ - EXP(-par/data%phytos(phy_i)%I_K) ) - data%phytos(phy_i)%c3
+         ELSE
+            ! darkness
+            dens_flux = -data%phytos(phy_i)%c3
+         ENDIF
+      !ML _FLUX_VAR_(data%id_rho(phy_i)) = _FLUX_VAR_(data%id_rho(phy_i)) + flux
+      p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux
+         ! check maximum/minimum density are not exceeded
+         IF( p(i)%ptm_env(DENS)>max_rho ) THEN
+            !ML _FLUX_VAR_(data%id_rho(phy_i)) =zero_
+            p(i)%ptm_env(DENS)=max_rho
+         ENDIF
+         IF(p(i)%ptm_env(DENS)<min_rho ) THEN
+            !ML _FLUX_VAR_(data%id_rho(phy_i)) =zero_
+            p(i)%ptm_env(DENS)=min_rho
+         ENDIF
+
+         ! Update p_vvel
+         pw   = _STATE_VAR_(data%id_dens)
+         mu   = water_viscosity(WaterTemperature)
+         p_vvel = -9.807*((ESD_*1d-6)**2.)*( p(i)%ptm_env(DENS)-pw ) / ( 18.*mu ) ! fixed density of 1100 kg/m3 for now
+         p(i)%ptm_env(DIAM) = ESD_*1d-6 !meters
+         p(i)%ptm_env(VVEL) = p_vvel
 
          ! If celular carbon is lower than the susbsistence threshold (Cmin), it dies:
          Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv)
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
-            print *, 'I died!'
             _DIAG_VAR_(data%id_N_mutate) = _DIAG_VAR_(data%id_N_mutate) + 1
             Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
 
             p(i)%ptm_state(data%ip_c)   = 0d0
             p(i)%ptm_state(data%ip_n)   = 0d0
@@ -1421,29 +1491,34 @@ P_min = 0.d0
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
-  uptake = uptake*1d-9/Hz !Convert uptake to mmol N m-3
-  uptake_P = uptake_P*1d-9/Hz !Convert uptake_P to mmol P m-3
-  Pmort  =  Pmort*1d-9/Hz !Convert Pmort to mmol N m-3
-  Pmort_P  =  Pmort_P*1d-9/Hz !Convert Pmort_P to mmol P m-3
+  uptake = uptake*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1
+  uptake_P = uptake_P*1d-9/Hz/secs_per_day !Convert uptake_P to mmol P m-3 s-1
+  oxy_flux = oxy_flux*1d-9/Hz/secs_per_day !Convert oxy flux to mmol O2 m-3 s-1
+  Pmort  =  Pmort*1d-9/Hz/secs_per_day !Convert Pmort to mmol N m-3 s-1
+  Pmort_P  =  Pmort_P*1d-9/Hz/secs_per_day !Convert Pmort_P to mmol P m-3 s-1
+  Pmort_C  =  Pmort_C*1d-9/Hz/secs_per_day !Convert Pmort_C to mmol C m-3 s-1
 
   ! Now increment water column properties based on particle fluxes
   !Now calculate NO3 and DET
   !ML t(iNO3,k) = NO3 + dtdays*(pp_ND + RES - uptake)
-  _FLUX_VAR_(data%id_nit)   = _FLUX_VAR_(data%id_nit) + (pp_ND + RES - uptake)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds
+  _FLUX_VAR_(data%id_nit)   = _FLUX_VAR_(data%id_nit) + (pp_ND + RES - uptake)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds; pp_ND and RES are zooplankton variables
   _DIAG_VAR_(data%id_d_nit) = (pp_ND + RES - uptake)  * secs_per_day    ! mmol/m3/day
-  _FLUX_VAR_(data%id_frp)   = _FLUX_VAR_(data%id_frp) + (pp_PD + RES_P - uptake_P)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds
+  _FLUX_VAR_(data%id_frp)   = _FLUX_VAR_(data%id_frp) + (pp_PD + RES_P - uptake_P)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds; pp_PD and RES_P are zooplankton variables
   _DIAG_VAR_(data%id_d_frp) = (pp_PD + RES_P - uptake_P)  * secs_per_day    ! mmol/m3/day
 
 
   !ML Varout(iNO3, k) = t(iNO3, k)
 
   !ML t(iDET,k) = DET + Pmort + dtdays*(pp_DZ - pp_ND)
-  _FLUX_VAR_(data%id_pon) = _FLUX_VAR_(data%id_pon)  + Pmort + (pp_DZ - pp_ND) ! mmol/m3/s CHECK
+  _FLUX_VAR_(data%id_pon) = _FLUX_VAR_(data%id_pon)  + Pmort + (pp_DZ - pp_ND) ! mmol/m3/s CHECK pp_DZ and pp_ND are zooplankton variables
   _DIAG_VAR_(data%id_d_pon) = Pmort + (pp_DZ - pp_ND) * secs_per_day ! mmol/m3/day
-  _FLUX_VAR_(data%id_pop) = _FLUX_VAR_(data%id_pop)  + Pmort_P + (pp_DZP - pp_PD) ! mmol/m3/s CHECK
+  _FLUX_VAR_(data%id_pop) = _FLUX_VAR_(data%id_pop)  + Pmort_P + (pp_DZP - pp_PD) ! mmol/m3/s CHECK pp_DZP and pp_PD are zooplankton variables
   _DIAG_VAR_(data%id_d_pop) = Pmort_P + (pp_DZP - pp_PD) * secs_per_day ! mmol/m3/day
+  _FLUX_VAR_(data%id_poc) = _FLUX_VAR_(data%id_poc)  + Pmort_C  ! mmol/m3/s CHECK would need to add equivalent zoop variables here if added zoops in
+  _DIAG_VAR_(data%id_d_poc) = Pmort_C * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
 
-
+  _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + oxy_flux  ! mmol/m3/s CHECK would need to add equivalent zoop variables here if added zoops in
+  _DIAG_VAR_(data%id_d_oxy) = oxy_flux * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
 
   !ML Varout(iDET,k) = t(iDET,k)
 
@@ -1546,7 +1621,7 @@ ENDDO !End of iterating over all super-individuals
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
-  _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mmol/m^3
+  _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mg Chl/m^3
 
   if (PHYC > 0.) then   !  # ML come back to this b/c need to make sure we are preventing dividing by 0 (case when there are no particles in layer)
     _DIAG_VAR_(data%id_mcdiv)    = _DIAG_VAR_(data%id_mcdiv)    / PHYC
@@ -1592,5 +1667,33 @@ ENDDO
 END SUBROUTINE aed_particle_bgc_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+!###############################################################################
+SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
+!------------------------------------------------------------------------------+
+! Get the light extinction coefficient due to biogeochemical variables
+!------------------------------------------------------------------------------+
+!ARGUMENTS
+   CLASS (aed_phyto_abm_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: extinction
+!
+!LOCALS
+   AED_REAL :: phy
+   INTEGER  :: phy_i
+!
+!------------------------------------------------------------------------------+
+!BEGIN
+
+   DO phy_i=1,data%num_phytos
+      ! Retrieve current (local) phytoplankton biomass in this layer
+      phy = _DIAG_VAR_(data%id_phyc) !MH will need expanding to multi-groups for phy>1
+
+      ! Self-shading with contribution from this phytoplankton concentration.
+      extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
+   ENDDO
+END SUBROUTINE aed_light_extinction_phyto_abm
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 END MODULE aed_phyto_abm

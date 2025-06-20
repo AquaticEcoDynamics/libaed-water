@@ -95,6 +95,9 @@ integer, parameter :: NTrait = 3
 real :: nu(NTrait) = [1d-12, 1d-12, 1d-12] !Probability per generation per cell
 real :: sigma(NTrait) = [0.1, 0.1, 0.1]    !Standard deviation of mutation of the three traits
 
+integer, parameter :: NInit = 8            ! Number of traits + initial conditions with variability
+real :: sigma_init(NInit) = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1,0.1, 0.1]    !Standard deviation of variability of the traits/initial conditions
+
 end module params
 
 !###############################################################################
@@ -429,7 +432,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -460,7 +463,7 @@ real, intent(out) :: dP               !Changes in the cellular phosphorus conten
 real, intent(out) :: dC               !Changes in the cellular carbon content [pmol C cell-1 d-1]
 real, intent(out) :: dChl             !Changes in the cellular Chl content [pg Chl cell-1 d-1]
 real              :: Vol    = 0d0     !Cell volume of phytoplankton [um3]
-real              :: ESD_   = 0d0     !ESD of phytoplankton [um]
+real, intent(out) :: ESD_              !ESD of phytoplankton [um]
 real              :: QNmin  = 0.05    !Minimal N:C ratio [mmol N mmol C]
 real              :: QNmax  = 0.18    !Maximal N:C ratio [mmol N mmol C]
 real              :: dQN    = 0.13    !(Qmax - Qmin) [mmol N mmol C]
@@ -637,7 +640,7 @@ VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp
 VCP = max(VCP, 0d0)
 
 !Changes of cellular carbon [d-1]:
-dC = C * (PC - zeta*VCN - RcT)
+dC = C * (PC - zeta*VCN - RcT) !ML might need to come back to this - not sure whether/how to include P uptake here
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell
