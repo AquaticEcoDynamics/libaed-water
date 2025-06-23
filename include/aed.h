@@ -96,9 +96,9 @@
 #define _FLUX_VAR_T_(id)  column(id)%flux_atm
 #define _FLUX_VAR_B_(id)  column(id)%flux_ben
 
-#define _PTM_STAT_(id)    p%ptm_istat(id)
-#define _PTM_ENV_(id)     p%ptm_env(id)
-#define _PTM_VAR_(id)     p%ptm_state(id)
-#define _PTM_DIAG_(id)    p%ptm_diag(id)
+#define _PTM_STAT_(pi,id)    p(pi)%ptm_istat(id)
+#define _PTM_ENV_(pi,id)     p(pi)%ptm_env(id)
+#define _PTM_VAR_(pi,id)     p(pi)%ptm_state(id)
+#define _PTM_DIAG_(pi,id)    p(pi)%ptm_diag(id)
 
 #endif
