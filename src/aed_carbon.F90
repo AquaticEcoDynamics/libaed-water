@@ -492,7 +492,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
    IF(.NOT.data%simDIC .AND. .NOT.data%simCH4) RETURN
 
-   Ko = 0.
+   Ko = zero_ ; pHout = zero_
 
    !----------------------------------------------------------------------------
    !# Get dependent state variables from physical driver
@@ -1034,7 +1034,7 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
 !BEGIN
    IF(.NOT.data%simDIC) RETURN
 
-    pCO2 = zero_
+    pCO2 = zero_ ; pHout = zero_
 
     !# Retrieve current (local) state variable values.
     dic  = _STATE_VAR_(data%id_dic)  ! Concentration of DIC in the cell
@@ -1435,10 +1435,11 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
   REAL,    INTENT(IN)   :: TC0, TA0
   REAL,    INTENT(OUT)  :: fCO2xx,pH00
   ! LOCAL
-  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi = 0., K1, K2, TB, TP, TS, TF, TSi, TC, TA
+  REAL                  :: PRE, K0, KS, kF, fH, KB, KW, KP1, KP2, KP3, KSi, K1, K2, TB, TP, TS, TF, TSi, TC, TA
 
   !===========Initialize the conditions =========================!
 
+  KSi = 0.
   TB  = 0.
   TP  = 0./1.e6
   TS  = 0.
@@ -1478,6 +1479,8 @@ SUBROUTINE CO2SYS(TEM,Sal,TA0,TC0,fCO2xx,pH00)
                            & K1fac, K2fac, KWfac, KFfac, KSfac, KP1fac, KP2fac,  &
                            & KP3fac, KSifac, pHfactor, Delta, b, P1atm, FugFac,  &
                            & VPWP, VPCorrWP, VPSWWP, VPFac, lnKBfac, KBfac
+
+  KSi = 0.
 
   TempK = TempC + 273.15
   RT    = 83.1451*TempK

@@ -163,7 +163,7 @@ FUNCTION exp_integral(inp) RESULT(E_ib)
      IF(inp==0.0) THEN
        E_ib = inp
      ELSE
-       j  = 10+2*IABS(INT(inp))
+       j  = 10+2*ABS(INT(inp))
        ff = 1.0/(REAL(j+1)**2.0)
        DO WHILE(j/=0)
          ff = (ff*REAL(j)*inp+1.0)/REAL(j*j)
@@ -173,7 +173,7 @@ FUNCTION exp_integral(inp) RESULT(E_ib)
        E_ib = ff
      ENDIF
    ELSE
-     j = 5 + 20 / IABS(INT(inp))
+     j = 5 + 20 / ABS(INT(inp))
      ff = inp
      DO WHILE(j/=0)
        ff = (1.0/(1.0/ff-1.0/REAL(j)))+inp
