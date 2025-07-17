@@ -1154,17 +1154,17 @@ P_min = 0.d0
       if (_PTM_STAT_(i,STAT) == 1) then !Ignore dead super-individuals
          N_ = N_ + 1
          if (N_ == 1) then
-	         allocate(scratch(1), stat=Allocatestatus)
-	         IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
-            scratch(1) = _PTM_STAT_(i,STAT) 
+             allocate(scratch(1), stat=Allocatestatus)
+             IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
+             scratch(1) = _PTM_STAT_(i,STAT)
 
             !Update index_ and scratch has been deallocated
             call move_alloc(scratch, index_)   
          else
-	         allocate(scratch(size(index_) + 1), stat=Allocatestatus)
-	         IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
-	         scratch(1:size(index_))   = index_
-            scratch(size(index_) + 1) = i  
+             allocate(scratch(size(index_) + 1), stat=Allocatestatus)
+             IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
+             scratch(1:size(index_))   = index_
+             scratch(size(index_) + 1) = i
 
             !Update index_ and scratch has been deallocated
             call move_alloc(scratch, index_)   
@@ -1247,7 +1247,7 @@ P_min = 0.d0
 
          !First calculate total phyto. prey from super-individuals
 !ML          IF (N_ > 0) THEN
-!ML             do m = 1, N_
+!ML             DO m = 1, N_
 
 !ML               i = index_(m)
 
@@ -1259,21 +1259,21 @@ P_min = 0.d0
 
               !Calculate the palatability of each prey superindividual and add to the total amount palatable prey
 !ML               FZoo(zz) = FZoo(zz) + Pmatrix(m,zz)
-!ML             enddo
+!ML             ENDDO
 !ML          ENDIF
 
-	      !Second, calculate the total zooplankton prey
-!ML 	      IF (zz > 1) THEN
-!ML 	        do m = 1, (zz - 1)
+          !Second, calculate the total zooplankton prey
+!ML           IF (zz > 1) THEN
+!ML             DO m = 1, (zz - 1)
 
              !Save the palatability into Gmatrix
 !ML              Gmatrix(m,zz) = palatability(VolZOO(zz), VolZOO(m), SDZoo) 
 
-		       !Calculate the palatability of each zoo. prey and add to the total amount palatable prey
-!ML 		       FZoo(zz) = FZoo(zz) + Gmatrix(m,zz) * ZOO(m)
+               !Calculate the palatability of each zoo. prey and add to the total amount palatable prey
+!ML                FZoo(zz) = FZoo(zz) + Gmatrix(m,zz) * ZOO(m)
 
-!ML 	        enddo
-!ML 	      ENDIF
+!ML             ENDDO
+!ML           ENDIF
 
          !Save the total available prey for zooplankton
 !ML         Varout(oFZ(zz),k) = FZOO(zz)
@@ -1283,17 +1283,17 @@ P_min = 0.d0
          !Total ingestion of zooplankton zz (mmol N m-3 d-1)
 !ML          INGES(zz) = ZOO(zz)*gmax*tf_z*gbar
 
-!ML 	      IF (zz > 1) THEN
-!ML 	        do m = 1, (zz - 1)
+!ML           IF (zz > 1) THEN
+!ML             DO m = 1, (zz - 1)
 
                !Calculate the total ingestion rate (mmol N m-3 d-1) of zooplankton zz on zooplankton m
-!ML                if (FZOO(zz) > 0d0) then
+!ML                IF (FZOO(zz) > 0d0) THEN
 !ML                   Gmatrix(m,zz) = Gmatrix(m,zz)*ZOO(m)/FZoo(zz)*INGES(zz)
-!ML                else
+!ML                ELSE
 !ML                   Gmatrix(m,zz) = 0d0
-!ML                endif
-!ML              enddo
-!ML 	      ENDIF
+!ML                ENDIF
+!ML              ENDDO
+!ML           ENDIF
 !ML       ENDDO !End of the zooplankton loop
 !ML    ELSE !Only one zooplankton
 

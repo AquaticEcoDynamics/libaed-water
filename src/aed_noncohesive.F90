@@ -428,11 +428,6 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
                                     _STATE_VAR_S_(data%id_ss_sed(i))
       ENDIF
    ENDDO
-
-
-
-
-
 END SUBROUTINE aed_calculate_benthic_noncohesive
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -454,7 +449,6 @@ SUBROUTINE aed_light_extinction_noncohesive(data,column,layer_idx,extinction)
 !
 !-----------------------------------------------------------------------
 !BEGIN
-
    IF ( .NOT. ALLOCATED(data%id_ss) ) RETURN
 
   !DO ss_i=1,ubound(data%id_ss,1)
@@ -467,7 +461,6 @@ SUBROUTINE aed_light_extinction_noncohesive(data,column,layer_idx,extinction)
    ENDDO
 END SUBROUTINE aed_light_extinction_noncohesive
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
@@ -550,9 +543,7 @@ SUBROUTINE aed_mobility_noncohesive(data,column,layer_idx,mobility)
 !        _FLUX_VAR_B_(data%id_ss_sed(i)) = _FLUX_VAR_B_(data%id_ss_sed(i)) - vvel*ss
 !      ENDIF
       !------------------------------------------------------------------------+
-
    ENDDO
-
 END SUBROUTINE aed_mobility_noncohesive
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

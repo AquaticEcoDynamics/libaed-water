@@ -81,7 +81,7 @@ else ifeq ($(F90),ifx)
   DEBUG_FFLAGS=-g -traceback -O0
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
-  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f08 -warn nounused
+  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-check all -check noarg_temp_created
   endif
