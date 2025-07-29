@@ -986,8 +986,8 @@ i=1 !ML need to remove this later
    !ML Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    !ML thickness = _STATE_VAR_(data%id_lht)
    !ML area      = 1000. !_STATE_VAR_S_(data%id_larea)
-   par = _STATE_VAR_S_(data%id_I0) ! _STATE_VAR_(data%id_par)      ! local photosynth. active radiation
-   !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
+   par =  _STATE_VAR_(data%id_par)  ! _STATE_VAR_S_(data%id_I0)  local photosynth. active radiation
+   print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
    no3 = _STATE_VAR_(data%id_nit)  
    !no3 = 300.      ! local nitrate
@@ -1124,7 +1124,7 @@ P_min = 0.d0
    !ML enddo
    real_day = _STATE_VAR_S_(data%id_yday)
    integer_day = INT(real_day)
-   sec_of_day = real_day - integer_day
+   sec_of_day = real_day - real(integer_day)
 
    if (sec_of_day == 0) then ! ML need to come back to this and figure out how to do equivalent in AED
       !ML Varout(oNPP, k) = NPPc_(k)      !NPP of the past day; this is real NPP (mg C d-1 m-3)
