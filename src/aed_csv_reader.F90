@@ -84,6 +84,7 @@ MODULE aed_csv_reader
    !TYPE(AED_READER),POINTER :: units(10)
     TYPE ARP
        TYPE(AED_READER),POINTER :: p
+       TYPE(AED_SYMBOL),DIMENSION(:),POINTER :: v
     END TYPE ARP
     TYPE(ARP) :: units(10)
 !
@@ -552,6 +553,7 @@ FUNCTION scan_rcsv_file(aedr) RESULT(count)
          IF ( lcount > count ) count=lcount
       ENDIF
    ENDDO
+   IF ( ASSOCIATED(sym%sym) ) DEALLOCATE(sym%sym)
    REWIND(aedr%lun)
 ! print*,"REWIND+++++++++++++++"
 END FUNCTION scan_rcsv_file
@@ -583,14 +585,15 @@ FUNCTION scan_csv_header(aedr,titles) RESULT(count)
          ALLOCATE(titles(count))
          titles = ' '
          DO WHILE( next_symbol(aedr, sym) )
-            IF ( sym%sym(1) .EQ. EOLN ) RETURN
+            IF ( sym%sym(1) .EQ. EOLN ) EXIT
             i = i + 1
             CALL copy_name(sym,titles(i))
          ENDDO
-         RETURN
+         EXIT
       ENDIF
       count=count+1
    ENDDO
+   IF ( ASSOCIATED(sym%sym) ) DEALLOCATE(sym%sym)
 END FUNCTION scan_csv_header
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -716,6 +719,7 @@ INTEGER FUNCTION aed_rcsv_read_row(unit, values)
    IF ( i > ncols ) &
       print *, "data row had ", i, " columns : expecting ", ncols
 
+   IF ( ASSOCIATED(sym%sym) ) DEALLOCATE(sym%sym)
    aed_rcsv_read_row = i
 END FUNCTION aed_rcsv_read_row
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -739,6 +743,13 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
    ncols = aedr%n_cols
    NULLIFY(sym%sym)
 
+   IF (.NOT.ASSOCIATED(units(unit)%v)) THEN
+      ALLOCATE(units(unit)%v(ncols))
+   ELSE
+      DO i=1,ncols
+         IF (ASSOCIATED(units(unit)%v(i)%sym)) DEALLOCATE(units(unit)%v(i)%sym)
+      ENDDO
+   ENDIF
    values(1:ncols)%length = 0
    i = 0
    DO WHILE ( next_symbol(aedr, sym) ) !#
@@ -750,12 +761,14 @@ LOGICAL FUNCTION aed_csv_read_row(unit, values)
          IF ( ASSOCIATED(values(i)%sym) ) NULLIFY( values(i)%sym )
 
          values(i) = sym
+         units(unit)%v(i) = sym
          NULLIFY(sym%sym)
       ENDIF
    ENDDO
    IF ( i > 0 .AND. i /= ncols ) &
       print *, "data row had ", i, " columns : expecting ", ncols
 
+   IF ( ASSOCIATED(sym%sym) ) DEALLOCATE(sym%sym)
    aed_csv_read_row = (i > 0)
 END FUNCTION aed_csv_read_row
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -789,11 +802,19 @@ LOGICAL FUNCTION aed_csv_close(unit)
 !
 !LOCALS
    TYPE(AED_READER),POINTER :: aedr
+   INTEGER :: i, ncols
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    aed_csv_close = .FALSE.
    aedr => units(unit)%p
+   ncols = aedr%n_cols
+   IF (ASSOCIATED(units(unit)%v)) THEN
+      DO i=1,ncols
+         IF (ASSOCIATED(units(unit)%v(i)%sym)) DEALLOCATE(units(unit)%v(i)%sym)
+      ENDDO
+      DEALLOCATE(units(unit)%v)
+   ENDIF
    IF (ASSOCIATED(aedr)) aed_csv_close = end_parse(aedr)
    NULLIFY(aedr)
    units(unit)%p => aedr
