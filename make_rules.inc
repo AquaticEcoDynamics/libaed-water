@@ -43,7 +43,7 @@ ${libdir}/$(OUTLIB).a: ${objdir} ${moddir} ${libdir} ${OBJS}
 #	ranlib $@
 
 ${objdir}/%.o: ${srcdir}/%.F90 ../libaed-water/${srcdir}/aed_core.F90 ../libaed-water/${incdir}/aed.h
-	$(F90) -g $(FFLAGS) -c $< -o $@
+	$(F90) $(FFLAGS) -c $< -o $@
 
 ${objdir}:
 	@mkdir ${objdir}
