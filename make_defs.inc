@@ -81,11 +81,19 @@ else ifeq ($(F90),ifx)
   DEBUG_FFLAGS=-g -traceback -O0
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
-  FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
-  ifeq ($(WITH_CHECKS),true)
-    FFLAGS+=-check all -check noarg_temp_created
+  ifeq ($(OSTYPE),Msys)
+    FFLAGS=-fpp -warn=all -module=${moddir} -static-intel -mp1 -stand=f23 -warn=nounused
+    ifeq ($(WITH_CHECKS),true)
+      FFLAGS+=-check=all -check=noarg_temp_created
+    endif
+    FFLAGS+=-real-size=64
+  else
+    FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
+    ifeq ($(WITH_CHECKS),true)
+      FFLAGS+=-check all -check noarg_temp_created
+    endif
+    FFLAGS+=-real-size 64
   endif
-  FFLAGS+=-real-size 64
 else ifeq ($(F90),flang)
   ifeq ($(OSTYPE),FreeBSD)
     INCLUDES+=-I../ancillary/freebsd/mod
