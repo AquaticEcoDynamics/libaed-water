@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2022 - 2025 -  The University of Western Australia               #
+!#  Copyright 2022-2025 - The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -32,7 +32,7 @@
 !# For information about the module, please refer to the documentation         #
 !# published here:                                                             #
 !#                                                                             #
-!# https://aquaticecodynamics.github.io/aed-science/index.html                 #
+!#       https://aquaticecodynamics.github.io/aed-science/index.html           #
 !#                                                                             #
 !###############################################################################
 

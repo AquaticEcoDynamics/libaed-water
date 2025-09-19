@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2025 -  The University of Western Australia               #
+!#  Copyright 2013-2025 - The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -54,7 +54,7 @@ MODULE aed_core
 
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
-   PUBLIC model_list, last_model
+   PUBLIC model_list, last_model, aed_thread
    PUBLIC n_aed_models
 
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
@@ -91,7 +91,7 @@ MODULE aed_core
          procedure :: rain_loss          => aed_rain_loss
          procedure :: light_shading      => aed_light_shading
          procedure :: bio_drag           => aed_bio_drag
-         procedure :: initialize_particle=> aed_initialize_particle  
+         procedure :: initialize_particle=> aed_initialize_particle
          procedure :: particle_bgc       => aed_particle_bgc
          procedure :: mobility           => aed_mobility
          procedure :: validate           => aed_validate
@@ -155,6 +155,8 @@ MODULE aed_core
 
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
+   INTEGER :: aed_thread = -2
+
    INTEGER :: cur_mod_base = 0
    INTEGER :: n_aed_models = 0
    INTEGER :: n_aed_vars = 0, a_vars = 0
@@ -202,7 +204,7 @@ CONTAINS
 
 
 !###############################################################################
-INTEGER FUNCTION aed_init_core(dname,have_cell_vel)
+INTEGER FUNCTION aed_init_core(dname, have_cell_vel)
 !-------------------------------------------------------------------------------
 ! Initialise the aed model library core routines
 !-------------------------------------------------------------------------------
@@ -731,7 +733,7 @@ FUNCTION aed_define_ptm_variable(name, units, longname, initial) RESULT(ptm_coun
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
-   AED_REAL,INTENT(in),OPTIONAL :: initial 
+   AED_REAL,INTENT(in),OPTIONAL :: initial
 !
 !LOCALS
    INTEGER :: ptm_counter_
@@ -740,7 +742,7 @@ FUNCTION aed_define_ptm_variable(name, units, longname, initial) RESULT(ptm_coun
 !-------------------------------------------------------------------------------
 !BEGIN
    ret = aed_create_variable(name, longname, units, .FALSE.)
-   
+
    all_vars(ret)%initial = -9999.
    if ( present(initial) ) all_vars(ret)%initial = initial
    all_vars(ret)%var_type = V_PARTICLE

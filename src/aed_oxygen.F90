@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2025 -  The University of Western Australia               #
+!#  Copyright 2013-2025 - The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -26,7 +26,9 @@
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
 !#   Created May 2011                                                          #
-!#   Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed2   #
+!#   Track changes on GitHub @                                                 #
+!#                                                                             #
+!#             https://github.com/AquaticEcoDynamics/libaed-water              #
 !#                                                                             #
 !###############################################################################
 !                                                                              !

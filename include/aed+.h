@@ -30,7 +30,7 @@
 
 #include <aed.h>
 
-#define AED_PLUS_VERSION  "2.1.3"
+#define AED_PLUS_VERSION  "2.1.4"
 
 #ifndef __STD_C__
 
