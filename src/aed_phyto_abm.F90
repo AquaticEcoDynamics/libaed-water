@@ -692,7 +692,8 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_dens  = aed_locate_global('density')
    data%id_lht   = aed_locate_global('layer_ht')
    data%id_par   = aed_locate_global('par')
-   data%id_larea = aed_locate_sheet_global('layer_area') ! ML currently state var s; use this for now but is only top layer
+   data%id_larea = aed_locate_global('layer_area') ! ML currently state var s; use this for now but is only top layer
+                                                   ! CAB no! top layer is col_area
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
 
@@ -982,7 +983,7 @@ i=1 !ML need to remove this later
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
    !ML Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    !ML thickness = _STATE_VAR_(data%id_lht)
-   !ML area      = 1000. !_STATE_VAR_S_(data%id_larea)
+   !ML area      = 1000. !_STATE_VAR_(data%id_larea)
    par = _STATE_VAR_S_(data%id_I0)       ! local photosynth. active radiation
    !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
@@ -1168,7 +1169,7 @@ P_min = 0.d0
 
    !print *, 'N_', N_
 
-   !Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_S_(data%id_larea) this was causing a segmentation fault so wait until layer_area properly defined
+   Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea)
 
    !Save number of super-individuals per m3
    !ML Varout(oN_ind, k) = dble(N_)/Hz(k)

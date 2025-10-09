@@ -244,7 +244,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
    ! Environment variables
    data%id_tem = aed_locate_global('temperature')
    data%id_lht = aed_locate_global('layer_ht')
-   data%id_larea = aed_locate_sheet_global('layer_area')
+   data%id_larea = aed_locate_global('layer_area')
    data%id_dep = aed_locate_sheet_global('col_depth')
 
 END SUBROUTINE aed_define_bio_particles
@@ -326,7 +326,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
    Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
-   area      = 1000. !_STATE_VAR_S_(data%id_larea)
+   area      = 1000. !_STATE_VAR_(data%id_larea)
 
    !
 
@@ -488,7 +488,7 @@ SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
 
     ! Particle decay, changing with age
    thickness = _STATE_VAR_(data%id_lht)
-   area      = _STATE_VAR_S_(data%id_larea)
+   area      = _STATE_VAR_(data%id_larea)
 
    IF((partcl(PTM_AGE)-partcl(PTM_BIRTH))<buoyancy_age) THEN
      decay = partcl(PTM_MASS) * (DT*data%decay_rate_new)  ! g / timestep

@@ -54,7 +54,7 @@ MODULE aed_core
 
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
-   PUBLIC model_list, last_model, aed_thread
+   PUBLIC model_list, last_model, aed_thread, aed_n_threads
    PUBLIC n_aed_models
 
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
@@ -94,7 +94,7 @@ MODULE aed_core
          procedure :: initialize_particle=> aed_initialize_particle
          procedure :: particle_bgc       => aed_particle_bgc
          procedure :: mobility           => aed_mobility
-         procedure :: validate           => aed_validate
+!        procedure :: validate           => aed_validate
          procedure :: inflow_update      => aed_inflow_update
          procedure :: delete             => aed_delete
       !# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -156,6 +156,7 @@ MODULE aed_core
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    INTEGER :: aed_thread = -2
+   INTEGER :: aed_n_threads = 1
 
    INTEGER :: cur_mod_base = 0
    INTEGER :: n_aed_models = 0
@@ -837,7 +838,7 @@ END FUNCTION aed_locate_variable
 
 
 !###############################################################################
-FUNCTION aed_locate_sheet_variable(name,update_from_zone) RESULT(ret)
+FUNCTION aed_locate_sheet_variable(name, update_from_zone) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
@@ -868,7 +869,7 @@ END FUNCTION aed_locate_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_locate_global(name,nr) RESULT(ret)
+FUNCTION aed_locate_global(name, nr) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name
@@ -889,13 +890,13 @@ FUNCTION aed_locate_global(name,nr) RESULT(ret)
 
    IF ( PRESENT(nr) ) nrl = nr
    IF ( nrl ) THEN
-     ret = aed_find_variable(name)
+      ret = aed_find_variable(name)
    ELSE
-     ret = aed_create_variable(name, '', '', .true.)
-   ENDIF
-   IF ( ret > 0 ) THEN
-      all_vars(ret)%extern = .TRUE.
-      all_vars(ret)%var_type = V_EXTERNAL
+      ret = aed_create_variable(name, '', '', .true.)
+      IF ( ret > 0 ) THEN
+         all_vars(ret)%extern = .TRUE.
+         all_vars(ret)%var_type = V_EXTERNAL
+      ENDIF
    ENDIF
 END FUNCTION aed_locate_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -919,15 +920,15 @@ FUNCTION aed_locate_sheet_global(name,nr) RESULT(ret)
 
    IF ( PRESENT(nr) ) nrl = nr
    IF ( nrl ) THEN
-     ret = aed_find_variable(name)
+      ret = aed_find_variable(name)
    ELSE
-     ret = aed_create_variable(name, '', '', .true.)
-   ENDIF
+      ret = aed_create_variable(name, '', '', .true.)
 
-   IF ( ret > 0 ) THEN
-      all_vars(ret)%sheet = .TRUE.
-      all_vars(ret)%extern = .TRUE.
-      all_vars(ret)%var_type = V_EXTERNAL
+      IF ( ret > 0 ) THEN
+         all_vars(ret)%sheet = .TRUE.
+         all_vars(ret)%extern = .TRUE.
+         all_vars(ret)%var_type = V_EXTERNAL
+      ENDIF
    ENDIF
 END FUNCTION aed_locate_sheet_global
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1102,7 +1103,7 @@ END SUBROUTINE aed_calculate_column
 
 
 !###############################################################################
-SUBROUTINE aed_calculate_riparian(data,column,layer_idx, pc_wet)
+SUBROUTINE aed_calculate_riparian(data, column, layer_idx, pc_wet)
 !-------------------------------------------------------------------------------
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
@@ -1115,7 +1116,7 @@ END SUBROUTINE aed_calculate_riparian
 
 
 !###############################################################################
-SUBROUTINE aed_calculate_dry(data,column,layer_idx)
+SUBROUTINE aed_calculate_dry(data, column, layer_idx)
 !-------------------------------------------------------------------------------
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
@@ -1127,7 +1128,7 @@ END SUBROUTINE aed_calculate_dry
 
 
 !###############################################################################
-SUBROUTINE aed_equilibrate(data,column,layer_idx)
+SUBROUTINE aed_equilibrate(data, column, layer_idx)
 !-------------------------------------------------------------------------------
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)
@@ -1138,21 +1139,22 @@ END SUBROUTINE aed_equilibrate
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-!###############################################################################
-LOGICAL FUNCTION aed_validate(data,column,layer_idx)
-!-------------------------------------------------------------------------------
-   CLASS (aed_model_data_t),INTENT(in) :: data
-   TYPE (aed_column_t),INTENT(inout) :: column(:)
-   INTEGER,INTENT(in) :: layer_idx
-!-------------------------------------------------------------------------------
-!print*,"Default aed_validate ", TRIM(data%aed_model_name)
-   aed_validate = .TRUE.
-END FUNCTION aed_validate
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! currently unused
+!!###############################################################################
+!LOGICAL FUNCTION aed_validate(data, column, layer_idx)
+!!-------------------------------------------------------------------------------
+!   CLASS (aed_model_data_t),INTENT(in) :: data
+!   TYPE (aed_column_t),INTENT(inout) :: column(:)
+!   INTEGER,INTENT(in) :: layer_idx
+!!-------------------------------------------------------------------------------
+!!print*,"Default aed_validate ", TRIM(data%aed_model_name)
+!   aed_validate = .TRUE.
+!END FUNCTION aed_validate
+!!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-SUBROUTINE aed_mobility(data,column,layer_idx,mobility)
+SUBROUTINE aed_mobility(data, column, layer_idx, mobility)
 !-------------------------------------------------------------------------------
    CLASS (aed_model_data_t),INTENT(in) :: data
    TYPE (aed_column_t),INTENT(inout) :: column(:)

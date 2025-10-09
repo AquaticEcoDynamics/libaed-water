@@ -76,7 +76,7 @@ MODULE aed_common
    !# Re-export these from aed_core.
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status, aed_get_var
-   PUBLIC aed_provide_global, aed_provide_sheet_global, aed_thread
+   PUBLIC aed_provide_global, aed_provide_sheet_global, aed_thread, aed_n_threads
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
 
    !#---------------------------------------------------------------------------
@@ -416,14 +416,14 @@ SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
    IF ( PRESENT(do_zones) ) do_z = do_zones
    IF ( do_z ) THEN
       DO WHILE (ASSOCIATED(model))
-      PTRACE("aed_calculate_benthic(true)->",trim(model%aed_model_name))
+         PTRACE("aed_calculate_benthic(true)->",trim(model%aed_model_name))
          IF ( model%aed_model_zone_avg .EQV. do_zones ) &
             CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
    ELSE
       DO WHILE (ASSOCIATED(model))
-      PTRACE("aed_calculate_benthic(false)->",trim(model%aed_model_name))
+         PTRACE("aed_calculate_benthic(false)->",trim(model%aed_model_name))
          CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
@@ -448,7 +448,6 @@ SUBROUTINE aed_calculate_riparian(column, layer_idx, pc_wet)
       CALL model%calculate_riparian(column, layer_idx, pc_wet)
       model => model%next
    ENDDO
-
 END SUBROUTINE aed_calculate_riparian
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -510,25 +509,26 @@ END SUBROUTINE aed_equilibrate
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-!###############################################################################
-FUNCTION aed_validate(column, layer_idx) RESULT(valid)
-!-------------------------------------------------------------------------------
-   TYPE (aed_column_t),INTENT(inout) :: column(:)
-   INTEGER,INTENT(in) :: layer_idx
-!
-!LOCALS
-   CLASS (aed_model_data_t),POINTER :: model
-   LOGICAL :: valid
-!-------------------------------------------------------------------------------
-   valid = .TRUE.
-   model => model_list
-   DO WHILE (ASSOCIATED(model))
-      PTRACE("aed_validate->",trim(model%aed_model_name))
-      IF (.NOT. model%validate(column, layer_idx)) valid = .FALSE.
-      model => model%next
-   ENDDO
-END FUNCTION aed_validate
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! currently unused ?
+!!###############################################################################
+!FUNCTION aed_validate(column, layer_idx) RESULT(valid)
+!!-------------------------------------------------------------------------------
+!   TYPE (aed_column_t),INTENT(inout) :: column(:)
+!   INTEGER,INTENT(in) :: layer_idx
+!!
+!!LOCALS
+!   CLASS (aed_model_data_t),POINTER :: model
+!   LOGICAL :: valid
+!!-------------------------------------------------------------------------------
+!   valid = .TRUE.
+!   model => model_list
+!   DO WHILE (ASSOCIATED(model))
+!      PTRACE("aed_validate->",trim(model%aed_model_name))
+!      IF (.NOT. model%validate(column, layer_idx)) valid = .FALSE.
+!      model => model%next
+!   ENDDO
+!END FUNCTION aed_validate
+!!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
