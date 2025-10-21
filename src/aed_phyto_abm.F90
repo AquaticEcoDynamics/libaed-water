@@ -987,7 +987,7 @@ i=1 !ML need to remove this later
    !ML thickness = _STATE_VAR_(data%id_lht)
    !ML area      = 1000. !_STATE_VAR_S_(data%id_larea)
    par =  _STATE_VAR_(data%id_par)  ! _STATE_VAR_S_(data%id_I0)  local photosynth. active radiation
-   print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
+   !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
    no3 = _STATE_VAR_(data%id_nit)  
    !no3 = 300.      ! local nitrate
@@ -1175,7 +1175,7 @@ P_min = 0.d0
    !print *, 'N_', N_
 
    Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea) !this was causing a segmentation fault so wait until layer_area properly defined
-   print *, 'Hz', Hz
+   !print *, 'Hz', Hz
 
 
    !Save number of super-individuals per m3
@@ -1627,6 +1627,7 @@ ENDDO !End of iterating over all super-individuals
 
 !DO k = 1, nlev   
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
+        print *, 'bef extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mg Chl/m^3
@@ -1700,6 +1701,7 @@ SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
 
       ! Self-shading with contribution from this phytoplankton concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
+      print *, 'in extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
    ENDDO
 END SUBROUTINE aed_light_extinction_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
