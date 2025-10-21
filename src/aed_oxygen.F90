@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2025 -  The University of Western Australia               #
+!#  Copyright 2013-2025 - The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -26,7 +26,9 @@
 !#   -----------------------------------------------------------------------   #
 !#                                                                             #
 !#   Created May 2011                                                          #
-!#   Track changes on GitHub @ https://github.com/AquaticEcoDynamics/libaed2   #
+!#   Track changes on GitHub @                                                 #
+!#                                                                             #
+!#             https://github.com/AquaticEcoDynamics/libaed-water              #
 !#                                                                             #
 !###############################################################################
 !                                                                              !
@@ -74,7 +76,8 @@ MODULE aed_oxygen
       INTEGER  :: id_atm_oxy_exch, id_sed_oxy
       INTEGER  :: id_sed_oxy_pel, id_atm_oxy_exch3d
       INTEGER  :: id_temp, id_salt, id_wind
-      INTEGER  :: id_larea, id_lht, id_cell_vel
+!     INTEGER  :: id_larea, id_lht, id_cell_vel
+      INTEGER  :: id_lht, id_cell_vel
 
       !# Model parameters
       AED_REAL :: Fsed_oxy,Ksed_oxy,theta_sed_oxy
@@ -249,7 +252,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%id_salt = aed_locate_global('salinity') ! Salinity (psu)
 !  data%id_pres = aed_locate_sheet_global('pressure') ! Pressure (dbar = 10 kPa)
    data%id_wind = aed_locate_sheet_global('wind_speed') ! Wind speed at 10 m above surface (m/s)
-   data%id_larea = aed_locate_sheet_global('layer_area')
+!  data%id_larea = aed_locate_global('layer_area')
    data%id_lht = aed_locate_global('layer_ht')
    data%id_cell_vel = -1
    IF( oxy_piston_model>3 )data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600

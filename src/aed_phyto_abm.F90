@@ -1,6 +1,6 @@
 !###############################################################################
 !#                                                                             #
-!# aed_phyto_abm.F90                                                       #
+!# aed_phyto_abm.F90                                                           #
 !#                                                                             #
 !#  Developed by :                                                             #
 !#      AquaticEcoDynamics (AED) Group                                         #
@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2018 - 2025 -  The University of Western Australia               #
+!#  Copyright 2018-2025 - The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -693,6 +693,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_lht   = aed_locate_global('layer_ht')
    data%id_par   = aed_locate_global('par')
    data%id_larea = aed_locate_global('layer_area') ! ML currently state var s; use this for now but is only top layer
+                                                   ! CAB no! top layer is col_area
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
    data%id_yday  = aed_locate_sheet_global('yearday')
@@ -1174,9 +1175,7 @@ P_min = 0.d0
 
    !print *, 'N_', N_
 
-   Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea) !this was causing a segmentation fault so wait until layer_area properly defined
-   !print *, 'Hz', Hz
-
+   Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea)
 
    !Save number of super-individuals per m3
    !ML Varout(oN_ind, k) = dble(N_)/Hz(k)

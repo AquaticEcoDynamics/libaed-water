@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013 - 2025 -  The University of Western Australia               #
+!#  Copyright 2013-2025 - The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -32,6 +32,11 @@
 
 #include "aed.h"
 
+#if 0
+# define PTRACE(arg1, arg2) print*, arg1, " ", arg2
+#else
+# define PTRACE(arg1, arg2) /* arg1, arg2 */
+#endif
 
 !###############################################################################
 MODULE aed_common
@@ -71,7 +76,7 @@ MODULE aed_common
    !# Re-export these from aed_core.
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status, aed_get_var
-   PUBLIC aed_provide_global, aed_provide_sheet_global
+   PUBLIC aed_provide_global, aed_provide_sheet_global, aed_thread, aed_n_threads
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
 
    !#---------------------------------------------------------------------------
@@ -303,6 +308,7 @@ SUBROUTINE aed_initialize(column, layer_idx)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_initialize->",trim(model%aed_model_name))
       CALL model%initialize(column, layer_idx)
       model => model%next
    ENDDO
@@ -312,19 +318,20 @@ END SUBROUTINE aed_initialize
 
 !###############################################################################
 SUBROUTINE aed_initialize_column(column, layer_map)
-   !-------------------------------------------------------------------------------
-      TYPE (aed_column_t),INTENT(inout) :: column(:)
-      INTEGER,INTENT(in) :: layer_map(:)
-   !
-   !LOCALS
-      CLASS (aed_model_data_t),POINTER :: model
-   !-------------------------------------------------------------------------------
-      model => model_list
-      DO WHILE (ASSOCIATED(model))
-         CALL model%initialize_column(column, layer_map)
-         model => model%next
-      ENDDO
-   END SUBROUTINE aed_initialize_column
+!-------------------------------------------------------------------------------
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_map(:)
+!
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_initialize_column->",trim(model%aed_model_name))
+      CALL model%initialize_column(column, layer_map)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed_initialize_column
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -339,6 +346,7 @@ SUBROUTINE aed_initialize_benthic(column, layer_idx)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_initialize_benthic->",trim(model%aed_model_name))
       CALL model%initialize_benthic(column, layer_idx)
       model => model%next
    ENDDO
@@ -357,7 +365,7 @@ SUBROUTINE aed_calculate(column, layer_idx)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
-!print*,"aed_calculate->",model%aed_model_name
+      PTRACE("aed_calculate->",trim(model%aed_model_name))
       CALL model%calculate(column, layer_idx)
       model => model%next
    ENDDO
@@ -376,6 +384,7 @@ SUBROUTINE aed_calculate_surface(column, layer_idx)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_calculate_surface->",trim(model%aed_model_name))
       CALL model%calculate_surface(column, layer_idx)
       model => model%next
    ENDDO
@@ -407,14 +416,14 @@ SUBROUTINE aed_calculate_benthic(column, layer_idx, do_zones)
    IF ( PRESENT(do_zones) ) do_z = do_zones
    IF ( do_z ) THEN
       DO WHILE (ASSOCIATED(model))
-!print*,"aed_calculate_benthicA->",model%aed_model_name
+         PTRACE("aed_calculate_benthic(true)->",trim(model%aed_model_name))
          IF ( model%aed_model_zone_avg .EQV. do_zones ) &
             CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
    ELSE
       DO WHILE (ASSOCIATED(model))
-!print*,"aed_calculate_benthicB->",model%aed_model_name
+         PTRACE("aed_calculate_benthic(false)->",trim(model%aed_model_name))
          CALL model%calculate_benthic(column, layer_idx)
          model => model%next
       ENDDO
@@ -435,10 +444,10 @@ SUBROUTINE aed_calculate_riparian(column, layer_idx, pc_wet)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_calculate_riparian->",trim(model%aed_model_name))
       CALL model%calculate_riparian(column, layer_idx, pc_wet)
       model => model%next
    ENDDO
-
 END SUBROUTINE aed_calculate_riparian
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -454,6 +463,7 @@ SUBROUTINE aed_calculate_column(column, layer_map)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_calculate_column->",trim(model%aed_model_name))
       CALL model%calculate_column(column, layer_map)
       model => model%next
    ENDDO
@@ -472,6 +482,7 @@ SUBROUTINE aed_calculate_dry(column, layer_idx)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_calculate_dry->",trim(model%aed_model_name))
       CALL model%calculate_dry(column, layer_idx)
       model => model%next
    ENDDO
@@ -490,6 +501,7 @@ SUBROUTINE aed_equilibrate(column, layer_idx)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_equilibrate->",trim(model%aed_model_name))
       CALL model%equilibrate(column, layer_idx)
       model => model%next
    ENDDO
@@ -497,24 +509,26 @@ END SUBROUTINE aed_equilibrate
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-!###############################################################################
-FUNCTION aed_validate(column, layer_idx) RESULT(valid)
-!-------------------------------------------------------------------------------
-   TYPE (aed_column_t),INTENT(inout) :: column(:)
-   INTEGER,INTENT(in) :: layer_idx
-!
-!LOCALS
-   CLASS (aed_model_data_t),POINTER :: model
-   LOGICAL :: valid
-!-------------------------------------------------------------------------------
-   valid = .TRUE.
-   model => model_list
-   DO WHILE (ASSOCIATED(model))
-      IF (.NOT. model%validate(column, layer_idx)) valid = .FALSE.
-      model => model%next
-   ENDDO
-END FUNCTION aed_validate
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! currently unused ?
+!!###############################################################################
+!FUNCTION aed_validate(column, layer_idx) RESULT(valid)
+!!-------------------------------------------------------------------------------
+!   TYPE (aed_column_t),INTENT(inout) :: column(:)
+!   INTEGER,INTENT(in) :: layer_idx
+!!
+!!LOCALS
+!   CLASS (aed_model_data_t),POINTER :: model
+!   LOGICAL :: valid
+!!-------------------------------------------------------------------------------
+!   valid = .TRUE.
+!   model => model_list
+!   DO WHILE (ASSOCIATED(model))
+!      PTRACE("aed_validate->",trim(model%aed_model_name))
+!      IF (.NOT. model%validate(column, layer_idx)) valid = .FALSE.
+!      model => model%next
+!   ENDDO
+!END FUNCTION aed_validate
+!!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
@@ -530,6 +544,7 @@ SUBROUTINE aed_light_extinction(column, layer_idx, extinction)
    extinction = zero_
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_light_extinction->",trim(model%aed_model_name))
       CALL model%light_extinction(column, layer_idx, extinction)
       model => model%next
    ENDDO
@@ -550,6 +565,7 @@ SUBROUTINE aed_mobility(column, layer_idx, mobility)
    !mobility = zero_ !MH leave this as is in case default settling vals provided
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_mobility->",trim(model%aed_model_name))
       CALL model%mobility(column, layer_idx, mobility)
       model => model%next
    ENDDO
@@ -570,6 +586,7 @@ SUBROUTINE aed_rain_loss(column, layer_idx, infil)
    infil = zero_
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_rain_loss->",trim(model%aed_model_name))
       CALL model%rain_loss(column, layer_idx, infil)
       model => model%next
    ENDDO
@@ -590,6 +607,7 @@ SUBROUTINE aed_light_shading(column, layer_idx, shade_frac)
    shade_frac = one_
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_light_shading->",trim(model%aed_model_name))
       CALL model%light_shading(column, layer_idx, shade_frac)
       model => model%next
    ENDDO
@@ -610,6 +628,7 @@ SUBROUTINE aed_bio_drag(column, layer_idx, drag)
    drag = zero_
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_bio_drag->",trim(model%aed_model_name))
       CALL model%bio_drag(column, layer_idx, drag)
       model => model%next
    ENDDO
@@ -631,6 +650,7 @@ SUBROUTINE aed_particle_bgc(column, layer_idx, ppid, p)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_particle_bgc->",trim(model%aed_model_name))
       CALL model%particle_bgc(column, layer_idx, ppid, p)
       model => model%next
    ENDDO
@@ -649,6 +669,7 @@ SUBROUTINE aed_initialize_particle(ppid, p)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_initialize_particle->",trim(model%aed_model_name))
       CALL model%initialize_particle(ppid, p)
       model => model%next
    ENDDO
@@ -666,6 +687,7 @@ SUBROUTINE aed_inflow_update(wqinf, temp, salt)
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_inflow_update->",trim(model%aed_model_name))
       CALL model%inflow_update(wqinf, temp, salt)
       model => model%next
    ENDDO
@@ -681,6 +703,7 @@ SUBROUTINE aed_delete
 !-------------------------------------------------------------------------------
    model => model_list
    DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_delete->",trim(model%aed_model_name))
       CALL model%delete
       model => model%next
    ENDDO

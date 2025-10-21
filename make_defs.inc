@@ -9,7 +9,7 @@
 #                                                                             #
 #      http://aquatic.science.uwa.edu.au/                                     #
 #                                                                             #
-#  Copyright 2013 - 2025 -  The University of Western Australia               #
+#  Copyright 2013-2025 - The University of Western Australia                  #
 #                                                                             #
 #   AED is free software: you can redistribute it and/or modify               #
 #   it under the terms of the GNU General Public License as published by      #
@@ -88,7 +88,7 @@ else ifeq ($(F90),ifx)
     endif
     FFLAGS+=-real-size=64
   else
-    FFLAGS=-warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
+    FFLAGS=-fpp -warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
     ifeq ($(WITH_CHECKS),true)
       FFLAGS+=-check all -check noarg_temp_created
     endif
