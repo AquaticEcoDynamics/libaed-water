@@ -28,7 +28,7 @@
 #ifndef _AED_H_
 #define _AED_H_
 
-#define AED_VERSION  "2.1.7"
+#define AED_VERSION  "2.3.0"
 
 /* aed_phytoplankton and aed_zooplankton constants */
 #define MAX_PHYTO_TYPES 256
