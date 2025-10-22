@@ -1561,6 +1561,7 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
 
          ! set global mobility array for phytoplankton IN pool, and record flux
          IF(data%phytos(phy_i)%simINDynamics>0) THEN
+            mobility(data%id_in(phy_i)) = vvel
             _DIAG_VAR_(data%id_PhySEDn(phy_i)) = (vvel/dz) * _STATE_VAR_(data%id_in(phy_i))* secs_per_day
          ELSE
             _DIAG_VAR_(data%id_PhySEDn(phy_i)) = (vvel/dz) * _STATE_VAR_(data%id_p(phy_i))* &
@@ -1568,6 +1569,7 @@ SUBROUTINE aed_mobility_phytoplankton(data,column,layer_idx,mobility)
          ENDIF
          ! set global mobility array for phytoplankton IP pool, and record flux
          IF(data%phytos(phy_i)%simIPDynamics>0) THEN
+            mobility(data%id_ip(phy_i)) = vvel
             _DIAG_VAR_(data%id_PhySEDp(phy_i)) = (vvel/dz) * _STATE_VAR_(data%id_ip(phy_i))* secs_per_day
          ELSE
             _DIAG_VAR_(data%id_PhySEDp(phy_i)) = (vvel/dz) * _STATE_VAR_(data%id_p(phy_i))* &
