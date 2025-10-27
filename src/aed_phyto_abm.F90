@@ -75,7 +75,7 @@ MODULE aed_phyto_abm
       INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl, ip_mu_C, ip_fit
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
-      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens
+      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday
 
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
@@ -696,6 +696,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                                                    ! CAB no! top layer is col_area
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
+   data%id_yday  = aed_locate_sheet_global('yearday')
 
 END SUBROUTINE aed_define_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -871,7 +872,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    integer, parameter :: ialphaChl = 3    !Trait index for optimal light
 
    !Additional variables declared from PIBM grid.F90 file
-   real     ::   Hz = 9962463.581
+   AED_REAL :: Hz != 9962463.581  mean layer area of FCR
 
 
 integer, parameter :: nzoo = 0        
@@ -930,7 +931,9 @@ real :: PHY_t = 0d0  !Total phytoplankton N
 
 ! additional declarations from PIBM time_settings.F90
 real     :: dtdays       = 1.0d0/24 !ML initializing this to 1 hour
-integer  :: sec_of_day   = 0
+real  :: sec_of_day   != 0
+integer  :: integer_day   != 0
+real  :: real_day
 
 ! more declarations to get things working
 integer  :: chk_lyr_new  = 0.
@@ -983,8 +986,8 @@ i=1 !ML need to remove this later
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
    !ML Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    !ML thickness = _STATE_VAR_(data%id_lht)
-   !ML area      = 1000. !_STATE_VAR_(data%id_larea)
-   par = _STATE_VAR_S_(data%id_I0)       ! local photosynth. active radiation
+   !ML area      = 1000. !_STATE_VAR_S_(data%id_larea)
+   par =  _STATE_VAR_(data%id_par)  ! _STATE_VAR_S_(data%id_I0)  local photosynth. active radiation
    !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
    no3 = _STATE_VAR_(data%id_nit)  
@@ -1120,6 +1123,9 @@ P_min = 0.d0
    !ML do zz = 1, NZOO
    !ML    ZOO(zz)= zero_ !ML t(iZOO(kk), k)
    !ML enddo
+   real_day = _STATE_VAR_S_(data%id_yday)
+   integer_day = INT(real_day)
+   sec_of_day = real_day - real(integer_day)
 
    if (sec_of_day == 0) then ! ML need to come back to this and figure out how to do equivalent in AED
       !ML Varout(oNPP, k) = NPPc_(k)      !NPP of the past day; this is real NPP (mg C d-1 m-3)
@@ -1620,6 +1626,7 @@ ENDDO !End of iterating over all super-individuals
 
 !DO k = 1, nlev   
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
+        print *, 'bef extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mg Chl/m^3
@@ -1693,6 +1700,7 @@ SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
 
       ! Self-shading with contribution from this phytoplankton concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
+      print *, 'in extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
    ENDDO
 END SUBROUTINE aed_light_extinction_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
