@@ -119,11 +119,6 @@ MODULE aed_geochemistry
 CONTAINS
 
 
-
-
-
-
-
 !###############################################################################
 SUBROUTINE aed_define_geochemistry(data, namlst)
 !-------------------------------------------------------------------------------
@@ -263,8 +258,6 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
 
    print *,"simMeAdsorption",simMeAdsorption
    print *,"MeAdsorptionModel",MeAdsorptionModel
-
-
 
    !----------------------------------------------------------------------------
    ! Now load the geochem database

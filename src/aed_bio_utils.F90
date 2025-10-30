@@ -119,10 +119,8 @@ MODULE aed_bio_utils
 !Module Locals
    INTEGER,PARAMETER :: ino3 = 1, inh4 = 2, idon = 3, in2 = 4, ifrp = 1, idop = 2
 
-
 !===============================================================================
 CONTAINS
-
 
 
 !###############################################################################
@@ -155,7 +153,6 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
 
    ! Uptake of phosphorus
    IF (phytos(group)%simIPDynamics == 0 .OR. phytos(group)%simIPDynamics == 1) THEN
-
       ! Static phosphorus uptake function
       ! uptake = X_pcon * mu * phy
 
@@ -164,7 +161,6 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
          ! uptake is spread over relevant sources (assumes evenly)
          uptake(c) = - (theX_pcon/npup) * primprod
       END DO
-
    ELSEIF (phytos(group)%simIPDynamics == 2) THEN
 
       ! Dynamic phosphorus uptake function
@@ -176,13 +172,10 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
       tmpary1   = tmpary1 * tmpary2 / (phytos(group)%X_pmax-phytos(group)%X_pmin)
       uptake(1) =-tmpary1 * phyto_fP(phytos,group,frp=pup)      ! FRP
       uptake(2) = zero_                                         ! DOP
-
    ELSE
-
       ! Unknown phosphorus uptake function
       print *,'STOP: unknown simIPDynamics (',phytos(group)%simIPDynamics,') for: ',phytos(group)%p_name
       STOP
-
    ENDIF
 
    ! Release of phosphorus due to excretion from phytoplankton and
@@ -190,8 +183,6 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
 
    excretion = (respiration*phytos(group)%k_fdom + exudation)*theX_pcon
    mortality = respiration*(1.0-phytos(group)%k_fdom)*theX_pcon
-
-
 END SUBROUTINE phyto_internal_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -203,7 +194,6 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
 !-------------------------------------------------------------------------------
 ! Calculates the biotic group internal nitrogen stores and fluxes
 !-------------------------------------------------------------------------------
-
 !ARGUMENTS
    TYPE(phyto_data_t),DIMENSION(:),INTENT(in)  :: phytos
    INTEGER,INTENT(in)                          :: group
@@ -229,18 +219,14 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    excretion  = zero_
    mortality  = zero_
 
-
    ! Uptake of nitrogen
    IF (phytos(group)%simINDynamics == 0 .OR. phytos(group)%simINDynamics == 1) THEN
-
       ! Static nitrogen uptake function (assuming fixed stoichiometry)
       ! uptake = X_ncon * mu * phy
 
       theX_ncon = phytos(group)%X_ncon * phy
       uptake(1)  = -theX_ncon * primprod
-
    ELSEIF (phytos(group)%simINDynamics == 2) THEN
-
       ! Dynamic nitrogen uptake function
       ! R_nuptake * fT * phy * (X_nmax-IN/phy)/(X_nmax-X_nmin) * (DIN/[K_N+DIN])
 
@@ -287,7 +273,6 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
       uptake(iN2) = -a_nfix                 ! iN2 == 4
    ENDIF
 
-
    ! Release of nitrogen due to excretion from phytoplankton and
    ! contribution of mortality and excretion OM:
    ! (/day +/day)* mg N/ mg C * mgC
@@ -296,7 +281,6 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    mortality = respiration*(1.0-phytos(group)%k_fdom)*theX_ncon
 
    ! should check here e or m is not exceeding X_nmin
-
 END SUBROUTINE phyto_internal_nitrogen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -341,7 +325,6 @@ FUNCTION phyto_fN(phytos, group, IN, din, don) RESULT(fN)
 
    IF ( fN < zero_ ) fN = zero_
    IF ( fN > 1.000 ) fN = 1.000
-
 END FUNCTION phyto_fN
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -374,7 +357,6 @@ FUNCTION phyto_fP(phytos, group, IP, frp) RESULT(fP)
 
    IF( fP < zero_ ) fP = zero_
    IF( fP > 1.000 ) fP = 1.000
-
 END FUNCTION phyto_fP
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -401,7 +383,6 @@ FUNCTION phyto_fSi(phytos, group, Si) RESULT(fSi)
            (Si-phytos(group)%Si_0+phytos(group)%K_Si)
      IF ( fSi < zero_ ) fSi=zero_
    ENDIF
-
 END FUNCTION phyto_fSi
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -448,7 +429,6 @@ FUNCTION findMin(a1,a2,a3,a4) RESULT(theMin)
    IF(a4 < theMin)      theMin = a4
 
    IF( theMin<zero_ )  theMin=zero_
-
 END FUNCTION findMin
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -473,7 +453,6 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
    fSal = 0.
    ! User can set salTol as negative (growth supressison) or positive
    ! (respiration enhancement). The equations are the same but will range from
@@ -483,7 +462,6 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 
    IF (sal_model == 0) THEN
       fSal = one_
-
    ELSEIF (sal_model == 1) THEN
       !# f(S) = 1 at S=S_opt, f(S) = S_bep at S=S_maxsp.
 
@@ -503,7 +481,6 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
       ELSE
         fSal = 1.0
       ENDIF
-
    ELSEIF (sal_model == 2) THEN
       !# f(S) = 1 at S>=S_opt, f(S) = S_bep at S=0.
 
@@ -518,7 +495,6 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
       ELSE
         fSal = 1.0
       ENDIF
-
    ELSEIF (sal_model == 3) THEN
       ! f(S) = 1 at S=S_opt, f(S) = S_bep at S=0 and 2*S_opt.
 
@@ -538,7 +514,6 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
       ENDIF
       IF ((salinity >=  phytos(group)%S_opt) .AND. (salinity <= phytos(group)%S_maxsp) ) fSal = 1
       IF ( salinity >= (phytos(group)%S_maxsp + phytos(group)%S_opt) ) fSal = phytos(group)%S_bep
-
     ELSEIF (sal_model == 4) THEN
        ! Lassiter.
        ! This is used to control growth on species that like brackish water
@@ -555,14 +530,12 @@ FUNCTION phyto_salinity(phytos,group,salinity) RESULT(fSal)
 
        ! check if its used as resipration enhancement or growth supression
        IF (phytos(group)%salTol>0 ) fSal = (one_-fSal) + one_
-
    ELSE
       fSal = one_
       PRINT *,'WARNING: Unsupported salTol flag for phyto group: ',group,'=', phytos(group)%salTol
    ENDIF
 
    IF( fSal < zero_ ) fSal = zero_
-
 END FUNCTION phyto_salinity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -710,9 +683,7 @@ FUNCTION bio_respiration(R_resp,theta_resp,temp) RESULT(respiration)
 !-------------------------------------------------------------------------------
 !BEGIN
    respiration = R_resp * theta_resp**(temp-20.0)
-
 END FUNCTION bio_respiration
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 END MODULE aed_bio_utils

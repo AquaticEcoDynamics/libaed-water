@@ -87,15 +87,14 @@ MODULE aed_habitat_water
 !-------------------------------------------------------------------------------
 !MODULE VARIABLES
    AED_REAL, PARAMETER :: DDT = 0.25/24.    ! Currently assuming 15 min timestep
-   INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
-                                              ! 1 = basic diagnostic outputs
-                                              ! 2 = flux rates, and supporitng
-                                              ! 3 = other metrics
-                                              !10 = all debug & checking outputs
+   INTEGER  :: diag_level = 10              ! 0 = no diagnostic outputs
+                                            ! 1 = basic diagnostic outputs
+                                            ! 2 = flux rates, and supporitng
+                                            ! 3 = other metrics
+                                            !10 = all debug & checking outputs
 
 !===============================================================================
 CONTAINS
-
 
 
 !###############################################################################
@@ -183,7 +182,6 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
 
    !----------------------------------------------------------------------------
    ! Define variables and dependencies
-
 
    !-- CONTAMINATION
    IF( simMetalTox ) THEN
@@ -292,7 +290,6 @@ SUBROUTINE aed_calculate_habitat_water(data,column,layer_idx)
 !BEGIN
    salt = 0.0 ; euphotic = 0.0 ; bathy = 0.0
 
-
    !---------------------------------------------------------------------------+
    !-- HABITAT TEMPLATE : FISH TOLERANCE
    IF( data%simFishTolerance ) THEN
@@ -300,7 +297,6 @@ SUBROUTINE aed_calculate_habitat_water(data,column,layer_idx)
      salt  = _STATE_VAR_(data%id_E_salt)   ! salinity g/L
      temp  = _STATE_VAR_(data%id_E_temp)   ! degC
      osat  = _STATE_VAR_(data%id_l_oxys)   ! oxy %
-
 
      DO f=1,data%num_fish
        Ocrit = data%fish_Ocrit(f)
@@ -317,11 +313,7 @@ SUBROUTINE aed_calculate_habitat_water(data,column,layer_idx)
 
        _DIAG_VAR_(data%id_fish(f)) = HSI_f
      ENDDO
-
    ENDIF
-
-
-
 END SUBROUTINE aed_calculate_habitat_water
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

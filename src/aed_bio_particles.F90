@@ -108,10 +108,8 @@ MODULE aed_bio_particles
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
 
-
 !===============================================================================
 CONTAINS
-
 
 
 !###############################################################################
@@ -157,7 +155,6 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
    ! Initialise
 
    ! Read the namelist
@@ -272,14 +269,12 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    AED_REAL, PARAMETER :: DT           = 15.*60.
    AED_REAL, PARAMETER :: decay_rate   = 0.15
    AED_REAL, PARAMETER :: fres         = 0.7
-
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   print *, 'Particle BGC Bio'
 
-  print *, 'Particle BGC Bio'
-
-  i = 1
+   i = 1
 
    ! Check if we are in a new cell, to reset cumulative counters
    IF (ppid == 0) THEN
@@ -293,26 +288,26 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
       _DIAG_VAR_(data%id_d_dp)  = zero_
 
       IF( diag_level >= 10 ) THEN
-       _DIAG_VAR_(data%id_ptm_01) = zero_
-       _DIAG_VAR_(data%id_ptm_02) = zero_
-       _DIAG_VAR_(data%id_ptm_03) = zero_
-       _DIAG_VAR_(data%id_ptm_04) = zero_
-       _DIAG_VAR_(data%id_ptm_05) = zero_
-       _DIAG_VAR_(data%id_ptm_06) = zero_
-       _DIAG_VAR_(data%id_ptm_07) = zero_
-       _DIAG_VAR_(data%id_ptm_08) = zero_
-       _DIAG_VAR_(data%id_ptm_09) = zero_
-       _DIAG_VAR_(data%id_ptm_10) = zero_
-       _DIAG_VAR_(data%id_ptm_11) = zero_
-       _DIAG_VAR_(data%id_ptm_12) = zero_
-       _DIAG_VAR_(data%id_ptm_13) = zero_
-       _DIAG_VAR_(data%id_ptm_16) = zero_
+         _DIAG_VAR_(data%id_ptm_01) = zero_
+         _DIAG_VAR_(data%id_ptm_02) = zero_
+         _DIAG_VAR_(data%id_ptm_03) = zero_
+         _DIAG_VAR_(data%id_ptm_04) = zero_
+         _DIAG_VAR_(data%id_ptm_05) = zero_
+         _DIAG_VAR_(data%id_ptm_06) = zero_
+         _DIAG_VAR_(data%id_ptm_07) = zero_
+         _DIAG_VAR_(data%id_ptm_08) = zero_
+         _DIAG_VAR_(data%id_ptm_09) = zero_
+         _DIAG_VAR_(data%id_ptm_10) = zero_
+         _DIAG_VAR_(data%id_ptm_11) = zero_
+         _DIAG_VAR_(data%id_ptm_12) = zero_
+         _DIAG_VAR_(data%id_ptm_13) = zero_
+         _DIAG_VAR_(data%id_ptm_16) = zero_
       ENDIF
-    ENDIF
+   ENDIF
 
-    ! Increment the particle count for this cell and set to diagnostic
-    ppid = ppid + 1
-    _DIAG_VAR_(data%id_ptm_00) = ppid !,AED_REAL)   ! total number of particles within a cell
+   ! Increment the particle count for this cell and set to diagnostic
+   ppid = ppid + 1
+   _DIAG_VAR_(data%id_ptm_00) = ppid !,AED_REAL)   ! total number of particles within a cell
 
    ! Temporary settings
    Mu_max=1.2  !maximum daily growth rate
@@ -327,8 +322,6 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
    area      = 1000. !_STATE_VAR_(data%id_larea)
-
-   !
 
    !print *,'cell depth & temp',Depth, WaterTemperature
 
@@ -360,16 +353,16 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) + zero_
 
    ! DOM leakage from particles during decay
-  ! _FLUX_VAR_(data%id_doc) = _FLUX_VAR_(data%id_doc) + (1.-fres) * oxy_flux
-  ! _FLUX_VAR_(data%id_don) = _FLUX_VAR_(data%id_don) + (1.-fres) * oxy_flux * data%X_nc
-  ! _FLUX_VAR_(data%id_dop) = _FLUX_VAR_(data%id_dop) + (1.-fres) * oxy_flux * data%X_pc
+ ! _FLUX_VAR_(data%id_doc) = _FLUX_VAR_(data%id_doc) + (1.-fres) * oxy_flux
+ ! _FLUX_VAR_(data%id_don) = _FLUX_VAR_(data%id_don) + (1.-fres) * oxy_flux * data%X_nc
+ ! _FLUX_VAR_(data%id_dop) = _FLUX_VAR_(data%id_dop) + (1.-fres) * oxy_flux * data%X_pc
 
    ! Set diagnostics to track cumulative oxygen and nutrient fluxes into a cell
    _DIAG_VAR_(data%id_d_oxy) = _DIAG_VAR_(data%id_d_oxy) - oxy_flux * secs_per_day    ! O2
-  ! _DIAG_VAR_(data%id_d_dc)  = _DIAG_VAR_(data%id_d_dc) - (1.-fres)* oxy_flux * secs_per_day ! DOC
-  ! _DIAG_VAR_(data%id_d_dn)  = &
-  !                          _DIAG_VAR_(data%id_d_dn) - oxy_flux * data%X_nc * secs_per_day    ! DON + NH4 + NO3
-  ! _DIAG_VAR_(data%id_d_dp)  = _DIAG_VAR_(data%id_d_dp) - oxy_flux * data%X_pc * secs_per_day ! DOP + FRP
+ ! _DIAG_VAR_(data%id_d_dc)  = _DIAG_VAR_(data%id_d_dc) - (1.-fres)* oxy_flux * secs_per_day ! DOC
+ ! _DIAG_VAR_(data%id_d_dn)  = &
+ !                          _DIAG_VAR_(data%id_d_dn) - oxy_flux * data%X_nc * secs_per_day    ! DON + NH4 + NO3
+ ! _DIAG_VAR_(data%id_d_dp)  = _DIAG_VAR_(data%id_d_dp) - oxy_flux * data%X_pc * secs_per_day ! DOP + FRP
 
    ! Update particle bouyancy, changing with age
    p(i)%ptm_env(VVEL) = -1.0/86400.
@@ -384,20 +377,20 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    _DIAG_VAR_(data%id_ptm_18) = &
                   _DIAG_VAR_(data%id_ptm_18) !+ (partcl(PTM_AGE)-partcl(PTM_BIRTH)) /secs_per_day
    IF( diag_level >= 10 ) THEN
-    _DIAG_VAR_(data%id_ptm_01) = _DIAG_VAR_(data%id_ptm_01) + 0. !partcl(1)
-    _DIAG_VAR_(data%id_ptm_02) = _DIAG_VAR_(data%id_ptm_02) + 0. !partcl(2)
-    _DIAG_VAR_(data%id_ptm_03) = _DIAG_VAR_(data%id_ptm_03) + 0. !partcl(3)
-    _DIAG_VAR_(data%id_ptm_04) = _DIAG_VAR_(data%id_ptm_04) + 0. !partcl(4)
-    _DIAG_VAR_(data%id_ptm_05) = _DIAG_VAR_(data%id_ptm_05) + 0. !partcl(5)
-    _DIAG_VAR_(data%id_ptm_06) = _DIAG_VAR_(data%id_ptm_06) + 0. !partcl(6)
-    _DIAG_VAR_(data%id_ptm_07) = _DIAG_VAR_(data%id_ptm_07) + 0. !partcl(7)
-    _DIAG_VAR_(data%id_ptm_08) = _DIAG_VAR_(data%id_ptm_08) + 0. !partcl(8)
-    _DIAG_VAR_(data%id_ptm_09) = _DIAG_VAR_(data%id_ptm_09) + 0. !partcl(9)
-    _DIAG_VAR_(data%id_ptm_10) = _DIAG_VAR_(data%id_ptm_10) + 0. !partcl(10)
-    _DIAG_VAR_(data%id_ptm_11) = _DIAG_VAR_(data%id_ptm_11) + 0. !partcl(11)
-    _DIAG_VAR_(data%id_ptm_12) = _DIAG_VAR_(data%id_ptm_12) + 0. !partcl(12)
-    _DIAG_VAR_(data%id_ptm_13) = _DIAG_VAR_(data%id_ptm_13) + 0. !partcl(13)
-    _DIAG_VAR_(data%id_ptm_16) = _DIAG_VAR_(data%id_ptm_16) + 0. !partcl(16)
+      _DIAG_VAR_(data%id_ptm_01) = _DIAG_VAR_(data%id_ptm_01) + 0. !partcl(1)
+      _DIAG_VAR_(data%id_ptm_02) = _DIAG_VAR_(data%id_ptm_02) + 0. !partcl(2)
+      _DIAG_VAR_(data%id_ptm_03) = _DIAG_VAR_(data%id_ptm_03) + 0. !partcl(3)
+      _DIAG_VAR_(data%id_ptm_04) = _DIAG_VAR_(data%id_ptm_04) + 0. !partcl(4)
+      _DIAG_VAR_(data%id_ptm_05) = _DIAG_VAR_(data%id_ptm_05) + 0. !partcl(5)
+      _DIAG_VAR_(data%id_ptm_06) = _DIAG_VAR_(data%id_ptm_06) + 0. !partcl(6)
+      _DIAG_VAR_(data%id_ptm_07) = _DIAG_VAR_(data%id_ptm_07) + 0. !partcl(7)
+      _DIAG_VAR_(data%id_ptm_08) = _DIAG_VAR_(data%id_ptm_08) + 0. !partcl(8)
+      _DIAG_VAR_(data%id_ptm_09) = _DIAG_VAR_(data%id_ptm_09) + 0. !partcl(9)
+      _DIAG_VAR_(data%id_ptm_10) = _DIAG_VAR_(data%id_ptm_10) + 0. !partcl(10)
+      _DIAG_VAR_(data%id_ptm_11) = _DIAG_VAR_(data%id_ptm_11) + 0. !partcl(11)
+      _DIAG_VAR_(data%id_ptm_12) = _DIAG_VAR_(data%id_ptm_12) + 0. !partcl(12)
+      _DIAG_VAR_(data%id_ptm_13) = _DIAG_VAR_(data%id_ptm_13) + 0. !partcl(13)
+      _DIAG_VAR_(data%id_ptm_16) = _DIAG_VAR_(data%id_ptm_16) + 0. !partcl(16)
    ENDIF
 
    ! 2nd, Set particle property (this will therefore remember last particle only)
@@ -406,26 +399,23 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    _DIAG_VAR_(data%id_ptm117) = 0. !partcl(PTM_BIRTH)
    _DIAG_VAR_(data%id_ptm118) = 0. !(partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day
    IF( diag_level >= 10 ) THEN
-    _DIAG_VAR_(data%id_ptm101) = 0. !partcl(1)
-    _DIAG_VAR_(data%id_ptm102) = 0. !partcl(2)
-    _DIAG_VAR_(data%id_ptm103) = 0. !partcl(3)
-    _DIAG_VAR_(data%id_ptm104) = 0. !partcl(4)
-    _DIAG_VAR_(data%id_ptm105) = 0. !partcl(5)
-    _DIAG_VAR_(data%id_ptm106) = 0. !partcl(6)
-    _DIAG_VAR_(data%id_ptm107) = 0. !partcl(7)
-    _DIAG_VAR_(data%id_ptm108) = 0. !partcl(8)
-    _DIAG_VAR_(data%id_ptm109) = 0. !partcl(9)
-    _DIAG_VAR_(data%id_ptm110) = 0. !partcl(10)
-    _DIAG_VAR_(data%id_ptm111) = 0. !partcl(11)
-    _DIAG_VAR_(data%id_ptm112) = 0. !partcl(12)
-    _DIAG_VAR_(data%id_ptm113) = 0. !partcl(13)
-    _DIAG_VAR_(data%id_ptm116) = 0. !partcl(16)
+      _DIAG_VAR_(data%id_ptm101) = 0. !partcl(1)
+      _DIAG_VAR_(data%id_ptm102) = 0. !partcl(2)
+      _DIAG_VAR_(data%id_ptm103) = 0. !partcl(3)
+      _DIAG_VAR_(data%id_ptm104) = 0. !partcl(4)
+      _DIAG_VAR_(data%id_ptm105) = 0. !partcl(5)
+      _DIAG_VAR_(data%id_ptm106) = 0. !partcl(6)
+      _DIAG_VAR_(data%id_ptm107) = 0. !partcl(7)
+      _DIAG_VAR_(data%id_ptm108) = 0. !partcl(8)
+      _DIAG_VAR_(data%id_ptm109) = 0. !partcl(9)
+      _DIAG_VAR_(data%id_ptm110) = 0. !partcl(10)
+      _DIAG_VAR_(data%id_ptm111) = 0. !partcl(11)
+      _DIAG_VAR_(data%id_ptm112) = 0. !partcl(12)
+      _DIAG_VAR_(data%id_ptm113) = 0. !partcl(13)
+      _DIAG_VAR_(data%id_ptm116) = 0. !partcl(16)
    ENDIF
-
-
 END SUBROUTINE aed_particle_bgc_bio_particles
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
@@ -450,37 +440,34 @@ SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
-
    ! Check if we are in a new cell, to reset cumulative counters
    IF (ppid == 0) THEN
-     _DIAG_VAR_(data%id_ptm_14) = zero_
-     _DIAG_VAR_(data%id_ptm_15) = zero_
-     _DIAG_VAR_(data%id_ptm_17) = zero_
-     _DIAG_VAR_(data%id_ptm_18) = zero_
-     _DIAG_VAR_(data%id_d_oxy) = zero_
-     _DIAG_VAR_(data%id_d_dc)  = zero_
-     _DIAG_VAR_(data%id_d_dn)  = zero_
-     _DIAG_VAR_(data%id_d_dp)  = zero_
+      _DIAG_VAR_(data%id_ptm_14) = zero_
+      _DIAG_VAR_(data%id_ptm_15) = zero_
+      _DIAG_VAR_(data%id_ptm_17) = zero_
+      _DIAG_VAR_(data%id_ptm_18) = zero_
+      _DIAG_VAR_(data%id_d_oxy) = zero_
+      _DIAG_VAR_(data%id_d_dc)  = zero_
+      _DIAG_VAR_(data%id_d_dn)  = zero_
+      _DIAG_VAR_(data%id_d_dp)  = zero_
 
-     IF( diag_level >= 10 ) THEN
-      _DIAG_VAR_(data%id_ptm_01) = zero_
-      _DIAG_VAR_(data%id_ptm_02) = zero_
-      _DIAG_VAR_(data%id_ptm_03) = zero_
-      _DIAG_VAR_(data%id_ptm_04) = zero_
-      _DIAG_VAR_(data%id_ptm_05) = zero_
-      _DIAG_VAR_(data%id_ptm_06) = zero_
-      _DIAG_VAR_(data%id_ptm_07) = zero_
-      _DIAG_VAR_(data%id_ptm_08) = zero_
-      _DIAG_VAR_(data%id_ptm_09) = zero_
-      _DIAG_VAR_(data%id_ptm_10) = zero_
-      _DIAG_VAR_(data%id_ptm_11) = zero_
-      _DIAG_VAR_(data%id_ptm_12) = zero_
-      _DIAG_VAR_(data%id_ptm_13) = zero_
-      _DIAG_VAR_(data%id_ptm_16) = zero_
-     ENDIF
+      IF( diag_level >= 10 ) THEN
+         _DIAG_VAR_(data%id_ptm_01) = zero_
+         _DIAG_VAR_(data%id_ptm_02) = zero_
+         _DIAG_VAR_(data%id_ptm_03) = zero_
+         _DIAG_VAR_(data%id_ptm_04) = zero_
+         _DIAG_VAR_(data%id_ptm_05) = zero_
+         _DIAG_VAR_(data%id_ptm_06) = zero_
+         _DIAG_VAR_(data%id_ptm_07) = zero_
+         _DIAG_VAR_(data%id_ptm_08) = zero_
+         _DIAG_VAR_(data%id_ptm_09) = zero_
+         _DIAG_VAR_(data%id_ptm_10) = zero_
+         _DIAG_VAR_(data%id_ptm_11) = zero_
+         _DIAG_VAR_(data%id_ptm_12) = zero_
+         _DIAG_VAR_(data%id_ptm_13) = zero_
+         _DIAG_VAR_(data%id_ptm_16) = zero_
+      ENDIF
    ENDIF
-
 
    ! Increment the particle count for this cell and set to diagnostic
    ppid = ppid + 1
@@ -490,10 +477,10 @@ SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
    thickness = _STATE_VAR_(data%id_lht)
    area      = _STATE_VAR_(data%id_larea)
 
-   IF((partcl(PTM_AGE)-partcl(PTM_BIRTH))<buoyancy_age) THEN
-     decay = partcl(PTM_MASS) * (DT*data%decay_rate_new)  ! g / timestep
+   IF ((partcl(PTM_AGE)-partcl(PTM_BIRTH))<buoyancy_age) THEN
+      decay = partcl(PTM_MASS) * (DT*data%decay_rate_new)  ! g / timestep
    ELSE
-     decay = partcl(PTM_MASS) * (DT*data%decay_rate_old)  ! g / timestep
+      decay = partcl(PTM_MASS) * (DT*data%decay_rate_old)  ! g / timestep
    ENDIF
    partcl(PTM_MASS) = partcl(PTM_MASS) - decay
    IF ( partcl(PTM_MASS) <=  data%mass_limit ) partcl(PTM_STATUS) = -1
@@ -520,10 +507,10 @@ SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
 
 
    ! Particle bouyancy, changing with age
-   IF((partcl(PTM_AGE)-partcl(PTM_BIRTH))<buoyancy_age) THEN
-     partcl(PTM_VVEL) = data%vvel_new
+   IF ((partcl(PTM_AGE)-partcl(PTM_BIRTH))<buoyancy_age) THEN
+      partcl(PTM_VVEL) = data%vvel_new
    ELSE
-     partcl(PTM_VVEL) = data%vvel_old
+      partcl(PTM_VVEL) = data%vvel_old
    ENDIF
 
    ! Set diagnostics, summarising particles in this cell
@@ -536,20 +523,20 @@ SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
    _DIAG_VAR_(data%id_ptm_18) = &
                   _DIAG_VAR_(data%id_ptm_18) + (partcl(PTM_AGE)-partcl(PTM_BIRTH)) /secs_per_day
    IF( diag_level >= 10 ) THEN
-    _DIAG_VAR_(data%id_ptm_01) = _DIAG_VAR_(data%id_ptm_01) + partcl(1)
-    _DIAG_VAR_(data%id_ptm_02) = _DIAG_VAR_(data%id_ptm_02) + partcl(2)
-    _DIAG_VAR_(data%id_ptm_03) = _DIAG_VAR_(data%id_ptm_03) + partcl(3)
-    _DIAG_VAR_(data%id_ptm_04) = _DIAG_VAR_(data%id_ptm_04) + partcl(4)
-    _DIAG_VAR_(data%id_ptm_05) = _DIAG_VAR_(data%id_ptm_05) + partcl(5)
-    _DIAG_VAR_(data%id_ptm_06) = _DIAG_VAR_(data%id_ptm_06) + partcl(6)
-    _DIAG_VAR_(data%id_ptm_07) = _DIAG_VAR_(data%id_ptm_07) + partcl(7)
-    _DIAG_VAR_(data%id_ptm_08) = _DIAG_VAR_(data%id_ptm_08) + partcl(8)
-    _DIAG_VAR_(data%id_ptm_09) = _DIAG_VAR_(data%id_ptm_09) + partcl(9)
-    _DIAG_VAR_(data%id_ptm_10) = _DIAG_VAR_(data%id_ptm_10) + partcl(10)
-    _DIAG_VAR_(data%id_ptm_11) = _DIAG_VAR_(data%id_ptm_11) + partcl(11)
-    _DIAG_VAR_(data%id_ptm_12) = _DIAG_VAR_(data%id_ptm_12) + partcl(12)
-    _DIAG_VAR_(data%id_ptm_13) = _DIAG_VAR_(data%id_ptm_13) + partcl(13)
-    _DIAG_VAR_(data%id_ptm_16) = _DIAG_VAR_(data%id_ptm_16) + partcl(16)
+      _DIAG_VAR_(data%id_ptm_01) = _DIAG_VAR_(data%id_ptm_01) + partcl(1)
+      _DIAG_VAR_(data%id_ptm_02) = _DIAG_VAR_(data%id_ptm_02) + partcl(2)
+      _DIAG_VAR_(data%id_ptm_03) = _DIAG_VAR_(data%id_ptm_03) + partcl(3)
+      _DIAG_VAR_(data%id_ptm_04) = _DIAG_VAR_(data%id_ptm_04) + partcl(4)
+      _DIAG_VAR_(data%id_ptm_05) = _DIAG_VAR_(data%id_ptm_05) + partcl(5)
+      _DIAG_VAR_(data%id_ptm_06) = _DIAG_VAR_(data%id_ptm_06) + partcl(6)
+      _DIAG_VAR_(data%id_ptm_07) = _DIAG_VAR_(data%id_ptm_07) + partcl(7)
+      _DIAG_VAR_(data%id_ptm_08) = _DIAG_VAR_(data%id_ptm_08) + partcl(8)
+      _DIAG_VAR_(data%id_ptm_09) = _DIAG_VAR_(data%id_ptm_09) + partcl(9)
+      _DIAG_VAR_(data%id_ptm_10) = _DIAG_VAR_(data%id_ptm_10) + partcl(10)
+      _DIAG_VAR_(data%id_ptm_11) = _DIAG_VAR_(data%id_ptm_11) + partcl(11)
+      _DIAG_VAR_(data%id_ptm_12) = _DIAG_VAR_(data%id_ptm_12) + partcl(12)
+      _DIAG_VAR_(data%id_ptm_13) = _DIAG_VAR_(data%id_ptm_13) + partcl(13)
+      _DIAG_VAR_(data%id_ptm_16) = _DIAG_VAR_(data%id_ptm_16) + partcl(16)
    ENDIF
 
    ! 2nd, Set particle property (this will therefore remember last particle only)
@@ -557,26 +544,26 @@ SUBROUTINE aed_particle_bgc_bio_particles_og( data,column,layer_idx,ppid,ptm )
    _DIAG_VAR_(data%id_ptm115) = partcl(PTM_MASS)
    _DIAG_VAR_(data%id_ptm117) = partcl(PTM_BIRTH)
    _DIAG_VAR_(data%id_ptm118) = (partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day
+
    IF( diag_level >= 10 ) THEN
-    _DIAG_VAR_(data%id_ptm101) = partcl(1)
-    _DIAG_VAR_(data%id_ptm102) = partcl(2)
-    _DIAG_VAR_(data%id_ptm103) = partcl(3)
-    _DIAG_VAR_(data%id_ptm104) = partcl(4)
-    _DIAG_VAR_(data%id_ptm105) = partcl(5)
-    _DIAG_VAR_(data%id_ptm106) = partcl(6)
-    _DIAG_VAR_(data%id_ptm107) = partcl(7)
-    _DIAG_VAR_(data%id_ptm108) = partcl(8)
-    _DIAG_VAR_(data%id_ptm109) = partcl(9)
-    _DIAG_VAR_(data%id_ptm110) = partcl(10)
-    _DIAG_VAR_(data%id_ptm111) = partcl(11)
-    _DIAG_VAR_(data%id_ptm112) = partcl(12)
-    _DIAG_VAR_(data%id_ptm113) = partcl(13)
-    _DIAG_VAR_(data%id_ptm116) = partcl(16)
+      _DIAG_VAR_(data%id_ptm101) = partcl(1)
+      _DIAG_VAR_(data%id_ptm102) = partcl(2)
+      _DIAG_VAR_(data%id_ptm103) = partcl(3)
+      _DIAG_VAR_(data%id_ptm104) = partcl(4)
+      _DIAG_VAR_(data%id_ptm105) = partcl(5)
+      _DIAG_VAR_(data%id_ptm106) = partcl(6)
+      _DIAG_VAR_(data%id_ptm107) = partcl(7)
+      _DIAG_VAR_(data%id_ptm108) = partcl(8)
+      _DIAG_VAR_(data%id_ptm109) = partcl(9)
+      _DIAG_VAR_(data%id_ptm110) = partcl(10)
+      _DIAG_VAR_(data%id_ptm111) = partcl(11)
+      _DIAG_VAR_(data%id_ptm112) = partcl(12)
+      _DIAG_VAR_(data%id_ptm113) = partcl(13)
+      _DIAG_VAR_(data%id_ptm116) = partcl(16)
    ENDIF
 
    !print *,'ptm ',ppid,(partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day,partcl(PTM_MASS), &
    !                                       decay,partcl(PTM_VVEL),_DIAG_VAR_(data%id_ptm_15)
-
 END SUBROUTINE aed_particle_bgc_bio_particles_og
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
