@@ -1543,7 +1543,7 @@ P_min = 0.d0
 !------------------------------------------------------
 ! CODE FROM PIBM Par2PHY SUBROUTINE
 
-!PHYC(:)= 0.d0
+PHYC = 0.d0
 _DIAG_VAR_(data%id_phyc) = 0.
 !PHY(:) = 0.d0
 _DIAG_VAR_(data%id_phyn) = 0.
@@ -1697,7 +1697,7 @@ SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
    DO phy_i=1,data%num_phytos
       ! Retrieve current (local) phytoplankton biomass in this layer
       phy = _DIAG_VAR_(data%id_phyc) !MH will need expanding to multi-groups for phy>1
-
+      
       ! Self-shading with contribution from this phytoplankton concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
       print *, 'in extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
