@@ -525,7 +525,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%ip_chl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_chl', 'pg Chl', 'cell Chl concentration',initial = 0.02 * 12/50)
 
    !real    :: num = 5d9           ! Number of cells per superindividual
-   data%ip_num = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_num', 'number', 'number of cells/particle',initial = 5d9)
+   data%ip_num = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_num', 'number', 'number of cells/particle',initial = 5d12)
 
    !real :: Cdiv= 0.04d0           !cellular carbon content threshold for division (pmol/cell), can be used as a proxy for size and can be converted to ESD; Phytoplankton half-saturation constant, minimal N:C and maximal N:C ratios are allometric functions of this parameter
                                    !This trait will vary with mutation
@@ -1490,6 +1490,7 @@ P_min = 0.d0
             p(i)%ptm_state(data%ip_chl) = 0d0
             p(i)%ptm_state(data%ip_num) = 0d0
             _PTM_STAT_(i,STAT) = 0
+            _PTM_STAT_(i,FLAG) = 3
          endif
 
          !Save fitness of each particle (per day)
@@ -1626,7 +1627,6 @@ ENDDO !End of iterating over all super-individuals
 
 !DO k = 1, nlev   
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
-        print *, 'bef extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mg Chl/m^3
@@ -1700,7 +1700,6 @@ SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
       
       ! Self-shading with contribution from this phytoplankton concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
-      print *, 'in extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
    ENDDO
 END SUBROUTINE aed_light_extinction_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
