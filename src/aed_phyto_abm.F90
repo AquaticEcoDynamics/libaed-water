@@ -75,7 +75,7 @@ MODULE aed_phyto_abm
       INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl, ip_mu_C, ip_fit
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
-      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday
+      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
 
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
@@ -688,6 +688,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_pop = aed_locate_variable('OGM_pop')
 
    ! Environment variables
+   data%id_depth = aed_locate_global('depth')
    data%id_tem   = aed_locate_global('temperature')
    data%id_dens  = aed_locate_global('density')
    data%id_lht   = aed_locate_global('layer_ht')
@@ -931,7 +932,7 @@ real :: PHY_t = 0d0  !Total phytoplankton N
 
 ! additional declarations from PIBM time_settings.F90
 real     :: dtdays       = 1.0d0/24 !ML initializing this to 1 hour
-real  :: sec_of_day   != 0
+real  :: hour_of_day   != 0
 integer  :: integer_day   != 0
 real  :: real_day
 
@@ -1125,9 +1126,9 @@ P_min = 0.d0
    !ML enddo
    real_day = _STATE_VAR_S_(data%id_yday)
    integer_day = INT(real_day)
-   sec_of_day = real_day - real(integer_day)
+   hour_of_day = NINT((real_day - real(integer_day))*24)
 
-   if (sec_of_day == 0) then ! ML need to come back to this and figure out how to do equivalent in AED
+   if (hour_of_day == 0) then ! ML need to come back to this and figure out how to do equivalent in AED
       !ML Varout(oNPP, k) = NPPc_(k)      !NPP of the past day; this is real NPP (mg C d-1 m-3)
       !ML Varout(oPAR, k) = IPAR(k)       !Integrated PAR of the past day (W m-2)
        _DIAG_VAR_(data%id_NPPc) = zero_  !ML NPPc_(k) = 0d0              !Reset NPPc_
@@ -1180,6 +1181,7 @@ P_min = 0.d0
    !Save number of super-individuals per m3
    !ML Varout(oN_ind, k) = dble(N_)/Hz(k)
    _DIAG_VAR_(data%id_count) = N_ !ML
+   print*, hour_of_day, _STATE_VAR_(data%id_depth), _DIAG_VAR_(data%id_count)
    
    !Reset total abundance
    Abun_ = 0d0
