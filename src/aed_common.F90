@@ -285,7 +285,6 @@ LOGICAL FUNCTION aed_requested_zones(n_aed_vars)
    ENDDO
 
    aed_requested_zones = res
-
 END FUNCTION aed_requested_zones
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -709,7 +708,6 @@ SUBROUTINE aed_delete
    ENDDO
 END SUBROUTINE aed_delete
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 !===============================================================================
 END MODULE aed_common

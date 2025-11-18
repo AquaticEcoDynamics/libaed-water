@@ -437,16 +437,8 @@ CONTAINS
    !-- Now find out if we have any redox pairs
    !-------
    CALL setupWCRedoxConfiguration( allComponents(1:nUserReqComponents) )
-
-
-
-
- END SUBROUTINE ConfigEquilibriumSolver                                               !
+ END SUBROUTINE ConfigEquilibriumSolver
 !------------------------------------------------------------------------------!
-
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -458,7 +450,7 @@ CONTAINS
 ! is stored in the transportable variable CHGBAL.                              !
 ! No mineral phases are included.                                              !
 !------------------------------------------------------------------------------!
- SUBROUTINE InitialiseGCProperties(dissConcs, partConcs, concMode, inTemp)             !
+ SUBROUTINE InitialiseGCProperties(dissConcs, partConcs, concMode, inTemp)
    !-- Incoming                                                                !
    ! made AED_REAL to enable build in single precision - CAB
    AED_REAL,DIMENSION(:)                   :: partConcs, dissConcs             !
@@ -631,14 +623,8 @@ CONTAINS
 
 
    verbosity = baseVerb
-
-
  END SUBROUTINE InitialiseGCProperties
 !------------------------------------------------------------------------------!
-
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -680,7 +666,6 @@ CONTAINS
    ELSE
      updateDerivedVars    = .FALSE.
    END IF
-
 
      nFailedCells = 0
 
@@ -817,11 +802,7 @@ CONTAINS
 
      DEALLOCATE(componentList)
 
-
-
-
      IF(nPPEqs > 0 .AND. solvePPtoEquilibrium) THEN
-
        IF(verbosity > 1) THEN
          PRINT *,'Starting Batch Rxn:'
        END IF
@@ -931,15 +912,8 @@ CONTAINS
 !     PRINT *,' ---<'
 !     nFailedCells = 0
 !   END IF
-
-
  END SUBROUTINE UpdateEquilibration                                           !
 !------------------------------------------------------------------------------!
-
-
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1096,7 +1070,6 @@ CONTAINS
        END DO
      END IF
 
-
      !-- Normalize columns if necessary
      normal = gc_one
 
@@ -1180,7 +1153,6 @@ CONTAINS
          END DO
      END IF
 
-
      IF(verbosity > 10) THEN
        DO miscIndex = 1,nOPTEqs+nEQLEqs+nINQEqs
          print *,'Q: ',inequalityArray(miscIndex,:)
@@ -1243,7 +1215,6 @@ CONTAINS
      !-- Recalculate mole balance sums based on the new species concs
      CALL moleBalanceSums(species, components)
 
-
      !-- Lastly, perform a final check for convergence in case
      !--     something went wrong
      DO componentIndex = 1,nComps2Process
@@ -1269,12 +1240,8 @@ CONTAINS
        END DO
      END IF
 
-
      nItern = nItern + 1
-
-
    END DO
-
 
    !---------------------------------------------------------------------------!
    !-- Now the Newton-Rhapson sequence is finished, interogate and             !
@@ -1324,13 +1291,8 @@ CONTAINS
    END IF
 
    DEALLOCATE(inequalityArray)
-
-
  END SUBROUTINE solveEquilibriumReactions                                      !
 !------------------------------------------------------------------------------!
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1372,13 +1334,8 @@ CONTAINS
      END IF
 
    END DO
-
-
  END SUBROUTINE updateLogK
 !------------------------------------------------------------------------------!
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1398,7 +1355,6 @@ CONTAINS
    DOUBLETYPE                                   :: d1, s1, s2, s3             !
    INTEGER  :: nSpec                      !
    INTEGER  :: sIndex                     !
-                                                                               !
 
    nSpec = SIZE(specs)
 
@@ -1449,15 +1405,9 @@ CONTAINS
        specs(sIndex)%delGamma  = gc_zero
 
      END IF
-
    END DO
-
-
  END SUBROUTINE updateGammas
 !------------------------------------------------------------------------------!
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1527,9 +1477,6 @@ CONTAINS
 !------------------------------------------------------------------------------!
 
 
-
-
-
 !------------------------------------------------------------------------------!
 ! SetEqIndiciesForSpeciation                                                   !
 !                                                                              !
@@ -1546,7 +1493,6 @@ CONTAINS
    !-- Local                                                                   !
    CHARACTER(*), PARAMETER :: THIS_PROC = "seteqIndiciesforSpeciation"         !
    INTEGER  :: cIndex, eqCounter
-
 
    eqCounter = 1
    DO cIndex = 1,nComponents
@@ -1579,13 +1525,8 @@ CONTAINS
      print *,'Problem setting eqIndex for Speciation:',eqCounter,nComps2Process
      STOP
    END IF
-
-
  END SUBROUTINE seteqIndiciesforSpeciation
 !------------------------------------------------------------------------------!
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1676,20 +1617,13 @@ CONTAINS
      END IF
    END DO
 
-
-
    IF(eqCounter /= nComps2Process .OR. (listCounter-1) /= nComps2Process) THEN
      PRINT *,'Problem setting eqIndex for Batch Rxn:',                         &
               eqCounter,nComps2Process,listCounter-1
      STOP
    END IF
-
-
  END SUBROUTINE SeteqIndiciesforBatchRxn
 !------------------------------------------------------------------------------!
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -1826,8 +1760,6 @@ SUBROUTINE UpdateUnknownsWithdX(deltaConc,comps,cList)                        !
      END DO
    END IF
 
-
-
    !---------------------------------------------------------------------------!
    !-- Calc factor for mass balance equations for aqueous unknowns
    factor      = gc_one
@@ -1910,8 +1842,6 @@ SUBROUTINE UpdateUnknownsWithdX(deltaConc,comps,cList)                        !
        deltaConc(componentIndex) = deltaConc(componentIndex) * factor
      END IF
    END DO
-
-
 
    !---------------------------------------------------------------------------!
    !-- Now apply the changes
@@ -4552,14 +4482,8 @@ END SUBROUTINE COLVEC
           derivedNames(i) = tmpNames(i)
    END DO
    DEALLOCATE(tmpNames)
-
  END SUBROUTINE GetListOfGeochemDiagnostics
 !------------------------------------------------------------------------------!
-
-
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -4625,15 +4549,8 @@ END SUBROUTINE COLVEC
       END IF
      END DO
    END IF
-
-
  END FUNCTION returnGCDerivedVector                                            !
 !------------------------------------------------------------------------------!
-
-
-
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -4644,15 +4561,15 @@ END SUBROUTINE COLVEC
 !------------------------------------------------------------------------------!
  FUNCTION calcpCO2(specs, temp, salinity) RESULT(pCO2)                         !
    !-- Incoming                                                                !
-   TYPE(gcSpecies), DIMENSION(:), INTENT(IN) :: specs                         !
-   DOUBLETYPE,                    INTENT(IN) :: temp                          !
-   DOUBLETYPE,                    INTENT(IN) :: salinity                      !
+   TYPE(gcSpecies), DIMENSION(:), INTENT(IN) :: specs                          !
+   DOUBLETYPE,                    INTENT(IN) :: temp                           !
+   DOUBLETYPE,                    INTENT(IN) :: salinity                       !
    !-- Outgoing                                                                !
-   DOUBLETYPE                                :: pCO2                          !
+   DOUBLETYPE                                :: pCO2                           !
    !-- Local                                                                   !
-   CHARACTER(*), PARAMETER                   :: THIS_PROC = "calcpCO2"        !
-   DOUBLETYPE                                :: d1,Solubility,CO2,H2CO3       !
-   INTEGER  :: nSpec, sIndex                 !
+   CHARACTER(*), PARAMETER                   :: THIS_PROC = "calcpCO2"         !
+   DOUBLETYPE                                :: d1,Solubility,CO2,H2CO3        !
+   INTEGER  :: nSpec, sIndex                                                   !
 
 
    nSpec = SIZE(specs)
@@ -4695,9 +4612,6 @@ END FUNCTION calcpCO2
 !------------------------------------------------------------------------------!
 
 
-
-
-
 !------------------------------------------------------------------------------!
 ! CalcSIforPP                                                                  !
 !                                                                              !
@@ -4722,12 +4636,8 @@ END FUNCTION calcpCO2
        END IF
      END IF
    END DO
-
-
  END FUNCTION calcSIforPP
 !------------------------------------------------------------------------------!
-
-
 
 
 !------------------------------------------------------------------------------!
@@ -4742,7 +4652,6 @@ FUNCTION CalcIAPforPP(PICHMIndex) RESULT(SI_PPX)                               !
    !-- Outgoing                                                                !
    DOUBLETYPE  :: SI_PPX                                                       !
 
-
    SI_PPX = -999.
 
    IF(allComponents(PICHMIndex)%CompType == PUREPHASE) THEN
@@ -4753,12 +4662,8 @@ FUNCTION CalcIAPforPP(PICHMIndex) RESULT(SI_PPX)                               !
      SI_PPX = SI_PPX/allComponents(PICHMIndex)%ppData%logK
 
    END IF
-
-
 END FUNCTION CalcIAPforPP
 !------------------------------------------------------------------------------!
-
-
 
 
 !------------------------------------------------------------------------------!

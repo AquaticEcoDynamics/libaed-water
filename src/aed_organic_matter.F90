@@ -1204,19 +1204,18 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    ! Set source & sink terms for the sediment pools (change per surface area per second)
    ! Note that this includes fluxes to and from the pelagic.
    IF( data%simSedimentOM>0 ) THEN
-    _FLUX_VAR_B_(data%id_sed_poc) = _FLUX_VAR_B_(data%id_sed_poc) -(Fsed_poc + Psed_poc)
-    _FLUX_VAR_B_(data%id_sed_pon) = _FLUX_VAR_B_(data%id_sed_pon) -(Fsed_pon + Psed_pon)
-    _FLUX_VAR_B_(data%id_sed_pop) = _FLUX_VAR_B_(data%id_sed_pop) -(Fsed_pop + Psed_pop)
-    _FLUX_VAR_B_(data%id_sed_doc) = _FLUX_VAR_B_(data%id_sed_doc) - Fsed_doc
-    _FLUX_VAR_B_(data%id_sed_don) = _FLUX_VAR_B_(data%id_sed_don) - Fsed_don
-    _FLUX_VAR_B_(data%id_sed_dop) = _FLUX_VAR_B_(data%id_sed_dop) - Fsed_dop
-    IF ( diag_level>0 ) THEN
-      _DIAG_VAR_S_(data%id_sed_toc) = _STATE_VAR_S_(data%id_sed_poc)+_STATE_VAR_S_(data%id_sed_doc)
-      _DIAG_VAR_S_(data%id_sed_ton) = _STATE_VAR_S_(data%id_sed_pon)+_STATE_VAR_S_(data%id_sed_don)
-      _DIAG_VAR_S_(data%id_sed_top) = _STATE_VAR_S_(data%id_sed_pop)+_STATE_VAR_S_(data%id_sed_dop)
-    ENDIF
-  ENDIF
-
+      _FLUX_VAR_B_(data%id_sed_poc) = _FLUX_VAR_B_(data%id_sed_poc) -(Fsed_poc + Psed_poc)
+      _FLUX_VAR_B_(data%id_sed_pon) = _FLUX_VAR_B_(data%id_sed_pon) -(Fsed_pon + Psed_pon)
+      _FLUX_VAR_B_(data%id_sed_pop) = _FLUX_VAR_B_(data%id_sed_pop) -(Fsed_pop + Psed_pop)
+      _FLUX_VAR_B_(data%id_sed_doc) = _FLUX_VAR_B_(data%id_sed_doc) - Fsed_doc
+      _FLUX_VAR_B_(data%id_sed_don) = _FLUX_VAR_B_(data%id_sed_don) - Fsed_don
+      _FLUX_VAR_B_(data%id_sed_dop) = _FLUX_VAR_B_(data%id_sed_dop) - Fsed_dop
+      IF ( diag_level>0 ) THEN
+         _DIAG_VAR_S_(data%id_sed_toc) = _STATE_VAR_S_(data%id_sed_poc)+_STATE_VAR_S_(data%id_sed_doc)
+         _DIAG_VAR_S_(data%id_sed_ton) = _STATE_VAR_S_(data%id_sed_pon)+_STATE_VAR_S_(data%id_sed_don)
+         _DIAG_VAR_S_(data%id_sed_top) = _STATE_VAR_S_(data%id_sed_pop)+_STATE_VAR_S_(data%id_sed_dop)
+      ENDIF
+   ENDIF
 END SUBROUTINE aed_calculate_benthic_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1237,7 +1236,6 @@ SUBROUTINE aed_light_extinction_organic_matter(data,column,layer_idx,extinction)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
    ! Retrieve current (local) state variable values.
    doc = _STATE_VAR_(data%id_doc)
    poc = _STATE_VAR_(data%id_poc)
@@ -1274,28 +1272,26 @@ SUBROUTINE aed_mobility_organic_matter(data,column,layer_idx,mobility)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   vvel = zero_
+   vvel_cpom = zero_
+   dz = _STATE_VAR_(data%id_dz)
 
-     vvel = zero_
-     vvel_cpom = zero_
-     dz = _STATE_VAR_(data%id_dz)
-
-     ! settling = 0 : no settling
-     ! settling = 1 : constant settling @ w_pom
-     ! settling = 2 : constant settling @ w_pom, corrected for variable density
-     ! settling = 3 : settling based on Stoke's Law (calculated below)
-     SELECT CASE (data%settling)
-
-        CASE ( _MOB_OFF_ )
+   ! settling = 0 : no settling
+   ! settling = 1 : constant settling @ w_pom
+   ! settling = 2 : constant settling @ w_pom, corrected for variable density
+   ! settling = 3 : settling based on Stoke's Law (calculated below)
+   SELECT CASE (data%settling)
+       CASE ( _MOB_OFF_ )
           ! disable settling by settign vertical velocity to 0
           vvel = zero_
           vvel_cpom = zero_
 
-        CASE ( _MOB_CONST_ )
+       CASE ( _MOB_CONST_ )
           ! constant settling velocity using user provided value
           vvel = data%w_pom
           vvel_cpom = data%w_cpom
 
-        CASE ( _MOB_TEMP_ )
+       CASE ( _MOB_TEMP_ )
           ! constant settling velocity @20C corrected for density changes
           pw = _STATE_VAR_(data%id_rho)
           temp = _STATE_VAR_(data%id_temp)
@@ -1305,7 +1301,7 @@ SUBROUTINE aed_mobility_organic_matter(data,column,layer_idx,mobility)
           vvel = data%w_pom*mu20*pw / ( mu*pw20 )
           vvel_cpom = data%w_cpom*mu20*pw / ( mu*pw20 )
 
-        CASE ( _MOB_STOKES_ )
+       CASE ( _MOB_STOKES_ )
           ! settling velocity based on Stokes Law calculation and cell density
 
           pw = _STATE_VAR_(data%id_rho)              ! water density
@@ -1315,30 +1311,28 @@ SUBROUTINE aed_mobility_organic_matter(data,column,layer_idx,mobility)
           vvel = -9.807*(data%d_pom**2.)*( rho_pom-pw ) / ( 18.*mu )
           IF(data%simRPools) &
           vvel_cpom = -9.807*(data%d_cpom**2.)*( data%rho_cpom-pw ) / ( 18.*mu )
-        CASE DEFAULT
+       CASE DEFAULT
           ! unknown settling/migration option selection
           vvel = data%w_pom
           vvel_cpom = data%w_cpom
+   END SELECT
 
-      END SELECT
+   ! set global mobility array (m/s), later used to compute settling
+   mobility(data%id_poc) = vvel
+   mobility(data%id_pon) = vvel
+   mobility(data%id_pop) = vvel
+   IF(data%simRPools) mobility(data%id_cpom) = vvel_cpom
+   IF ( diag_level>1 ) THEN
+      _DIAG_VAR_(data%id_pom_vvel) = vvel*secs_per_day
+      IF(data%simRPools) _DIAG_VAR_(data%id_cpom_vvel) = vvel_cpom*secs_per_day
+   ENDIF
 
-      ! set global mobility array (m/s), later used to compute settling
-      mobility(data%id_poc) = vvel
-      mobility(data%id_pon) = vvel
-      mobility(data%id_pop) = vvel
-      IF(data%simRPools) mobility(data%id_cpom) = vvel_cpom
-      IF ( diag_level>1 ) THEN
-        _DIAG_VAR_(data%id_pom_vvel) = vvel*secs_per_day
-        IF(data%simRPools) _DIAG_VAR_(data%id_cpom_vvel) = vvel_cpom*secs_per_day
-      ENDIF
-
-      ! set sedimentation flux (mmmol/m3/d) for later use/reporting
-      _DIAG_VAR_(data%id_Psed_poc) = (vvel/dz)*_STATE_VAR_(data%id_poc)*secs_per_day
-      _DIAG_VAR_(data%id_Psed_pon) = (vvel/dz)*_STATE_VAR_(data%id_pon)*secs_per_day
-      _DIAG_VAR_(data%id_Psed_pop) = (vvel/dz)*_STATE_VAR_(data%id_pop)*secs_per_day
-      IF(data%simRPools) _DIAG_VAR_(data%id_Psed_cpom) = &
+   ! set sedimentation flux (mmmol/m3/d) for later use/reporting
+   _DIAG_VAR_(data%id_Psed_poc) = (vvel/dz)*_STATE_VAR_(data%id_poc)*secs_per_day
+   _DIAG_VAR_(data%id_Psed_pon) = (vvel/dz)*_STATE_VAR_(data%id_pon)*secs_per_day
+   _DIAG_VAR_(data%id_Psed_pop) = (vvel/dz)*_STATE_VAR_(data%id_pop)*secs_per_day
+   IF(data%simRPools) _DIAG_VAR_(data%id_Psed_cpom) = &
                                (vvel_cpom/dz)*_STATE_VAR_(data%id_cpom)*secs_per_day
-
 END SUBROUTINE aed_mobility_organic_matter
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
