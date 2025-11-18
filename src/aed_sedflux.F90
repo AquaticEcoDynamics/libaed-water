@@ -78,7 +78,7 @@ MODULE aed_sedflux
       INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_ch4_ebb, id_Fsed_n2o
       INTEGER  :: id_Fsed_dic_dry, id_Fsed_ch4_dry, id_Fsed_ch4_ebb_dry, id_Fsed_n2o_dry
       INTEGER  :: id_Fsed_oxy_pel, id_Fsed_feii
-      INTEGER  :: id_Fstm_ch4
+      INTEGER  :: id_Fstm_ch4, id_Ktau_0
       INTEGER  :: id_zones
 
       !# Model parameters
@@ -89,7 +89,7 @@ MODULE aed_sedflux
                   Fsed_poc, Fsed_doc, Fsed_feii, &
                   Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o, &
                   Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry, Fsed_n2o_dry, &
-                  Fstm_ch4
+                  Fstm_ch4, Ktau_0
 
       AED_REAL,DIMENSION(:),ALLOCATABLE :: &
                   Fsed_oxy_P, Fsed_rsi_P, Fsed_amm_P, Fsed_nit_P, Fsed_frp_P, &
@@ -97,7 +97,7 @@ MODULE aed_sedflux
                   Fsed_poc_P, Fsed_doc_P, Fsed_feii_P, &
                   Fsed_dic_P, Fsed_ch4_P, Fsed_ch4_ebb_P, Fsed_n2o_P, &
                   Fsed_dic_dry_P, Fsed_ch4_dry_P, Fsed_ch4_ebb_dry_P, Fsed_n2o_dry_P, &
-                  Fstm_ch4_P
+                  Fstm_ch4_P, Ktau_0_P
 
 
      CONTAINS
@@ -265,6 +265,12 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
+   AED_REAL :: Ktau_0(_MAX_ZONES_)  = MISVAL   !% Sediment critical shear stress modifier
+                                               !% $$N/m^2$$
+                                               !% float
+                                               !% 0
+                                               !% 0 - XX
+                                               !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
 !  %% END NAMELIST   %%  /aed_sed_const2d/
 
    NAMELIST /aed_sed_const2d/ n_zones, active_zones,                           &
@@ -273,7 +279,8 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                               Fsed_poc, Fsed_doc, Fsed_feii,                   &
                               Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o,      &
                               Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry,    &
-                              Fsed_n2o_dry, Fstm_ch4
+                              Fsed_n2o_dry, Fstm_ch4,                          &
+                              Ktau_0
 
 !
 !-------------------------------------------------------------------------------
@@ -358,6 +365,9 @@ SUBROUTINE load_sed_zone_data(data,namlst)
    IF (Fstm_ch4(1) .NE. MISVAL ) THEN
       ALLOCATE(data%Fstm_ch4_P(n_zones)) ; data%Fstm_ch4_P(1:n_zones) = Fstm_ch4(1:n_zones)
    ENDIF
+   IF (Ktau_0(1) .NE. MISVAL ) THEN
+      ALLOCATE(data%Ktau_0_P(n_zones)) ; data%Ktau_0_P(1:n_zones) = Ktau_0(1:n_zones)
+   ENDIF
 END SUBROUTINE load_sed_zone_data
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -426,6 +436,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Fsed_ch4_ebb_dry = MISVAL
    AED_REAL :: Fsed_n2o_dry     = MISVAL
    AED_REAL :: Fstm_ch4         = MISVAL
+   AED_REAL :: Ktau_0           = MISVAL
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
@@ -440,7 +451,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
                      Fsed_poc, Fsed_doc, Fsed_feii,                             &
                      Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o,                &
                      Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry, Fsed_n2o_dry,&
-                     Fstm_ch4
+                     Fstm_ch4, Ktau_0
 
 !
 !-------------------------------------------------------------------------------
@@ -484,6 +495,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       data%Fsed_ch4_ebb_dry  = Fsed_ch4_ebb_dry
       data%Fsed_n2o_dry  = Fsed_n2o_dry
       data%Fstm_ch4  = Fstm_ch4
+      data%Ktau_0   = Ktau_0
 
    ELSEIF ( sedflux_model .EQ. "dynamic" ) THEN
       data%sed_modl = SED_DYNAMIC
@@ -520,6 +532,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       IF (ALLOCATED(data%Fsed_ch4_ebb_dry_P))  Fsed_ch4_ebb_dry  = data%Fsed_ch4_ebb_dry_P(1)
       IF (ALLOCATED(data%Fsed_n2o_dry_P))  Fsed_n2o_dry  = data%Fsed_n2o_dry_P(1)
       IF (ALLOCATED(data%Fstm_ch4_P))  Fstm_ch4  = data%Fstm_ch4_P(1)
+      IF (ALLOCATED(data%Ktau_0_P))  Ktau_0  = data%Ktau_0_P(1)
    ELSE
       PRINT*,"**ERROR : Unknown sedflux model type :", TRIM(sedflux_model)
    ENDIF
@@ -545,6 +558,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    data%id_Fsed_ch4_ebb_dry = 0
    data%id_Fsed_n2o_dry = 0
    data%id_Fstm_ch4 = 0
+   data%id_Ktau_0 = 0
 
 
    ! Register state variables
@@ -613,8 +627,10 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Fstm_ch4 .GT. MISVAL ) &
       data%id_Fstm_ch4 = aed_define_sheet_diag_variable('Fstm_ch4','mmol C/m2/d',   &
                                           'flux rate of ch4 across the vegetation-air interface')
-
-
+   IF ( Ktau_0 .GT. MISVAL ) &
+      data%id_Ktau_0 = aed_define_sheet_diag_variable('Ktau_0','N/m2',   &
+                                          'critical shear stress modifier')
+                                    
    IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
       CALL aed_set_const_var(data%id_Fsed_oxy)
       CALL aed_set_const_var(data%id_Fsed_rsi)
@@ -637,6 +653,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       CALL aed_set_const_var(data%id_Fsed_ch4_ebb_dry)
       CALL aed_set_const_var(data%id_Fsed_n2o_dry)
       CALL aed_set_const_var(data%id_Fstm_ch4)
+      CALL aed_set_const_var(data%id_Ktau_0)
    ENDIF
 
 END SUBROUTINE aed_define_sedflux
@@ -669,6 +686,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
    AED_REAL :: Fsed_ch4_dry = 0., Fsed_dic_dry = 0.
    AED_REAL :: Fsed_n2o_dry = 0., Fsed_ch4_ebb_dry = 0.
    AED_REAL :: Fstm_ch4 = 0.
+   AED_REAL :: Ktau_0 = 0.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -697,6 +715,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
        Fsed_ch4_ebb_dry  = data%Fsed_ch4_ebb_dry
        Fsed_n2o_dry  = data%Fsed_n2o_dry
        Fstm_ch4  = data%Fstm_ch4
+       Ktau_0  = data%Ktau_0
    ELSEIF ( data%sed_modl .EQ. SED_CONSTANT_2D .OR. data%sed_modl .EQ. SED_DYNAMIC_2D ) THEN
        !# Do the 2D variants - zone variant
        !# Get the zone array dependency
@@ -737,6 +756,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
        IF ( data%id_Fsed_ch4_ebb_dry  > 0 ) Fsed_ch4_ebb_dry  = data%Fsed_ch4_ebb_dry_P(zone)
        IF ( data%id_Fsed_n2o_dry  > 0 ) Fsed_n2o_dry  = data%Fsed_n2o_dry_P(zone)
        IF ( data%id_Fstm_ch4  > 0 ) Fstm_ch4 = data%Fstm_ch4_P(zone)
+       IF ( data%id_Ktau_0  > 0 ) Ktau_0 = data%Ktau_0_P(zone)
    ENDIF
 
    !# Also store sediment flux as diagnostic variable
@@ -761,6 +781,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
    IF ( data%id_Fsed_ch4_ebb_dry  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_ebb_dry)  = Fsed_ch4_ebb_dry
    IF ( data%id_Fsed_n2o_dry  > 0 ) _DIAG_VAR_S_(data%id_Fsed_n2o_dry)  = Fsed_n2o_dry
    IF ( data%id_Fstm_ch4  > 0 ) _DIAG_VAR_S_(data%id_Fstm_ch4)  = Fstm_ch4
+   IF ( data%id_Ktau_0  > 0 ) _DIAG_VAR_S_(data%id_Ktau_0)  = Ktau_0
 
 END SUBROUTINE aed_initialize_benthic_sedflux
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

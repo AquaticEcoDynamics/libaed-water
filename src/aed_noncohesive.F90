@@ -137,14 +137,14 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    AED_REAL          :: ss_initial(100) = zero_
    AED_REAL          :: decay(100)      = zero_
    AED_REAL          :: Ke_ss(100)      = 0.02
-   AED_REAL          :: w_ss(100)       = 0.
+   AED_REAL          :: w_ss(100)       = 0.0
    AED_REAL          :: rho_ss(100)     = 1.6e3
    AED_REAL          :: d_ss(100)       = 1e-6
    AED_REAL          :: Fsed(100)       = zero_
    AED_REAL          :: tau_0(100)      = 0.04
    AED_REAL          :: epsilon         = 0.02
    AED_REAL          :: tau_r           = 1.0
-   AED_REAL          :: kTau_0          = 1.0
+   AED_REAL          :: kTau_0          = 0.0
    AED_REAL          :: fs(100)         = 1.0
    AED_REAL          :: sed_porosity    = 0.3
    AED_REAL          :: sed_initial     = zero_
@@ -233,7 +233,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    IF ( simSedimentMass ) THEN
      data%id_sed = aed_define_sheet_diag_variable('ss_sed','g/m2','total non-cohesive sediment mass')
    ENDIF
-   IF ( resuspension == 2 ) THEN
+   IF ( resuspension == 2 .or. resuspension == 3 ) THEN
       data%id_tau_0 = aed_define_sheet_diag_variable('tau_0','N/m2','dynamic bottom drag')
       data%id_epsilon = aed_define_sheet_diag_variable('epsilon','g/m2/s','max resuspension rate')
 
@@ -245,7 +245,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
          data%id_sfss(i) =  aed_define_sheet_diag_variable(TRIM(ncs_name),'w/w', 'sediment fraction of sed size')
       ENDDO
 
-      IF ( macrophyte_link_var .NE. '' ) THEN
+      IF ( resuspension == 2 .and. macrophyte_link_var .NE. '' ) THEN
          data%id_l_bot = aed_locate_sheet_variable(macrophyte_link_var)
        !  IF ( data%id_l_bot .LE. 0 ) THEN
        !     print *, "Macrophyte Link Variable ", TRIM(macrophyte_link_var), " is not defined."
@@ -254,9 +254,13 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
       !ELSE
        !  data%id_l_bot = 0
       ENDIF
+      IF ( resuspension == 3 .and. macrophyte_link_var .NE. '' ) THEN
+         data%id_l_bot = aed_locate_sheet_variable(macrophyte_link_var)
+          print *, "Macrophyte critical stress modifier ", TRIM(macrophyte_link_var), " is being used."
+      ENDIF
    ENDIF
 
-   data%id_set =  aed_define_diag_variable('set','g/m3/d','total sedimentation flux')
+   data%id_set    =  aed_define_diag_variable('set','g/m3/d','total sedimentation flux')
    data%id_ss_swi =  aed_define_sheet_diag_variable('swi','g/m2/d','net flux across the sediment-water interface')
    data%id_swi_dz =  aed_define_sheet_diag_variable('swi_dz','m/d','cum. swi position change')
    IF ( resuspension > 0 ) THEN
@@ -360,15 +364,18 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
 
    ! Retrieve current environmental conditions for the bottom pelagic layer
    IF ( data%resuspension  > 0) THEN
-      bottom_stress = MIN( _STATE_VAR_S_(data%id_e_taub), one_ )
+      bottom_stress = MIN( _STATE_VAR_S_(data%id_e_taub), 2.5 )
       _DIAG_VAR_S_(data%id_d_taub) = bottom_stress
       _DIAG_VAR_S_(data%id_resus)  = zero_
    ENDIF
 
    ! If (spatially variable) resuspension has plant stabilisation (e.g.,
    ! seagrass-sediment-turbidity feedback), then update tau_0
-   IF ( data%resuspension == 2 .AND. data%id_l_bot > 0 ) &
-      _DIAG_VAR_S_(data%id_tau_0) = data%tau_0(1) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
+   IF ( data%resuspension == 2 .AND. data%id_l_bot > 0 ) THEN
+      _DIAG_VAR_S_(data%id_tau_0) = data%tau_0(1) + data%kTau_0 * _DIAG_VAR_S_(data%id_l_bot)
+   ELSEIF ( data%resuspension == 3 .AND. data%id_l_bot > 0 ) THEN
+      _DIAG_VAR_S_(data%id_tau_0) = data%tau_0(1) + _DIAG_VAR_S_(data%id_l_bot)
+   ENDIF
 
    IF ( data%simSedimentMass ) _DIAG_VAR_S_(data%id_sed) = zero_
 
@@ -378,7 +385,14 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
       IF ( data%resuspension > 0 ) THEN
          IF ( data%resuspension == 2 ) THEN
             IF (data%id_l_bot > 0) THEN
-               dummy_tau = data%tau_0(i) + data%kTau_0 * _STATE_VAR_S_(data%id_l_bot)
+               dummy_tau = data%tau_0(i) + data%kTau_0 * _DIAG_VAR_S_(data%id_l_bot)
+            ELSE
+               dummy_tau = data%tau_0(i)
+            ENDIF
+            dummy_eps = data%epsilon * _DIAG_VAR_S_(data%id_sfss(i))
+         ELSEIF ( data%resuspension == 3 ) THEN
+            IF (data%id_l_bot > 0) THEN
+               dummy_tau = data%tau_0(i) + _DIAG_VAR_S_(data%id_l_bot)
             ELSE
                dummy_tau = data%tau_0(i)
             ENDIF
