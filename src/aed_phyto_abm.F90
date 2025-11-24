@@ -950,7 +950,7 @@ real     :: dens_flux = 0.
 !-------------------------------------------------------------------------------
 !BEGIN
 
-  print *, 'Phyto ABM: ',ppid
+  !print *, 'Phyto ABM: ',ppid
   
 
 !------------------------------------------------------
@@ -1181,7 +1181,7 @@ P_min = 0.d0
    !Save number of super-individuals per m3
    !ML Varout(oN_ind, k) = dble(N_)/Hz(k)
    _DIAG_VAR_(data%id_count) = N_ !ML
-   print*, hour_of_day, _STATE_VAR_(data%id_depth), _DIAG_VAR_(data%id_count)
+   !print*, hour_of_day, _STATE_VAR_(data%id_depth), _DIAG_VAR_(data%id_count)
    
    !Reset total abundance
    Abun_ = 0d0
