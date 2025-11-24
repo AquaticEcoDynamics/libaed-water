@@ -240,6 +240,10 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('f2')            ; pd(dcol)%f2            = extract_double(values(ccol))
             CASE ('d_phy')         ; pd(dcol)%d_phy         = extract_double(values(ccol))
 
+            ! added with addition of PIBM code
+            CASE ('X_cinit')       ; pd(dcol)%X_cinit       = extract_double(values(ccol))
+
+
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
          END SELECT
       ENDDO
@@ -362,6 +366,9 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%f1           = pd(list(i))%f1
        data%phytos(i)%f2           = pd(list(i))%f2
        data%phytos(i)%d_phy        = pd(list(i))%d_phy
+
+       ! added with addition of PIBM code
+       data%phytos(i)%X_cinit       = pd(list(i))%X_cinit
 
     ENDDO
     DEALLOCATE(pd)
@@ -513,7 +520,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%ip_frp = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_frp', 'mmol P', 'particle layer FRP')
    
    !real    :: C   = 0.02          ! cellular carbon content (pmol; assuming a 1 micron cell)
-   data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',0.02)
+   data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',initial=data%phytos(1)%X_cinit)
    
    !real    :: N   = 0.02/106.*16. ! cellular nitrogen content (pmol per cell; assuming a 1 micron cell)
    data%ip_n = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_n', 'pmol N/cell', 'cell N concentration',initial=0.02/106.*16.)
@@ -534,7 +541,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    
    
    !real :: Topt = 20.d0           !Optimal temperature
-   data%ip_Topt = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_topt', 'degrees C', 'optimal temperature',initial = 20.d0)
+   data%ip_Topt = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_topt', 'degrees C', 'optimal temperature',initial = data%phytos(1)%T_opt)
 
    !real :: LnalphaChl = -2.3  !log(0.1) !Ln alphaChl (slope of the P-I curve; unit: (W m-2)-1 (gChl molC)-1 d-1 instead of micro mol quanta m-2 s-1)
    data%ip_LnalphaChl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_lnalphachl', '(W m-2)-1 (gChl molC)-1 d-1', 'slope of the P-I curve',initial = -2.3)
@@ -725,7 +732,7 @@ INTEGER   :: i, v
 
 !Number of traits
 integer, parameter :: iTopt = 1        !Trait index for Topt
-integer, parameter :: iSize = 2        !Trait index for Size (ESD)
+integer, parameter :: iSize = 2        !Trait index for Cdiv: carbon-weighted cellular carbon content threshold for division
 integer, parameter :: ialphaChl = 3    !Trait index for optimal light
 integer, parameter :: iC = 4           !Trait index for Topt
 integer, parameter :: iNO3 = 5         !Trait index for Size (ESD)

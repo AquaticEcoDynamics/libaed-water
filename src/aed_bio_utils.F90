@@ -85,6 +85,8 @@ MODULE aed_bio_utils
       AED_REAL  :: resuspension, tau_0
       ! Growth form (benthic, water, surface)
       INTEGER  :: growth_form, slough_model
+      ! Particle parameters
+      AED_REAL :: X_cinit
    END TYPE phyto_data_t
 
 
@@ -113,6 +115,8 @@ MODULE aed_bio_utils
       AED_REAL :: Si_0, K_Si, X_sicon
       !
       AED_REAL :: c1, c3, f1, f2, d_phy
+      ! Particle parameters
+      AED_REAL :: X_cinit
    END TYPE phyto_param_t
    ! %% END NAMELIST   %% phyto_param_t
 
