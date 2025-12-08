@@ -592,7 +592,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! Additional diagnostics from PIBM Par2PHY
 
    !real      :: PHYC(nlev) = 0d0  !Eulerian concentration of phyto C, mean trait  for each layer
-   data%id_phyc = aed_define_diag_variable('mean_C', 'mmol/m3', 'mean Eulerian concentration of phyto particle C')
+   data%id_phyc = aed_define_diag_variable('mean_C', 'mmol/m3', 'mean Eulerian concentration of phyto particle C', rezero = .false.)
 
    !real      ::    PHY(nlev) = 0d0
    data%id_phyn = aed_define_diag_variable('mean_N', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
@@ -956,9 +956,6 @@ real     :: dens_flux = 0.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
-  !print *, 'Phyto ABM: ',ppid
-  
 
 !------------------------------------------------------
 ! INITIAL CODE FROM AED

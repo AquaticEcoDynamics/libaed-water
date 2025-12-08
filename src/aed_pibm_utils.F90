@@ -510,7 +510,6 @@ real              :: CDiv1 = 0.       !CDiv value with ug C per cell
 !End of declaration
 
 if (C .le. 0d0) then
-  print *, 'C was 0 and I returned!'
    dN   = 0.d0
    dP   = 0.d0
    dC   = 0.d0
