@@ -585,7 +585,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! Additional diagnostics from PIBM Par2PHY
 
    !real      :: PHYC(nlev) = 0d0  !Eulerian concentration of phyto C, mean trait  for each layer
-   data%id_phyc = aed_define_diag_variable('mean_C', 'mmol/m3', 'mean Eulerian concentration of phyto particle C')
+   data%id_phyc = aed_define_diag_variable('mean_C', 'mmol/m3', 'mean Eulerian concentration of phyto particle C', rezero = .false.)
 
    !real      ::    PHY(nlev) = 0d0
    data%id_phyn = aed_define_diag_variable('mean_N', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
@@ -948,9 +948,6 @@ real     :: dens_flux = 0.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
-  print *, 'Phyto ABM: ',ppid
-  
 
 !------------------------------------------------------
 ! INITIAL CODE FROM AED
@@ -1626,7 +1623,6 @@ ENDDO !End of iterating over all super-individuals
 
 !DO k = 1, nlev   
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
-        print *, 'bef extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mg Chl/m^3
@@ -1700,7 +1696,6 @@ SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
 
       ! Self-shading with contribution from this phytoplankton concentration.
       extinction = extinction + (data%phytos(phy_i)%KePHY*phy)
-      print *, 'in extc func _DIAG_VAR_(data%id_phyc)', _DIAG_VAR_(data%id_phyc)  
    ENDDO
 END SUBROUTINE aed_light_extinction_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

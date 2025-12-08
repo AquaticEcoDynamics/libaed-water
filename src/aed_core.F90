@@ -126,6 +126,7 @@ MODULE aed_core
       LOGICAL           :: zavg, zavg_req
       INTEGER           :: particle_link
       INTEGER           :: index
+      LOGICAL           :: rezero
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -654,11 +655,13 @@ END FUNCTION aed_define_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
+FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: zavg
+   LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep, 
+   										 !use this flag to not rezero
 !
 !LOCALS
    INTEGER :: ret
@@ -681,18 +684,27 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
       all_vars(ret)%zavg = .FALSE.
       all_vars(ret)%zavg_req = .FALSE.
    ENDIF
+   
+   IF ( PRESENT(rezero) ) THEN
+      all_vars(ret)%rezero = rezero
+   ELSE
+      all_vars(ret)%rezero = .TRUE.
+   ENDIF
+   
 
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESULT(ret)
+FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezero) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: surf
    LOGICAL,INTENT(in),OPTIONAL :: zavg
+   LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep, 
+   										 !use this flag to not rezero
 !
 !LOCALS
    INTEGER :: ret
@@ -722,6 +734,12 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
    ELSE
       all_vars(ret)%zavg = .FALSE.
       all_vars(ret)%zavg_req = .FALSE.
+   ENDIF
+   
+   IF ( PRESENT(rezero) ) THEN
+      all_vars(ret)%rezero = rezero
+   ELSE
+      all_vars(ret)%rezero = .TRUE.
    ENDIF
 
    ret = n_aed_vars
