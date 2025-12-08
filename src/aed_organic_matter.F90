@@ -1232,7 +1232,7 @@ SUBROUTINE aed_light_extinction_organic_matter(data,column,layer_idx,extinction)
    AED_REAL,INTENT(inout) :: extinction
 !
 !LOCALS
-   AED_REAL :: doc, poc, cpom, cdom
+   AED_REAL :: doc, poc, cpom, docr
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -1244,10 +1244,10 @@ SUBROUTINE aed_light_extinction_organic_matter(data,column,layer_idx,extinction)
    extinction = extinction + (data%KeDOM*doc +data%KePOM*poc)
 
    IF (data%simRPools) THEN
-     cdom = _DIAG_VAR_(data%id_cdom)    ! CDOM is in "/m" units here
+     docr = _STATE_VAR_(data%id_docr) 
      cpom = _STATE_VAR_(data%id_cpom)   ! CPOM is in "mmol/m3" units here
 
-     extinction = extinction + (data%KeDOMR*cdom)
+     extinction = extinction + (data%KeDOMR*docr)
      extinction = extinction + (data%KeCPOM*cpom)
    ENDIF
 END SUBROUTINE aed_light_extinction_organic_matter
