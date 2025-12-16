@@ -630,7 +630,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Ktau_0 .GT. MISVAL ) &
       data%id_Ktau_0 = aed_define_sheet_diag_variable('Ktau_0','N/m2',   &
                                           'critical shear stress modifier')
-                                    
+
    IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
       CALL aed_set_const_var(data%id_Fsed_oxy)
       CALL aed_set_const_var(data%id_Fsed_rsi)
