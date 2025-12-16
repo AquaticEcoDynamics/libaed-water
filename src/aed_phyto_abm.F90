@@ -1566,7 +1566,7 @@ _DIAG_VAR_(data%id_mlnalpha) = 0.
 
 
 !loop through all super-individuals to convert into Eulerian concentrations
-DO i = 1, N_PAR  ! # ML come back to this once we can have more than 1 particle per layer; will need to replace all p% with p(i)%
+DO i = 1, N_  ! # ML come back to this once we can have more than 1 particle per layer; will need to replace all p% with p(i)%
    !Handle cell division and mutation
    ! If cellular carbon is above the division threshold, it divides
    IF (p(i)%ptm_state(data%ip_c) >= p(i)%ptm_state(data%ip_cdiv)) THEN  !Divide
@@ -1652,7 +1652,7 @@ _DIAG_VAR_(data%id_cov_AL)   = 0d0
 _DIAG_VAR_(data%id_cov_TA)   = 0d0
 _DIAG_VAR_(data%id_cov_TL)   = 0d0
 
-DO i = 1, N_PAR !ML removing logs from ip_cdiv here too - pretty sure this is a typo given how it is handled in GMK routine OR should be logged everywhere
+DO i = 1, N_ !ML removing logs from ip_cdiv here too - pretty sure this is a typo given how it is handled in GMK routine OR should be logged everywhere
    _DIAG_VAR_(data%id_vcdiv)    = _DIAG_VAR_(data%id_vcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
    _DIAG_VAR_(data%id_vtopt)    = _DIAG_VAR_(data%id_vtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
    _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))**2
