@@ -500,21 +500,21 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
    ! Register particle state variables (phytoplankton agents)
 
-   !real    :: PAR = 0.01  associated PAR                                       _PTM_VAR_          p(..)%ptm_state(data%ip_par)      
+   !real    :: PAR = 0.01  associated PAR                                       _PTM_VAR_          p(..)%ptm_state(data%ip_par)
    data%ip_par = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_par', 'ummol m2 sec', 'particle layer PAR')
 
-   !real    :: temp= 20.   associated Temperature                               _PTM_VAR_               
+   !real    :: temp= 20.   associated Temperature                               _PTM_VAR_
    data%ip_tem = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_tem', 'degrees C', 'particle layer temperature')
 
-   !real    :: NO3 = 0.1   associated nutrient                                  _PTM_VAR_        
+   !real    :: NO3 = 0.1   associated nutrient                                  _PTM_VAR_
    data%ip_no3 = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_no3', 'mmol N', 'particle layer NO3')
 
-   !real    :: FRP = 0.1   associated nutrient                                  _PTM_VAR_        
+   !real    :: FRP = 0.1   associated nutrient                                  _PTM_VAR_
    data%ip_frp = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_frp', 'mmol P', 'particle layer FRP')
-   
+
    !real    :: C   = 0.02          ! cellular carbon content (pmol; assuming a 1 micron cell)
    data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',0.02)
-   
+
    !real    :: N   = 0.02/106.*16. ! cellular nitrogen content (pmol per cell; assuming a 1 micron cell)
    data%ip_n = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_n', 'pmol N/cell', 'cell N concentration',initial=0.02/106.*16.)
 
@@ -531,8 +531,8 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                                    !This trait will vary with mutation
    data%ip_Cdiv = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_cdiv', 'pmol/cell', 'cellular carbon content threshold for division',initial = 0.04d0)
 
-   
-   
+
+
    !real :: Topt = 20.d0           !Optimal temperature
    data%ip_Topt = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_topt', 'degrees C', 'optimal temperature',initial = 20.d0)
 
@@ -545,24 +545,24 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    !real :: fitness = 0.d0     !Fitness represented by net growth rate (growth - mortality)
    data%ip_fit = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_fit', '??', 'fitness represented by net growth rate (growth - mortality)',initial = 0.d0)
 
-   
-   
+
+
    !FROM PIBM
    !integer :: ID = 1      ! Particle ID                                         p(..)%ptm_istat(PTID)
    !integer :: iz = 1      ! Grid indices for particles (range from nlev to 1)   p(..)%ptm_istat(LAYR)
    !real    :: rz = 0.     ! Z coordinates for particles                         p(..)%ptm_istat(HGHT)
    !logical :: alive = .true.      !Dead or alive                                p(..)%ptm_istat(?FLAG or STAT?)
 
-   !real    :: PAR = 0.01  ! associated PAR                                       _PTM_VAR_          p(..)%ptm_state(data%ip_par)      
-   !real    :: temp= 20.   ! associated Temperature                               _PTM_VAR_ 
-   !real    :: NO3 = 0.1   ! associated nutrient                                  _PTM_VAR_ 
+   !real    :: PAR = 0.01  ! associated PAR                                       _PTM_VAR_          p(..)%ptm_state(data%ip_par)
+   !real    :: temp= 20.   ! associated Temperature                               _PTM_VAR_
+   !real    :: NO3 = 0.1   ! associated nutrient                                  _PTM_VAR_
 
    !real    :: C   = 0.02          ! cellular carbon content (pmol; assuming a 1 micron cell)
    !real    :: N   = 0.02/106.*16. ! cellular nitrogen content (pmol per cell; assuming a 1 micron cell)
    !real    :: Chl = 0.02 * 12/50  ! Cellular Chl content (pg Chl)
    !real    :: num = 5d9           ! Number of cells per superindividual
    !real :: Cdiv= 0.04d0           !cellular carbon content threshold for division (pmol/cell), can be used as a proxy for size and can be converted to ESD; Phytoplankton half-saturation constant, minimal N:C and maximal N:C ratios are allometric functions of this parameter
-                                   !This trait will vary with mutation 
+                                   !This trait will vary with mutation
    !real :: Topt = 20.d0           !Optimal temperature
    !real :: LnalphaChl = -2.3  !log(0.1) !Ln alphaChl (slope of the P-I curve; unit: (W m-2)-1 (gChl molC)-1 d-1 instead of micro mol quanta m-2 s-1)
    !real :: mu_C = 0.d0              !Carbon-specific growth rate
@@ -572,8 +572,8 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
 
    ! Diagnostic outputs for particle properties
-   data%id_count  = aed_define_diag_variable('total_count', '#', 'layer live particle count')             !#MH  N_ in PIBM 
-   !ML data%id_ptm_14 = aed_define_diag_variable('total_vvel', 'm/s', 'sum of particle vvel') 
+   data%id_count  = aed_define_diag_variable('total_count', '#', 'layer live particle count')             !#MH  N_ in PIBM
+   !ML data%id_ptm_14 = aed_define_diag_variable('total_vvel', 'm/s', 'sum of particle vvel')
    !ML data%id_ptm_15 = aed_define_diag_variable('total_mass', 'g', 'sum of particle mass')
    !ML data%id_ptm_17 = aed_define_diag_variable('total_birth', 'day', 'sum of birth date')
    !ML data%id_ptm_18 = aed_define_diag_variable('total_age', 'days', 'sum of particle age')
@@ -625,7 +625,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
 
    !FROM PIBM Par2PHY
-   !This subroutine calculate the total amount of concentrations of 
+   !This subroutine calculate the total amount of concentrations of
    !phytoplankton carbon, nitrogen, and chl based on the cells present.
    !real      :: PHYC(nlev) = 0d0
    !real      ::    PHY(nlev) = 0d0
@@ -649,10 +649,10 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    !integer :: k,i,m, ipar
 
    ! Additional diagnostics from PIBM variables.F90
-   
+
    !integer :: N_birth(nlev) = 0  !Number of birth events during one hour                    # ML this may cause problems because is defined as an integer
    data%id_N_birth = aed_define_diag_variable('N_birth', 'number', 'number of births in a layer')
-   
+
    !integer :: N_mutate(nlev)= 0  !Number of mutation events during one hour at each grid    # ML this may cause problems because is defined as an integer
    data%id_N_mutate = aed_define_diag_variable('N_mutate', 'number', 'number of mutation events in a layer')
 
@@ -662,7 +662,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! Additional diagnostics from PIBM Geider_Lag.F90
    data%id_IPAR = aed_define_diag_variable('IPAR', 'umol/m2/s', 'daily integrated PAR at each depth')
    data%id_NPPc = aed_define_diag_variable('NPPc', '(mg C m-3 d-1)', 'C-based phytoplankton production')
-   data%id_cells = aed_define_diag_variable('id_cells', 'number', 'cells/m3') 
+   data%id_cells = aed_define_diag_variable('id_cells', 'number', 'cells/m3')
    data%id_d_nit = aed_define_diag_variable('id_d_nit', 'mmol N/m3/day', 'daily flux of NO3 from particles in a layer')
    data%id_d_pon = aed_define_diag_variable('id_d_pon', 'mmol N/m3/day', 'daily flux of PON from particles in a layer')
    data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP from particles in a layer')
@@ -707,7 +707,7 @@ END SUBROUTINE aed_define_phyto_abm
 !###############################################################################
 SUBROUTINE aed_particle_initialize_phyto_abm( data,ppid,p )
 
-use params,          only : NInit, sigma_init 
+use params,          only : NInit, sigma_init
 use mGf90,           only : srand_mtGaus
 
 !ARGUMENTS
@@ -748,7 +748,7 @@ DO i = 1, ppid
             case(iTopt)
                oldtt(1) = p(i)%ptm_state(data%ip_Topt)
             case(iSize)
-               oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv)) 
+               oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv))
             case(ialphaChl)
                oldtt(1) = p(i)%ptm_state(data%ip_LnalphaChl)
             case(iC)
@@ -805,11 +805,11 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 !declarations from Par2PHY subroutine
    !use state_variables, only : t, N_PAR, iPC, iPN, iChl, p_PHY, Varout, iTopt, iSize, ialphaChl
    !use state_variables, only : N_birth, N_mutate
-   !use state_variables, only : oN_cell, oCDiv_avg, oCDiv_var, oTopt_avg, oTopt_var 
+   !use state_variables, only : oN_cell, oCDiv_avg, oCDiv_var, oTopt_avg, oTopt_var
    !use state_variables, only : oLnalpha_var, oLnalpha_avg
    !use state_variables, only : oTalp_cov, oALnV_cov, oTLnV_cov
    !use grid,            only : Hz, nlev
-   use params,          only : NTrait, nu, sigma 
+   use params,          only : NTrait, nu, sigma
    use mGf90,           only : srand_mtGaus
    USE Trait_functions, only : TEMPBOL, PHY_C2Vol, palatability
 
@@ -839,7 +839,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 ! ADDITIONAL DECLARATIONS FROM PIBM
 
    !Par2PHY
-   !This subroutine calculate the total amount of concentrations of 
+   !This subroutine calculate the total amount of concentrations of
    !phytoplankton carbon, nitrogen, and chl based on the cells present.
    !real      :: PHYC(nlev) = 0d0
    real       :: PHYC = 0d0
@@ -875,13 +875,13 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    AED_REAL :: Hz != 9962463.581  mean layer area of FCR
 
 
-integer, parameter :: nzoo = 0        
+integer, parameter :: nzoo = 0
 INTEGER :: j, zz, v
 INTEGER :: N_ = 0   !Number of particles in each grid
 real    :: Abun_ = 0   !Total abundance in each grid
 !real    :: NO3 = 0.
-real    :: ZOO(NZOO) = 0. 
-real    :: DET = 0. 
+real    :: ZOO(NZOO) = 0.
+real    :: DET = 0.
 real    :: tf_z  = 0.
 real    :: Graz  = 0.
 real    :: dC_   = 0.
@@ -893,23 +893,23 @@ real    :: uptake= 0.   !Total NO3 uptake
 real    :: uptake_P = 0.   !Total FRP uptake
 !ML real    :: NPPc_(nlev)  = 0.  !C-based phytoplankton production (mg C m-3 d-1)
 !ML real    ::  IPAR(nlev)  = 0.  !Daily integrated PAR at each depth
-real    :: pp_DZ = 0.   
-real    :: pp_DZP = 0.   
-real    :: pp_ND = 0. 
-real    :: pp_PD = 0.   
-real    :: Pmort = 0.  
-real    :: Pmort_P = 0.   
-real    :: Pmort_C = 0.   
-real    :: Cmin  = 0. !Phytoplankton subsistence carbon quota below which the cell will die   
+real    :: pp_DZ = 0.
+real    :: pp_DZP = 0.
+real    :: pp_ND = 0.
+real    :: pp_PD = 0.
+real    :: Pmort = 0.
+real    :: Pmort_P = 0.
+real    :: Pmort_C = 0.
+real    :: Cmin  = 0. !Phytoplankton subsistence carbon quota below which the cell will die
 real    :: FZoo(NZOO) = 0.   !The total amount of palatable prey (in Nitrogen)
                              !for each zooplankton size class
 real    :: phyV = 0.   !Phytoplankton cell volume
-real    :: RES     = 0. 
-real    :: RES_P   = 0.   
-real    :: EGES  = 0.   
-real    :: gbar  = 0.   
-real    :: INGES(NZOO) = 0.   
-real    :: Zmort = 0.   
+real    :: RES     = 0.
+real    :: RES_P   = 0.
+real    :: EGES  = 0.
+real    :: gbar  = 0.
+real    :: INGES(NZOO) = 0.
+real    :: Zmort = 0.
 real    :: Gmatrix(NZOO,NZOO) = 0.d0     !Grazer biomass specific grazing rate matrix
 real,    allocatable :: BN(:)            !The amount of nitrogen in each super-individual
 real,    allocatable :: BP(:)            !The amount of phosphorus in each super-individual
@@ -987,7 +987,7 @@ i=1 !ML need to remove this later
    par =  _STATE_VAR_(data%id_par)  ! _STATE_VAR_S_(data%id_I0)  local photosynth. active radiation
    !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
-   no3 = _STATE_VAR_(data%id_nit)  
+   no3 = _STATE_VAR_(data%id_nit)
    !no3 = 300.      ! local nitrate
    frp = _STATE_VAR_(data%id_frp)        ! local frp
 
@@ -996,7 +996,7 @@ i=1 !ML need to remove this later
    !print *,'p(i)%ptm_env(5),',p(i)%ptm_env(5)
 
    !print *,'normal_sample(),',normal_sample(data%phytos(1)%T_opt, 3.)
-   
+
    !ML status=p(i)%ptm_istat(STAT) ! get cell status
    !print *,'p(i)%ptm_istat(STAT),',p(i)%ptm_istat(STAT)
    !print *,'p(i)%ptm_istat(PTID),',p(i)%ptm_istat(PTID)
@@ -1078,7 +1078,7 @@ i=1 !ML need to remove this later
    !ML _DIAG_VAR_(data%id_ptm115) = 0. !partcl(PTM_MASS)
    !ML _DIAG_VAR_(data%id_ptm117) = 0. !partcl(PTM_BIRTH)
    !ML _DIAG_VAR_(data%id_ptm118) = 0. !(partcl(PTM_AGE)-partcl(PTM_BIRTH))/secs_per_day
- 
+
 
 !------------------------------------------------------
 ! CODE FROM PIBM BIOLOGY SUBROUTINE
@@ -1157,7 +1157,7 @@ P_min = 0.d0
              scratch(1) = _PTM_STAT_(i,STAT)
 
             !Update index_ and scratch has been deallocated
-            call move_alloc(scratch, index_)   
+            call move_alloc(scratch, index_)
          else
              allocate(scratch(size(index_) + 1), stat=Allocatestatus)
              IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
@@ -1165,7 +1165,7 @@ P_min = 0.d0
              scratch(size(index_) + 1) = i
 
             !Update index_ and scratch has been deallocated
-            call move_alloc(scratch, index_)   
+            call move_alloc(scratch, index_)
          endif
       endif
    enddo
@@ -1177,7 +1177,7 @@ P_min = 0.d0
    !Save number of super-individuals per m3
    !ML Varout(oN_ind, k) = dble(N_)/Hz(k)
    _DIAG_VAR_(data%id_count) = N_ !ML
-   
+
    !Reset total abundance
    Abun_ = 0d0
 
@@ -1228,9 +1228,9 @@ P_min = 0.d0
 
 !ML #ifdef 0
    !The multiple zooplankton size class model follows Ward et al. L&O 2012
-   !In the NPZD model, phytoplankton cells utilize DIN and are eaten by zooplankton. 
-   !The ingested food by zooplankton has three fates: 
-   !1) being recycled to DIN; 2) being converted to detritus; and 3) supporting zooplankton growth. 
+   !In the NPZD model, phytoplankton cells utilize DIN and are eaten by zooplankton.
+   !The ingested food by zooplankton has three fates:
+   !1) being recycled to DIN; 2) being converted to detritus; and 3) supporting zooplankton growth.
    !The natural mortality of zooplankton are converted to detritus which is recycled to DIN and also sinks.
 
 !ML    tf_z = TEMPBOL(Ez,Temp(k))  !Temperature coefficient of zooplankton
@@ -1238,7 +1238,7 @@ P_min = 0.d0
    !Calculate the total amount of prey N biomass available to each size class of zooplankton
 !ML    IF (NZOO > 1) THEN
 !ML       DO zz = 1, NZOO
-!ML          gmax = A_g * VolZOO(zz)**B_g 
+!ML          gmax = A_g * VolZOO(zz)**B_g
 !ML          FZoo(zz) = 0d0
 
          !First calculate total phyto. prey from super-individuals
@@ -1263,7 +1263,7 @@ P_min = 0.d0
 !ML             DO m = 1, (zz - 1)
 
              !Save the palatability into Gmatrix
-!ML              Gmatrix(m,zz) = palatability(VolZOO(zz), VolZOO(m), SDZoo) 
+!ML              Gmatrix(m,zz) = palatability(VolZOO(zz), VolZOO(m), SDZoo)
 
                !Calculate the palatability of each zoo. prey and add to the total amount palatable prey
 !ML                FZoo(zz) = FZoo(zz) + Gmatrix(m,zz) * ZOO(m)
@@ -1313,7 +1313,7 @@ P_min = 0.d0
    !Computing zooplankton mortality
 !ML    RES   = 0d0  !Total amount of nitrogen that is excreted by zooplankton and becomes DIN
 !ML    EGES  = 0d0  !Total egestion by zooplankton to detritus
-!ML    pp_DZ = 0d0  !Flux from ZOO to DET 
+!ML    pp_DZ = 0d0  !Flux from ZOO to DET
 
 !ML    DO zz = 1, NZOO
 
@@ -1353,11 +1353,11 @@ P_min = 0.d0
    !Now calculate new cell numbers associated with each particle
    ! Impose the zooplankton grazing (the number of cells associated with each superindividual changes)
 !ML    IF (N_ > 0) THEN
- 
+
 !ML       do j = 1, N_
 !ML          i = index_(j)
 
-!ML          Graz = 0d0 
+!ML          Graz = 0d0
 
          !Calculate all the zooplankton ingestion for this superindividual (Graz, unit: mmol N m-3 d-1)
 !ML          if (NZOO > 1) then
@@ -1377,8 +1377,8 @@ P_min = 0.d0
    RES   = 0d0  !Total amount of nitrogen that is excreted by zooplankton and becomes DIN
    RES_P = 0d0  !Total amount of phosphorus that is excreted by zooplankton and becomes DIP
    EGES  = 0d0  !Total egestion by zooplankton to detritus
-   pp_DZ = 0d0  !Nitrogen Flux from ZOO to DET 
-   pp_DZP = 0d0 !Phosphorus Flux from ZOO to DET 
+   pp_DZ = 0d0  !Nitrogen Flux from ZOO to DET
+   pp_DZP = 0d0 !Phosphorus Flux from ZOO to DET
 
    ! Calculate total phytoplankton nitrogen uptake, mortality, and PP (must after calculation of num(t+dt))
    uptake  = 0d0
@@ -1391,7 +1391,7 @@ P_min = 0.d0
    if (N_ > 0) then
       do j = 1, N_
          i = index_(j) !ML come back to this when we can handle more than one particle
-         
+
          !ML set particle par, temp, and no3 using environmental conditions from this layer
          p(i)%ptm_state(data%ip_par) = par
          p(i)%ptm_state(data%ip_tem) = WaterTemperature
@@ -1431,7 +1431,7 @@ P_min = 0.d0
          uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
          uptake_P =   uptake_P + dP_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol P d-1
          oxy_flux =   oxy_flux + dC_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol C d-1 (assuming 1:1 stoichiometry with O2)
-         !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1 
+         !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1
          _DIAG_VAR_(data%id_NPPc) = _DIAG_VAR_(data%id_NPPc) + dC_ * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz * 12.d0 * dtdays !Unit: mgC m-3 d-1 ML why multiplied by 12? and also multiplying by dtdays means this is hr-1 (timestep) not d-1
 
          ! Save carbon-specific growth rate
@@ -1611,17 +1611,17 @@ DO i = 1, N_PAR  ! # ML come back to this once we can have more than 1 particle 
    ENDIF !End of division
 
    !Calculate Eulerian concentrations of phyto C, N, and Chl, mean trait  for each layer
-   PHYC = PHYC + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) 
+   PHYC = PHYC + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c)
    PHYN = PHYN + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_n)
-   PHYP = PHYP + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_p)  
-   CHL  = CHL  + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_chl) 
+   PHYP = PHYP + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_p)
+   CHL  = CHL  + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_chl)
 
    _DIAG_VAR_(data%id_mcdiv)    = _DIAG_VAR_(data%id_mcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * log(p(i)%ptm_state(data%ip_cdiv))
    _DIAG_VAR_(data%id_mtopt)    = _DIAG_VAR_(data%id_mtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_Topt)
    _DIAG_VAR_(data%id_mlnalpha) = _DIAG_VAR_(data%id_mlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_LnalphaChl)
 ENDDO !End of iterating over all super-individuals
 
-!DO k = 1, nlev   
+!DO k = 1, nlev
   _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
   _DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
@@ -1632,7 +1632,7 @@ ENDDO !End of iterating over all super-individuals
     _DIAG_VAR_(data%id_mtopt)    = _DIAG_VAR_(data%id_mtopt)    / PHYC
     _DIAG_VAR_(data%id_mlnalpha) = _DIAG_VAR_(data%id_mlnalpha) / PHYC
   endif
-  
+
 !ENDDO
 
 !Compute trait covariances

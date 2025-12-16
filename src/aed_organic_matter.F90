@@ -1244,7 +1244,7 @@ SUBROUTINE aed_light_extinction_organic_matter(data,column,layer_idx,extinction)
    extinction = extinction + (data%KeDOM*doc +data%KePOM*poc)
 
    IF (data%simRPools) THEN
-     docr = _STATE_VAR_(data%id_docr) 
+     docr = _STATE_VAR_(data%id_docr)
      cpom = _STATE_VAR_(data%id_cpom)   ! CPOM is in "mmol/m3" units here
 
      extinction = extinction + (data%KeDOMR*docr)

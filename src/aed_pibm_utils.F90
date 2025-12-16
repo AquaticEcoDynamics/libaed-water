@@ -48,7 +48,7 @@ real :: RdN     =  0.1  !Rate of detritus converting to DIN
 real :: wDET    =  0.5 ! Sinking rate of detritus
 
 ! Standard deviation of log zooplankton feeding preference
-real :: SDZoo   =  0.5 
+real :: SDZoo   =  0.5
 
 ! Acclimation parameter
 real, parameter :: nx = 1.d0
@@ -173,13 +173,13 @@ real, intent(in)  :: SDpref_Z
 real  :: R_real = 0d0
 
 !Optimal prey Volume of the predator
-real :: Vprey_opt = 1d3 
+real :: Vprey_opt = 1d3
 
 real :: Xpred, Xprey !ESD of predator and prey
 real :: Xprey_opt = 0. !Optimal prey ESD
 
 !Optimal predator:prey volume ratio
-real :: R_opt = 1d3 
+real :: R_opt = 1d3
 
 !Maximal predator:prey volume ratio following copepods (Hansen et al. 1994)
 real, parameter :: R_opt_max = 18.**3
@@ -242,18 +242,18 @@ real, parameter :: V_s = 8.d0 !micron^3
 
 real :: V, ESD_s
 
-V = pi/6.d0*ESD**3 
+V = pi/6.d0*ESD**3
 ESD_s = (6.d0*V_s/pi)**0.333333
 
 y = r_s*ESD_s/ESD * (V/V_s)**b_rho
 
 return
-end function 
+end function
 
 pure real function TEMPBOL(Ea,tC)
 implicit none
 !DESCRIPTION:
-!The temperature dependence of plankton rates are fomulated according to the Arrhenuis equation. 
+!The temperature dependence of plankton rates are fomulated according to the Arrhenuis equation.
 ! tC: in situ temperature
 ! Tr: reference temperature
 !
@@ -264,7 +264,7 @@ real, intent (in) :: Ea, tC
 real, parameter   :: kb = 8.62d-5, Tr = 15D0
 
 TEMPBOL = exp(-(Ea/kb)*(1D0/(273.15 + tC)-1D0/(273.15 + Tr)))
-return 
+return
 end function TEMPBOL
 
 REAL function temp_Topt(tC, mumax0, Topt_) result(y)
@@ -274,17 +274,17 @@ real, intent(in) :: mumax0    !Maximal rate normalized to an optimal temperature
 real, intent(in) :: tC         !Environmental temperature in ºC
 real, intent(in) :: Topt_   !Optimal temperature in ºC
 
-real, parameter   :: Ea0   = 0.98  
+real, parameter   :: Ea0   = 0.98
 real, parameter   :: Ed0   = 2.3
-real, parameter   :: Ei    = 0.22  
+real, parameter   :: Ei    = 0.22
 real, parameter   :: beta  =-0.2  !Exponent for Ea0
 real, parameter   :: phi   = 0.27  !Exponent for Ed
 
 real :: Ed, Ea, mumax
 
-mumax = alloscale(Topt_, mumax0,  Ei) 
-Ea    = alloscale(Topt_, Ea0,  beta) 
-Ed    = alloscale(Topt_, Ed0,  phi) 
+mumax = alloscale(Topt_, mumax0,  Ei)
+Ea    = alloscale(Topt_, Ea0,  beta)
+Ed    = alloscale(Topt_, Ed0,  phi)
 y     = JOHNSON(tC, mumax, Ea, Ed, Topt_)
 return
 END function temp_Topt
@@ -304,14 +304,14 @@ Eh = Ed+Ea
 x    = TK(TC)
 theta = TK(Topt_)
 b = x - theta
-y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b))   
+y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b))
 return
 END FUNCTION JOHNSON
 
 PURE REAL FUNCTION TK(TC)
 IMPLICIT NONE
 !DESCRIPTION:
-!The temperature dependence of plankton rates are fomulated according to the Arrhenuis equation. 
+!The temperature dependence of plankton rates are fomulated according to the Arrhenuis equation.
 ! tC: in situ temperature
 ! Tr: reference temperature
 !
@@ -321,7 +321,7 @@ REAL, INTENT (IN) :: TC
 REAL, PARAMETER   :: kb = 8.62d-5, Tr = 15.0
 
 TK = -(1./kb)*(1./(273.15 + tC) - 1./(273.15 + Tr))
-return 
+return
 END FUNCTION TK
 
 PURE REAL FUNCTION alloscale(Topt_, mu0p, alpha)
@@ -329,7 +329,7 @@ IMPLICIT NONE
 real, intent(in) :: Topt_     !Topt in ºC
 real, intent(in) :: mu0p  !Normalized growth rate
 real, intent(in) :: alpha    !Exponent of thermal traits normalized to z
-alloscale =  mu0p * exp(TK(Topt_) * alpha) 
+alloscale =  mu0p * exp(TK(Topt_) * alpha)
 END FUNCTION alloscale
 
 !------------------------------------------------------------------------------------------------
@@ -402,12 +402,12 @@ if (Kr < 1d-10) then
 else
   !Ratio of damage to repair constants [s]:
   K  = Kd / Kr
-  
+
   !Calculate photoinhibition [nd]:
   Ainf = 1d0 / (1d0 + Tau * Sigma * PARWm2 + K * Tau * Sigma**2 * PARWm2**2)
 endif
 
-return 
+return
 END FUNCTION Ainf
 !------------------------------------------------------------------------------------------------
 
@@ -530,7 +530,7 @@ theta = Chl/C
 Vol = PHY_C2Vol(CDiv)
 
 !Convert Volume to ESD:
-ESD_ = (6.d0*Vol/pi)**0.3333333 
+ESD_ = (6.d0*Vol/pi)**0.3333333
 
 !Nitrate half-saturation constant of phyto growth based on cell volume [uM]:
 KN   = KN_a * Vol**KN_b
@@ -675,7 +675,7 @@ real,    intent(in)   :: mean(N)  !Mean values of the multivariate distribution
 real,    intent(in)   :: cvm(N,N) !Covariance matrix of the multivariate distribution
 dimension             :: y(N)
 integer    :: nullty  ! i/o for cholesky subroutine
-integer    :: error  
+integer    :: error
 integer    :: i, j
 real       :: cvm_(N*(N+1)/2)
 real       :: chol(N*(N+1)/2)
@@ -700,7 +700,7 @@ real, save :: GSET
 integer, save :: ISET = 0
 
 IF (ISET.EQ.0) THEN
-   R = 99 
+   R = 99
    do while( R .ge. 1.0d0 )
       call random_number(V1)
       V1= 2d0*V1 - 1d0
@@ -755,8 +755,8 @@ subroutine cholesky ( a, n, nn, u, nullty, ifault )
 !
 !  Parameters:
 !
-!    Input, real ( kind = 8 ) A((N*(N+1))/2), a positive definite matrix 
-!    stored by rows in lower triangular form as a one dimensional array, 
+!    Input, real ( kind = 8 ) A((N*(N+1))/2), a positive definite matrix
+!    stored by rows in lower triangular form as a one dimensional array,
 !    in the sequence
 !    A(1,1),
 !    A(2,1), A(2,2),
@@ -764,7 +764,7 @@ subroutine cholesky ( a, n, nn, u, nullty, ifault )
 !
 !    Input, integer ( kind = 4 ) N, the order of A.
 !
-!    Input, integer NN, the dimension of the array used to store A, 
+!    Input, integer NN, the dimension of the array used to store A,
 !    which should be at least (N*(N+1))/2.
 !
 !    Output, real ( kind = 8 ) U((N*(N+1))/2), an upper triangular matrix,
@@ -902,7 +902,7 @@ end subroutine cholesky
 subroutine subchl ( a, b, n, u, nullty, ifault, ndim, det )
 
 !*****************************************************************************80
-! 
+!
 !! SUBCHL computes the Cholesky factorization of a (subset of a) PDS matrix.
 !
 !  Modified:
@@ -931,26 +931,26 @@ subroutine subchl ( a, b, n, u, nullty, ifault, ndim, det )
 !
 !  Parameters:
 !
-!    Input, real ( kind = 8 ) A((M*(M+1))/2), a positive definite matrix 
-!    stored by rows in lower triangular form as a one dimensional array, 
+!    Input, real ( kind = 8 ) A((M*(M+1))/2), a positive definite matrix
+!    stored by rows in lower triangular form as a one dimensional array,
 !    in the sequence
 !    A(1,1),
 !    A(2,1), A(2,2),
-!    A(3,1), A(3,2), A(3,3), and so on.  
+!    A(3,1), A(3,2), A(3,3), and so on.
 !    In the simplest case, M, the order of A, is equal to N.
 !
 !    Input, integer ( kind = 4 ) B(N), indicates the order in which the
-!    rows and columns of A are to be used.  In the simplest case, 
+!    rows and columns of A are to be used.  In the simplest case,
 !    B = (1,2,3...,N).
 !
-!    Input, integer ( kind = 4 ) N, the order of the matrix, that is, 
+!    Input, integer ( kind = 4 ) N, the order of the matrix, that is,
 !    the matrix formed by using B to select N rows and columns of A.
 !
 !    Output, real ( kind = 8 ) U((N*(N+1))/2), an upper triangular matrix,
 !    stored by columns, which is the Cholesky factor of A.  The program is
 !    written in such a way that A and U can share storage.
 !
-!    Output, integer ( kind = 4 ) NULLTY, the rank deficiency of A.  
+!    Output, integer ( kind = 4 ) NULLTY, the rank deficiency of A.
 !    If NULLTY is zero, the matrix is judged to have full rank.
 !
 !    Output, integer ( kind = 4 ) IFAULT, an error indicator.
@@ -958,7 +958,7 @@ subroutine subchl ( a, b, n, u, nullty, ifault, ndim, det )
 !    1, if N < 1;
 !    2, if A is not positive semi-definite.
 !
-!    Input, integer ( kind = 4 ) NDIM, the dimension of A and U, which might 
+!    Input, integer ( kind = 4 ) NDIM, the dimension of A and U, which might
 !    be presumed to be (N*(N+1))/2.
 !
 !    Output, real ( kind = 8 ) DET, the determinant of the matrix.
@@ -1072,10 +1072,10 @@ end subroutine subchl
 
 real function multigauss(R,mu,n) result(G)
 !!$ Generates a one dimensional array of length n containing multivariate Gaussian pseudo-random numbers
-!!$ where R is the lower-triangular Cholesky factor of the covariance matrix of the desired distribution 
-!!$ and mu is a one dimensional array of length n, containing the mean value for each random variable. 
-!!$ R must be a one dimensional array, containing the lower-triangular matrix stored by row, starting from the 
-!!$ uppermost, leftmost entry (first row, first column). 
+!!$ where R is the lower-triangular Cholesky factor of the covariance matrix of the desired distribution
+!!$ and mu is a one dimensional array of length n, containing the mean value for each random variable.
+!!$ R must be a one dimensional array, containing the lower-triangular matrix stored by row, starting from the
+!!$ uppermost, leftmost entry (first row, first column).
    implicit none
    integer, intent(in) :: n
    real, intent(in) :: R(n*(n+1)/2)
@@ -1083,20 +1083,20 @@ real function multigauss(R,mu,n) result(G)
    real :: Nu(n)
    dimension :: G(n)
    integer :: i, j
-   
+
    if( n*(n+1)/2 .ne. size(R) ) then
       write(6,*) ' n*(n+1)/2 != size(R) in multiGauss '
-      write(6,*) ' Cholesky factor matrix has size ', size(R) 
+      write(6,*) ' Cholesky factor matrix has size ', size(R)
       write(6,*) ' but you are requesting a vector of size ',n
       stop
    else
-      
+
 !!$ generate an array of independent Gaussian variates
       do j = 1, n
          Nu(j) = gasdev()
       end do
 
-!!$ start with the desired mean, and add the product of 
+!!$ start with the desired mean, and add the product of
 !!$ [the lower-triangular Cholesky factor of the covariance matrix] x [ the vector of iid Gaussian variates]
       do i = 1, n
          G(i) = mu(i)
