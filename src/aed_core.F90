@@ -325,7 +325,7 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, n_p, quiet)
 !ARGUMENTS
    INTEGER,INTENT(out) :: n_v, n_sv, n_d, n_sd
    INTEGER,INTENT(out),OPTIONAL :: n_p
-   LOGICAL,INTENT(out),OPTIONAL :: quiet
+   LOGICAL,INTENT(in),OPTIONAL :: quiet
 !
 !LOCALS
    INTEGER :: i
