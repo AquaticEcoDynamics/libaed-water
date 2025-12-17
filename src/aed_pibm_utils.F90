@@ -35,10 +35,10 @@ MODULE PARAMS
 implicit NONE
 
 ! Parameters
-real :: mu0     =  5.00  !Maximal growth rate normalized to 15 C (d-1)
-real :: aI0     =  1.20  !Chl-specific Slope of P-I curve ((W m-2)-1 (gChl molC)-1 d-1)
-real :: KN      =  0.50  !Half saturation constant of phytoplankton growth on N
-real :: KPho    =  0.50  !Half saturation constant of phytoplankton growth on P
+real :: mu0     =  5.00  !Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
+real :: aI0     =  1.20  !Chl-specific Slope of P-I curve ((W m-2)-1 (gChl molC)-1 d-1) 
+real :: KN      =  0.50  !Half saturation constant of phytoplankton growth on N 
+real :: KPho    =  0.50  !Half saturation constant of phytoplankton growth on P 
 real :: gmax    =  2.00  !Maximal zooplankton grazing rate
 real :: Kp      =  0.15  !Half saturation constant of zooplankton grazing
 real :: mz      =  0.002  !Zooplankton mortality grazing coefficient
@@ -50,44 +50,44 @@ real :: wDET    =  0.5 ! Sinking rate of detritus
 ! Standard deviation of log zooplankton feeding preference
 real :: SDZoo   =  0.5
 
-! Acclimation parameter
+! Acclimation parameter ML pull this out to nml
 real, parameter :: nx = 1.d0
 
-! Activation energy for phytoplankton growth
+! Activation energy for phytoplankton growth ML don't see this used anywhere below
 real, parameter :: Ep  = 0.32d0
 
 ! Activation energy for zooplankton grazing
 real, parameter :: Ez  = 0.65d0
 
 ! Maixmal Chl:N ratio (g:mol) for phytoplankton
-real, parameter :: thetaNmax = 3d0
+real, parameter :: thetaNmax = 3d0 ! ML pull this out to nml
 
 ! Maixmal Chl:P ratio (g:mol) for phytoplankton
-real, parameter :: thetaPmax = 3d0/16.*1.
+real, parameter :: thetaPmax = 3d0/16.*1. ! ML this is not currently used
 
 !the value of rhochl before last sunset
 real            :: rhochl_L  = 0d0
 
 !QNmin and QNmax are allometric functions of Vol (Ward et al. 2012) [mol N: mol C]:
-real, parameter   :: QNmin_a = 0.07d0     !Normalization constant for QNmin [molN:molC]
-real, parameter   :: QNmin_b = -0.17d0    !Allometric exponent for QNmin
-real, parameter   :: QNmax_a = 0.166d0    !Normalization constant for QNmax [molN:molC]
-real, parameter   :: QNmax_b = 0.0d0      !Allometric exponent for QNmax which is independent from size
+real, parameter   :: QNmin_a = 0.07d0     !Normalization constant for QNmin [molN:molC] ML pull to nml
+real, parameter   :: QNmin_b = -0.17d0    !Allometric exponent for QNmin ML pull to nml
+real, parameter   :: QNmax_a = 0.166d0    !Normalization constant for QNmax [molN:molC] ML pull to nml
+real, parameter   :: QNmax_b = 0.0d0      !Allometric exponent for QNmax which is independent from size ML pull to nml
 
-!QPmin and QPmax are allometric functions of Vol (Ward et al. 2012) [mol N: mol P]:
-real, parameter   :: QPmin_a = 0.07d0     !Normalization constant for QPmin [molP:molC]
-real, parameter   :: QPmin_b = -0.17d0    !Allometric exponent for QPmin
-real, parameter   :: QPmax_a = 0.166d0    !Normalization constant for QPmax [molP:molC]
-real, parameter   :: QPmax_b = 0.0d0      !Allometric exponent for QPmax which is independent from size
+!QPmin and QPmax are allometric functions of Vol (Ward et al. 2012) [mol P: mol C]:
+real, parameter   :: QPmin_a = 0.07d0     !Normalization constant for QPmin [molP:molC] ML pull to nml
+real, parameter   :: QPmin_b = -0.17d0    !Allometric exponent for QPmin ML pull to nml
+real, parameter   :: QPmax_a = 0.166d0    !Normalization constant for QPmax [molP:molC] ML pull to nml
+real, parameter   :: QPmax_b = 0.0d0      !Allometric exponent for QPmax which is independent from size ML pull to nml
 
 
 !Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
-real, parameter   :: KN_a   = 0.14d0      !Normalization constant for KN
-real, parameter   :: KN_b   = 0.33d0      !Allometric exponent for KN
+real, parameter   :: KN_a   = 0.14d0      !Normalization constant for KN ML pull to nml
+real, parameter   :: KN_b   = 0.33d0      !Allometric exponent for KN ML pull to nml
 
 !KPho is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
-real, parameter   :: KPho_a   = 0.14d0      !Normalization constant for KPho
-real, parameter   :: KPho_b   = 0.33d0      !Allometric exponent for KPho
+real, parameter   :: KPho_a   = 0.14d0      !Normalization constant for KPho ML pull to nml
+real, parameter   :: KPho_b   = 0.33d0      !Allometric exponent for KPho ML pull to nml
 
 real, parameter   :: pi= 3.1415926535
 
@@ -442,8 +442,8 @@ USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 implicit none
 
 ! ML took from state_variables.f90
-real,    parameter :: NO3_min = 0.01  !Minimal NO3 concentration
-real,    parameter :: FRP_min = 0.01/16.*1.  !Minimal NO3 concentration
+real,    parameter :: NO3_min = 0.01  !Minimal NO3 concentration ML in the environment (mmol/m3)
+real,    parameter :: FRP_min = 0.01/16.*1.  !Minimal FRP concentration ML in the environment (mmol/m3)
 
 !Declaration on variables:
 real, intent(in)  :: Temp             !Associated temperarure [degree C]
@@ -484,16 +484,17 @@ real              :: rhoChl = 0.      !Phyto C production devoted to Chl synthes
 real              :: Ik     = 0.      !Saturation parameter for the PI curve [W m-2 s-1]
 real              :: A      = 0.      !Photoinhibition, following Nikolau et al. (2016)
 
-real, parameter   :: RC     = 0.1d0   !Basic C respiration rate [d-1]
-real, parameter   :: RN     = 0.1d0   !Basic N respiration rate [d-1]
-real, parameter   :: RP     = 0.1d0   !Basic P respiration rate [d-1]
-real, parameter   :: RChl   = 0.1d0   !Basic Chl respiration rate [d-1]
+real, parameter   :: RC     = 0.1d0   !Basic C respiration rate [d-1] ML pull to nml
+real, parameter   :: RN     = 0.1d0   !Basic N respiration rate [d-1] ML pull to nml
+real, parameter   :: RP     = 0.1d0   !Basic P respiration rate [d-1] ML pull to nml
+real, parameter   :: RChl   = 0.1d0   !Basic Chl respiration rate [d-1] ML pull to nml
 real              :: RcT    = 0.d0    !Temperature dependent C-based respiration rate [d-1]
 real              :: RNT    = 0.d0    !Temperature dependent N-based respiration rate [d-1]
 real              :: RPT    = 0.d0    !Temperature dependent P-based respiration rate [d-1]
 real              :: RChlT  = 0.d0    !Temperature dependent Chl-based respiration rate [d-1]
 
-real, parameter   :: zeta   = 3.0d0   !Cost of biosynthesis [mol C mol N-1]
+real, parameter   :: zeta_N   = 3.0d0   !Cost of biosynthesis [mol C mol N-1] ML pull to nml
+real, parameter   :: zeta_P   = 3.0d0   !Cost of biosynthesis [mol C mol P-1] ML pull to nml
 
 ! Maximal specific N uptake as a function of temp. under resource (nutrient and light) replete conditions [mol N mol C-1 d-1]:
 real              :: Vcref  = 0.
@@ -506,7 +507,7 @@ real              :: muT    = 0.
 real              :: KN     = 0.      !Half-saturation constant for N [uM]
 real              :: KPho     = 0.    !Half-saturation constant for P [uM]
 real, parameter   :: a1 = 0.d0        !Allometric exponent between mumax and alphaChl
-real              :: CDiv1 = 0.       !CDiv value with ug C per cell
+real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't see that this is used
 !End of declaration
 
 if (C .le. 0d0) then
@@ -576,7 +577,7 @@ Vcref  = muT * QNmax
 Vcrefp  = muT * QPmax
 
 !Assume the same temperature dependence of respiration as on photosynthetic rate (long-term adaptation; Barton et al. 2020):
-RcT   = temp_Topt(Temp, Rc,   Topt_)
+RcT   = temp_Topt(Temp, RC,   Topt_)
 RcT   = respiration(ESD_, RcT)
 
 RNT   = temp_Topt(Temp, RN,   Topt_)
@@ -626,7 +627,7 @@ Endif
 if (PAR <= 0d0) then
    rhochl   = rhoChl_L
 else
-   rhochl   = thetaNmax * PC / alphachl_ / theta / PAR ! ML not sure how to include P in this at the moment
+   rhochl   = thetaNmax * PC / alphachl_ / theta / PAR ! ML leaving this as regulated by Chl:N ratio for now
    rhoChl_L = rhochl
 endif
 
@@ -639,7 +640,7 @@ VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp
 VCP = max(VCP, 0d0)
 
 !Changes of cellular carbon [d-1]:
-dC = C * (PC - zeta*VCN - RcT) !ML might need to come back to this - not sure whether/how to include P uptake here
+dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) !ML biosynthesis cost probably too high here now that P is added; check params
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell
