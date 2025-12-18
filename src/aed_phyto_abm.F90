@@ -242,6 +242,8 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
 
             ! added with addition of PIBM code
             CASE ('X_cinit')       ; pd(dcol)%X_cinit       = extract_double(values(ccol))
+            CASE ('Cdiv')          ; pd(dcol)%Cdiv          = extract_double(values(ccol))
+            CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
 
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
@@ -369,6 +371,8 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
 
        ! added with addition of PIBM code
        data%phytos(i)%X_cinit       = pd(list(i))%X_cinit
+       data%phytos(i)%Cdiv          = pd(list(i))%Cdiv
+       data%phytos(i)%mort_prob     = pd(list(i))%mort_prob
 
     ENDDO
     DEALLOCATE(pd)
@@ -520,7 +524,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%ip_frp = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_frp', 'mmol P', 'particle layer FRP')
 
    !real    :: C   = 0.02          ! cellular carbon content (pmol; assuming a 1 micron cell)
-   data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',initial=data%phytos(1)%X_cinit)
+   data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',initial=data%phytos(1)%X_cinit) ! 0.02
    
    !real    :: N   = 0.02/106.*16. ! cellular nitrogen content (pmol per cell; assuming a 1 micron cell)
    data%ip_n = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_n', 'pmol N/cell', 'cell N concentration',initial=0.02/106.*16.)
@@ -536,7 +540,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
    !real :: Cdiv= 0.04d0           !cellular carbon content threshold for division (pmol/cell), can be used as a proxy for size and can be converted to ESD; Phytoplankton half-saturation constant, minimal N:C and maximal N:C ratios are allometric functions of this parameter
                                    !This trait will vary with mutation
-   data%ip_Cdiv = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_cdiv', 'pmol/cell', 'cellular carbon content threshold for division',initial = 0.04d0)
+   data%ip_Cdiv = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_cdiv', 'pmol/cell', 'cellular carbon content threshold for division',initial = data%phytos(1)%Cdiv) ! 0.04d0
 
 
 
@@ -866,7 +870,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    !real      ::   cov_TL(nlev) = 0d0
    !real      ::   cov_AL(nlev) = 0d0
    real      ::  nu_ = 0d0   !Basic Mutation rate
-   real      :: cff = 0.d0   !Random number [0,1]
+   real      :: cff = 0.d0   !Random number [0,1] for mutation
+   real      :: rnm = 0.d0   !Random number [0,1] for mortality
    real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
    real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
    real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -1484,7 +1489,7 @@ P_min = 0.d0
          Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv)
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
-            _DIAG_VAR_(data%id_N_mutate) = _DIAG_VAR_(data%id_N_mutate) + 1
+            _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1
             Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
@@ -1497,6 +1502,27 @@ P_min = 0.d0
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
          endif
+
+         ! ML mortality to compensate because we don't have zoops
+         call random_number(rnm)
+         print *, 'rnm', rnm
+
+         IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
+            print *, 'I died due to mort_prob!'
+            print *, 'mort_prob', data%phytos(1)%mort_prob !ML need to change phytos(1) when can have more than 1 group
+            _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
+            Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+
+            p(i)%ptm_state(data%ip_c)   = 0d0
+            p(i)%ptm_state(data%ip_n)   = 0d0
+            p(i)%ptm_state(data%ip_p)   = 0d0
+            p(i)%ptm_state(data%ip_chl) = 0d0
+            p(i)%ptm_state(data%ip_num) = 0d0
+            _PTM_STAT_(i,STAT) = 0
+            _PTM_STAT_(i,FLAG) = 3
+         ENDIF
 
          !Save fitness of each particle (per day)
          p(i)%ptm_state(data%ip_fit) = (p(i)%ptm_state(data%ip_c)*p(i)%ptm_state(data%ip_num)*1d-9/Hz - BC(j))/BC(j)/dtdays
