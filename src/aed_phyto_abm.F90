@@ -316,7 +316,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%p_name       = pd(list(i))%p_name
        data%phytos(i)%p0           = pd(list(i))%p0
        data%phytos(i)%w_p          = pd(list(i))%w_p/secs_per_day
-      !data%phytos(i)%settling     = settling(i)
+       data%phytos(i)%settling     = settling(i)
       !data%phytos(i)%resuspension = resuspension(i)
        data%phytos(i)%Xcc          = pd(list(i))%Xcc
        data%phytos(i)%R_growth     = pd(list(i))%R_growth/secs_per_day
@@ -839,7 +839,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    AED_REAL :: oxy_flux
    AED_REAL :: decay, area, thickness
 
-   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, frp, pw, mu
+   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, frp, pw, mu, pw20, mu20
    AED_REAL :: f_T, Iz, f_I, Respiration, Mu_net
 
    AED_REAL, PARAMETER :: buoyancy_age = 86400.
@@ -997,8 +997,8 @@ i=1 !ML need to remove this later
    !ML Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    !ML thickness = _STATE_VAR_(data%id_lht)
    !ML area      = 1000. !_STATE_VAR_S_(data%id_larea)
-   par =  _STATE_VAR_(data%id_par)  ! _STATE_VAR_S_(data%id_I0)  local photosynth. active radiation
-   !print *, 'par', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
+   par =  _STATE_VAR_S_(data%id_I0) ! _STATE_VAR_(data%id_par) local photosynth. active radiation
+   !print *, 'par, I0', _STATE_VAR_(data%id_par),_STATE_VAR_S_(data%id_I0)
    !I0 = _STATE_VAR_S_(data%id_I0)       ! surface photosynth. active radiation !ML need to get rid of this and go back to layer par when fixed
    no3 = _STATE_VAR_(data%id_nit)
    !no3 = 300.      ! local nitrate
@@ -1456,6 +1456,9 @@ P_min = 0.d0
          p(i)%ptm_state(data%ip_p)   = p(i)%ptm_state(data%ip_p)   + dP_   * dtdays !Unit: pmol P cell-1 hr-1
          p(i)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl) + dChl_ * dtdays !Unit: pg Chl cell-1 hr-1
 
+         ! Update ESD
+         p(i)%ptm_env(DIAM) = ESD_*1d-6 !meters
+
          !# PHYTOPLANKTON CELL DENSITY
          ! density increases during carbohydrate creation (daytime)
          dens_flux = zero_
@@ -1478,12 +1481,37 @@ P_min = 0.d0
             p(i)%ptm_env(DENS)=min_rho
          ENDIF
 
-         ! Update p_vvel
-         pw   = _STATE_VAR_(data%id_dens)
-         mu   = water_viscosity(WaterTemperature)
-         p_vvel = -9.807*((ESD_*1d-6)**2.)*( p(i)%ptm_env(DENS)-pw ) / ( 18.*mu ) ! fixed density of 1100 kg/m3 for now
-         p(i)%ptm_env(DIAM) = ESD_*1d-6 !meters
-         p(i)%ptm_env(VVEL) = p_vvel
+         SELECT CASE (data%phytos(1)%settling)
+
+            CASE ( _MOB_OFF_ )
+               ! disable settling by setting vertical velocity to 0
+               p(i)%ptm_env(VVEL) = zero_
+
+            CASE ( _MOB_CONST_ )
+               ! constant settling velocity using user provided value
+               p(i)%ptm_env(VVEL) = data%phytos(1)%w_p
+
+            CASE ( _MOB_TEMP_ )
+               ! constant settling velocity @20C corrected for density changes
+               pw   = _STATE_VAR_(data%id_dens)
+               mu   = water_viscosity(WaterTemperature)
+               mu20 = 0.001002  ! N s/m2
+               pw20 = 998.2000  ! kg/m3 (assuming freshwater)
+               p(i)%ptm_env(VVEL) = data%phytos(1)%w_p*mu20*pw / ( mu*pw20 )
+
+            CASE ( _MOB_STOKES_ )
+               ! Update p_vvel (Stokes' Law)
+               pw   = _STATE_VAR_(data%id_dens)
+               mu   = water_viscosity(WaterTemperature)
+               p_vvel = -9.807*((ESD_*1d-6)**2.)*( p(i)%ptm_env(DENS)-pw ) / ( 18.*mu ) 
+               p(i)%ptm_env(VVEL) = p_vvel
+
+            CASE DEFAULT
+               ! unknown settling/migration option selection
+               print *, "Settling option not recognized; vertical velocity set to 0"
+               p(i)%ptm_env(VVEL) =  zero_
+
+         END SELECT
 
          ! If celular carbon is lower than the susbsistence threshold (Cmin), it dies:
          Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv)
@@ -1505,11 +1533,8 @@ P_min = 0.d0
 
          ! ML mortality to compensate because we don't have zoops
          call random_number(rnm)
-         print *, 'rnm', rnm
 
          IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
-            print *, 'I died due to mort_prob!'
-            print *, 'mort_prob', data%phytos(1)%mort_prob !ML need to change phytos(1) when can have more than 1 group
             _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
             Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
