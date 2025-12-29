@@ -432,7 +432,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -458,6 +458,13 @@ real, intent(in)  :: Cdiv             !Cellular carbon content threshold for div
 
 real, intent(in)  :: Topt_            !Optimal temperature [degree C]
 real, intent(in)  :: alphaChl_        !Slope of the P-I curve [Unit the same as aI0]
+real, intent(in)   :: RC     != 0.1d0   Basic C respiration rate [d-1] ML pull to nml
+real, intent(in)   :: RN     != 0.1d0   Basic N respiration rate [d-1] ML pull to nml
+real, intent(in)   :: RP     != 0.1d0   Basic P respiration rate [d-1] ML pull to nml
+real, intent(in)   :: RChl   != 0.1d0   Basic Chl respiration rate [d-1] ML pull to nml
+real, intent(in)   :: zeta_N != 3.0d0   Cost of biosynthesis [mol C mol N-1] ML pull to nml
+real, intent(in)   :: zeta_P != 3.0d0   Cost of biosynthesis [mol C mol P-1] ML pull to nml
+
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
 real, intent(out) :: dP               !Changes in the cellular phosphorus content [pmol P cell-1 d-1]
 real, intent(out) :: dC               !Changes in the cellular carbon content [pmol C cell-1 d-1]
@@ -484,17 +491,10 @@ real              :: rhoChl = 0.      !Phyto C production devoted to Chl synthes
 real              :: Ik     = 0.      !Saturation parameter for the PI curve [W m-2 s-1]
 real              :: A      = 0.      !Photoinhibition, following Nikolau et al. (2016)
 
-real, parameter   :: RC     = 0.1d0   !Basic C respiration rate [d-1] ML pull to nml
-real, parameter   :: RN     = 0.1d0   !Basic N respiration rate [d-1] ML pull to nml
-real, parameter   :: RP     = 0.1d0   !Basic P respiration rate [d-1] ML pull to nml
-real, parameter   :: RChl   = 0.1d0   !Basic Chl respiration rate [d-1] ML pull to nml
 real              :: RcT    = 0.d0    !Temperature dependent C-based respiration rate [d-1]
 real              :: RNT    = 0.d0    !Temperature dependent N-based respiration rate [d-1]
 real              :: RPT    = 0.d0    !Temperature dependent P-based respiration rate [d-1]
 real              :: RChlT  = 0.d0    !Temperature dependent Chl-based respiration rate [d-1]
-
-real, parameter   :: zeta_N   = 3.0d0   !Cost of biosynthesis [mol C mol N-1] ML pull to nml
-real, parameter   :: zeta_P   = 3.0d0   !Cost of biosynthesis [mol C mol P-1] ML pull to nml
 
 ! Maximal specific N uptake as a function of temp. under resource (nutrient and light) replete conditions [mol N mol C-1 d-1]:
 real              :: Vcref  = 0.
