@@ -256,6 +256,20 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('zeta_P')        ; pd(dcol)%zeta_P        = extract_double(values(ccol))
             CASE ('a1')            ; pd(dcol)%a1            = extract_double(values(ccol))
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
+            CASE ('nx')            ; pd(dcol)%nx            = extract_double(values(ccol))
+            CASE ('thetaNmax')     ; pd(dcol)%thetaNmax     = extract_double(values(ccol))
+            CASE ('QNmin_a')       ; pd(dcol)%QNmin_a       = extract_double(values(ccol))
+            CASE ('QNmin_b')       ; pd(dcol)%QNmin_b       = extract_double(values(ccol))
+            CASE ('QNmax_a')       ; pd(dcol)%QNmax_a       = extract_double(values(ccol))
+            CASE ('QNmax_b')       ; pd(dcol)%QNmax_b       = extract_double(values(ccol))
+            CASE ('QPmin_a')       ; pd(dcol)%QPmin_a       = extract_double(values(ccol))
+            CASE ('QPmin_b')       ; pd(dcol)%QPmin_b       = extract_double(values(ccol))
+            CASE ('QPmax_a')       ; pd(dcol)%QPmax_a       = extract_double(values(ccol))
+            CASE ('QPmax_b')       ; pd(dcol)%QPmax_b       = extract_double(values(ccol))
+            CASE ('KN_a')          ; pd(dcol)%KN_a          = extract_double(values(ccol))
+            CASE ('KN_b')          ; pd(dcol)%KN_b          = extract_double(values(ccol))
+            CASE ('KPho_a')        ; pd(dcol)%KPho_a        = extract_double(values(ccol))
+            CASE ('KPho_b')        ; pd(dcol)%KPho_b        = extract_double(values(ccol))
 
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
@@ -331,7 +345,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%settling     = settling(i)
       !data%phytos(i)%resuspension = resuspension(i)
        data%phytos(i)%Xcc          = pd(list(i))%Xcc
-       data%phytos(i)%R_growth     = pd(list(i))%R_growth/secs_per_day
+       data%phytos(i)%R_growth     = pd(list(i))%R_growth!ML/secs_per_day not how it's used in PIBM
        data%phytos(i)%fT_Method    = pd(list(i))%fT_Method
        data%phytos(i)%theta_growth = pd(list(i))%theta_growth
        data%phytos(i)%T_std        = pd(list(i))%T_std
@@ -397,6 +411,20 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%zeta_P        = pd(list(i))%zeta_P
        data%phytos(i)%a1            = pd(list(i))%a1
        data%phytos(i)%mort_prob     = pd(list(i))%mort_prob
+       data%phytos(i)%nx            = pd(list(i))%nx
+       data%phytos(i)%thetaNmax     = pd(list(i))%thetaNmax
+       data%phytos(i)%QNmin_a       = pd(list(i))%QNmin_a
+       data%phytos(i)%QNmin_b       = pd(list(i))%QNmin_b
+       data%phytos(i)%QNmax_a       = pd(list(i))%QNmax_a
+       data%phytos(i)%QNmax_b       = pd(list(i))%QNmax_b
+       data%phytos(i)%QPmin_a       = pd(list(i))%QPmin_a
+       data%phytos(i)%QPmin_b       = pd(list(i))%QPmin_b
+       data%phytos(i)%QPmax_a       = pd(list(i))%QPmax_a
+       data%phytos(i)%QPmax_b       = pd(list(i))%QPmax_b
+       data%phytos(i)%KN_a          = pd(list(i))%KN_a
+       data%phytos(i)%KN_b          = pd(list(i))%KN_b
+       data%phytos(i)%KPho_a        = pd(list(i))%KPho_a
+       data%phytos(i)%KPho_b        = pd(list(i))%KPho_b
 
     ENDDO
     DEALLOCATE(pd)
@@ -1460,7 +1488,9 @@ P_min = 0.d0
          !ML CASE(GMK98_ToptSizeLight)
             call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem), p(i)%ptm_state(data%ip_par), p(i)%ptm_state(data%ip_no3), p(i)%ptm_state(data%ip_frp), p(i)%ptm_state(data%ip_Topt),&
                  p(i)%ptm_state(data%ip_c), p(i)%ptm_state(data%ip_n), p(i)%ptm_state(data%ip_p), p(i)%ptm_state(data%ip_chl), p(i)%ptm_state(data%ip_cdiv), exp(p(i)%ptm_state(data%ip_LnalphaChl)),&
-                 dC_, dN_, dP_, dChl_, ESD_, data%phytos(1)%RC, data%phytos(1)%RN, data%phytos(1)%RP, data%phytos(1)%RChl, data%phytos(1)%zeta_N, data%phytos(1)%zeta_P, data%phytos(1)%a1)
+                 dC_, dN_, dP_, dChl_, ESD_, data%phytos(1)%RC, data%phytos(1)%RN, data%phytos(1)%RP, data%phytos(1)%RChl, data%phytos(1)%zeta_N, data%phytos(1)%zeta_P, data%phytos(1)%a1,&
+                 data%phytos(1)%R_growth, data%phytos(1)%nx, data%phytos(1)%thetaNmax, data%phytos(1)%QNmin_a, data%phytos(1)%QNmin_b, data%phytos(1)%QNmax_a, data%phytos(1)%QNmax_b, &
+                 data%phytos(1)%QPmin_a, data%phytos(1)%QPmin_b, data%phytos(1)%QPmax_a, data%phytos(1)%QPmax_b, data%phytos(1)%KN_a, data%phytos(1)%KN_b, data%phytos(1)%KPho_a, data%phytos(1)%KPho_b)
          !ML CASE DEFAULT
          !ML    stop "Model choice is wrong!!"
          !ML ENDSELECT

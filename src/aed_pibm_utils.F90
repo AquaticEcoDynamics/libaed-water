@@ -35,7 +35,7 @@ MODULE PARAMS
 implicit NONE
 
 ! Parameters
-real :: mu0     =  5.00  !Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
+!real :: mu0     =  5.00  !Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
 real :: aI0     =  1.20  !Chl-specific Slope of P-I curve ((W m-2)-1 (gChl molC)-1 d-1) 
 real :: KN      =  0.50  !Half saturation constant of phytoplankton growth on N 
 real :: KPho    =  0.50  !Half saturation constant of phytoplankton growth on P 
@@ -51,7 +51,7 @@ real :: wDET    =  0.5 ! Sinking rate of detritus
 real :: SDZoo   =  0.5
 
 ! Acclimation parameter ML pull this out to nml
-real, parameter :: nx = 1.d0
+!real, parameter :: nx = 1.d0
 
 ! Activation energy for phytoplankton growth ML don't see this used anywhere below
 real, parameter :: Ep  = 0.32d0
@@ -60,7 +60,7 @@ real, parameter :: Ep  = 0.32d0
 real, parameter :: Ez  = 0.65d0
 
 ! Maixmal Chl:N ratio (g:mol) for phytoplankton
-real, parameter :: thetaNmax = 3d0 ! ML pull this out to nml
+!real, parameter :: thetaNmax = 3d0 ! ML pull this out to nml
 
 ! Maixmal Chl:P ratio (g:mol) for phytoplankton
 real, parameter :: thetaPmax = 3d0/16.*1. ! ML this is not currently used
@@ -69,25 +69,25 @@ real, parameter :: thetaPmax = 3d0/16.*1. ! ML this is not currently used
 real            :: rhochl_L  = 0d0
 
 !QNmin and QNmax are allometric functions of Vol (Ward et al. 2012) [mol N: mol C]:
-real, parameter   :: QNmin_a = 0.07d0     !Normalization constant for QNmin [molN:molC] ML pull to nml
-real, parameter   :: QNmin_b = -0.17d0    !Allometric exponent for QNmin ML pull to nml
-real, parameter   :: QNmax_a = 0.166d0    !Normalization constant for QNmax [molN:molC] ML pull to nml
-real, parameter   :: QNmax_b = 0.0d0      !Allometric exponent for QNmax which is independent from size ML pull to nml
+!real, parameter   :: QNmin_a = 0.07d0     !Normalization constant for QNmin [molN:molC] ML pull to nml
+!real, parameter   :: QNmin_b = -0.17d0    !Allometric exponent for QNmin ML pull to nml
+!real, parameter   :: QNmax_a = 0.166d0    !Normalization constant for QNmax [molN:molC] ML pull to nml
+!real, parameter   :: QNmax_b = 0.0d0      !Allometric exponent for QNmax which is independent from size ML pull to nml
 
 !QPmin and QPmax are allometric functions of Vol (Ward et al. 2012) [mol P: mol C]:
-real, parameter   :: QPmin_a = 0.07d0     !Normalization constant for QPmin [molP:molC] ML pull to nml
-real, parameter   :: QPmin_b = -0.17d0    !Allometric exponent for QPmin ML pull to nml
-real, parameter   :: QPmax_a = 0.166d0    !Normalization constant for QPmax [molP:molC] ML pull to nml
-real, parameter   :: QPmax_b = 0.0d0      !Allometric exponent for QPmax which is independent from size ML pull to nml
+!real, parameter   :: QPmin_a = 0.07d0     !Normalization constant for QPmin [molP:molC] ML pull to nml
+!real, parameter   :: QPmin_b = -0.17d0    !Allometric exponent for QPmin ML pull to nml
+!real, parameter   :: QPmax_a = 0.166d0    !Normalization constant for QPmax [molP:molC] ML pull to nml
+!real, parameter   :: QPmax_b = 0.0d0      !Allometric exponent for QPmax which is independent from size ML pull to nml
 
 
 !Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
-real, parameter   :: KN_a   = 0.14d0      !Normalization constant for KN ML pull to nml
-real, parameter   :: KN_b   = 0.33d0      !Allometric exponent for KN ML pull to nml
+!real, parameter   :: KN_a   = 0.14d0      !Normalization constant for KN ML pull to nml
+!real, parameter   :: KN_b   = 0.33d0      !Allometric exponent for KN ML pull to nml
 
 !KPho is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
-real, parameter   :: KPho_a   = 0.14d0      !Normalization constant for KPho ML pull to nml
-real, parameter   :: KPho_b   = 0.33d0      !Allometric exponent for KPho ML pull to nml
+!real, parameter   :: KPho_a   = 0.14d0      !Normalization constant for KPho ML pull to nml
+!real, parameter   :: KPho_b   = 0.33d0      !Allometric exponent for KPho ML pull to nml
 
 real, parameter   :: pi= 3.1415926535
 
@@ -417,10 +417,7 @@ END MODULE
 !###############################################################################
 !
 Module gmk
-!-------------------------------------------------------------------------------
-! Trait_functions --- utility functions for the PIBM GMK98_ToptSizeLight model
-!
-!-------------------------------------------------------------------------------
+
 use params
 
 !This module provides several functions calculating phytoplankton physiological rates as a function of environmental conditions (e.g., temperature) and traits
@@ -432,7 +429,9 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, &
+ ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, QNmin_a, QNmin_b, QPmin_a, QPmin_b, QNmax_a, &
+ QNmax_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -465,6 +464,29 @@ real, intent(in)   :: RChl   != 0.1d0   Basic Chl respiration rate [d-1] ML pull
 real, intent(in)   :: zeta_N != 3.0d0   Cost of biosynthesis [mol C mol N-1] ML pull to nml
 real, intent(in)   :: zeta_P != 3.0d0   Cost of biosynthesis [mol C mol P-1] ML pull to nml
 real, intent(in)   :: a1 != 0.d0        Allometric exponent between mumax and alphaChl
+real, intent(in)   :: mu0    !=  5.00   Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
+real, intent(in)   :: nx != 1.d0
+real, intent(in)   :: thetaNmax != 3d0  ML pull this out to nml
+
+!QNmin and QNmax are allometric functions of Vol (Ward et al. 2012) [mol N: mol C]:
+real, intent(in)   :: QNmin_a != 0.07d0     Normalization constant for QNmin [molN:molC] ML pull to nml
+real, intent(in)   :: QNmin_b != -0.17d0    Allometric exponent for QNmin ML pull to nml
+real, intent(in)   :: QNmax_a != 0.166d0    Normalization constant for QNmax [molN:molC] ML pull to nml
+real, intent(in)   :: QNmax_b != 0.0d0      Allometric exponent for QNmax which is independent from size ML pull to nml
+
+!QPmin and QPmax are allometric functions of Vol (Ward et al. 2012) [mol P: mol C]:
+real, intent(in)   :: QPmin_a != 0.07d0     Normalization constant for QPmin [molP:molC] ML pull to nml
+real, intent(in)   :: QPmin_b != -0.17d0    Allometric exponent for QPmin ML pull to nml
+real, intent(in)   :: QPmax_a != 0.166d0    Normalization constant for QPmax [molP:molC] ML pull to nml
+real, intent(in)   :: QPmax_b != 0.0d0      Allometric exponent for QPmax which is independent from size ML pull to nml
+
+!Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
+real, intent(in)   :: KN_a   != 0.14d0      Normalization constant for KN ML pull to nml
+real, intent(in)   :: KN_b   != 0.33d0      Allometric exponent for KN ML pull to nml
+
+!KPho is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
+real, intent(in)   :: KPho_a   != 0.14d0      Normalization constant for KPho ML pull to nml
+real, intent(in)   :: KPho_b   != 0.33d0      Allometric exponent for KPho ML pull to nml
 
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
 real, intent(out) :: dP               !Changes in the cellular phosphorus content [pmol P cell-1 d-1]
