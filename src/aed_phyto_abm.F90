@@ -242,7 +242,12 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
 
             ! added with addition of PIBM code
             CASE ('X_cinit')       ; pd(dcol)%X_cinit       = extract_double(values(ccol))
+            CASE ('X_ninit')       ; pd(dcol)%X_ninit       = extract_double(values(ccol))
+            CASE ('X_pinit')       ; pd(dcol)%X_pinit       = extract_double(values(ccol))
+            CASE ('X_chlinit')     ; pd(dcol)%X_chlinit     = extract_double(values(ccol))
             CASE ('Cdiv')          ; pd(dcol)%Cdiv          = extract_double(values(ccol))
+            CASE ('n0')            ; pd(dcol)%n0            = extract_double(values(ccol))
+            CASE ('Lnalphachl')    ; pd(dcol)%Lnalphachl    = extract_double(values(ccol))
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
 
 
@@ -371,7 +376,12 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
 
        ! added with addition of PIBM code
        data%phytos(i)%X_cinit       = pd(list(i))%X_cinit
+       data%phytos(i)%X_ninit       = pd(list(i))%X_ninit
+       data%phytos(i)%X_pinit       = pd(list(i))%X_pinit
+       data%phytos(i)%X_chlinit     = pd(list(i))%X_chlinit
        data%phytos(i)%Cdiv          = pd(list(i))%Cdiv
+       data%phytos(i)%n0            = pd(list(i))%n0
+       data%phytos(i)%Lnalphachl    = pd(list(i))%Lnalphachl
        data%phytos(i)%mort_prob     = pd(list(i))%mort_prob
 
     ENDDO
@@ -527,16 +537,16 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%ip_c = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_c', 'pmol C/cell', 'cell C concentration',initial=data%phytos(1)%X_cinit) ! 0.02
    
    !real    :: N   = 0.02/106.*16. ! cellular nitrogen content (pmol per cell; assuming a 1 micron cell)
-   data%ip_n = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_n', 'pmol N/cell', 'cell N concentration',initial=0.02/106.*16.)
+   data%ip_n = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_n', 'pmol N/cell', 'cell N concentration',initial=data%phytos(1)%X_ninit) !0.02/106.*16.
 
    !real    :: P   = 0.02/106.*1. ! cellular phosphorus content (pmol per cell; assuming a 1 micron cell)
-   data%ip_p = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_p', 'pmol P/cell', 'cell P concentration',initial=0.02/106.*1.)
+   data%ip_p = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_p', 'pmol P/cell', 'cell P concentration',initial=data%phytos(1)%X_pinit) !0.02/106.*1.
 
    !real    :: Chl = 0.02 * 12/50  ! Cellular Chl content (pg Chl)
-   data%ip_chl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_chl', 'pg Chl', 'cell Chl concentration',initial = 0.02 * 12/50)
+   data%ip_chl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_chl', 'pg Chl', 'cell Chl concentration',initial = data%phytos(1)%X_chlinit) !0.02 * 12/50
 
    !real    :: num = 5d9           ! Number of cells per superindividual
-   data%ip_num = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_num', 'number', 'number of cells/particle',initial = 5d12)
+   data%ip_num = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_num', 'number', 'number of cells/particle',initial = data%phytos(1)%n0) !5d12
 
    !real :: Cdiv= 0.04d0           !cellular carbon content threshold for division (pmol/cell), can be used as a proxy for size and can be converted to ESD; Phytoplankton half-saturation constant, minimal N:C and maximal N:C ratios are allometric functions of this parameter
                                    !This trait will vary with mutation
@@ -548,7 +558,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%ip_Topt = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_topt', 'degrees C', 'optimal temperature',initial = data%phytos(1)%T_opt)
 
    !real :: LnalphaChl = -2.3  !log(0.1) !Ln alphaChl (slope of the P-I curve; unit: (W m-2)-1 (gChl molC)-1 d-1 instead of micro mol quanta m-2 s-1)
-   data%ip_LnalphaChl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_lnalphachl', '(W m-2)-1 (gChl molC)-1 d-1', 'slope of the P-I curve',initial = -2.3)
+   data%ip_LnalphaChl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_lnalphachl', '(W m-2)-1 (gChl molC)-1 d-1', 'slope of the P-I curve',initial = data%phytos(1)%Lnalphachl) !-2.3
 
    !real :: mu_C = 0.d0              !Carbon-specific growth rate
    data%ip_mu_C = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_mu_c', '??', 'carbon-specific growth rate',initial = 0.d0)
