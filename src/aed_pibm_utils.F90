@@ -432,7 +432,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, Topt_, C, N, P, Chl, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -464,6 +464,7 @@ real, intent(in)   :: RP     != 0.1d0   Basic P respiration rate [d-1] ML pull t
 real, intent(in)   :: RChl   != 0.1d0   Basic Chl respiration rate [d-1] ML pull to nml
 real, intent(in)   :: zeta_N != 3.0d0   Cost of biosynthesis [mol C mol N-1] ML pull to nml
 real, intent(in)   :: zeta_P != 3.0d0   Cost of biosynthesis [mol C mol P-1] ML pull to nml
+real, intent(in)   :: a1 != 0.d0        Allometric exponent between mumax and alphaChl
 
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
 real, intent(out) :: dP               !Changes in the cellular phosphorus content [pmol P cell-1 d-1]
@@ -506,7 +507,6 @@ real              :: muT    = 0.
 !Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
 real              :: KN     = 0.      !Half-saturation constant for N [uM]
 real              :: KPho     = 0.    !Half-saturation constant for P [uM]
-real, parameter   :: a1 = 0.d0        !Allometric exponent between mumax and alphaChl
 real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't see that this is used
 !End of declaration
 

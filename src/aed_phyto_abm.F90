@@ -254,6 +254,7 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('RChl')          ; pd(dcol)%RChl          = extract_double(values(ccol))
             CASE ('zeta_N')        ; pd(dcol)%zeta_N        = extract_double(values(ccol))
             CASE ('zeta_P')        ; pd(dcol)%zeta_P        = extract_double(values(ccol))
+            CASE ('a1')            ; pd(dcol)%a1            = extract_double(values(ccol))
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
 
 
@@ -394,6 +395,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%RChl          = pd(list(i))%RChl
        data%phytos(i)%zeta_N        = pd(list(i))%zeta_N
        data%phytos(i)%zeta_P        = pd(list(i))%zeta_P
+       data%phytos(i)%a1            = pd(list(i))%a1
        data%phytos(i)%mort_prob     = pd(list(i))%mort_prob
 
     ENDDO
@@ -1458,7 +1460,7 @@ P_min = 0.d0
          !ML CASE(GMK98_ToptSizeLight)
             call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem), p(i)%ptm_state(data%ip_par), p(i)%ptm_state(data%ip_no3), p(i)%ptm_state(data%ip_frp), p(i)%ptm_state(data%ip_Topt),&
                  p(i)%ptm_state(data%ip_c), p(i)%ptm_state(data%ip_n), p(i)%ptm_state(data%ip_p), p(i)%ptm_state(data%ip_chl), p(i)%ptm_state(data%ip_cdiv), exp(p(i)%ptm_state(data%ip_LnalphaChl)),&
-                 dC_, dN_, dP_, dChl_, ESD_, data%phytos(1)%RC, data%phytos(1)%RN, data%phytos(1)%RP, data%phytos(1)%RChl, data%phytos(1)%zeta_N, data%phytos(1)%zeta_P)
+                 dC_, dN_, dP_, dChl_, ESD_, data%phytos(1)%RC, data%phytos(1)%RN, data%phytos(1)%RP, data%phytos(1)%RChl, data%phytos(1)%zeta_N, data%phytos(1)%zeta_P, data%phytos(1)%a1)
          !ML CASE DEFAULT
          !ML    stop "Model choice is wrong!!"
          !ML ENDSELECT
