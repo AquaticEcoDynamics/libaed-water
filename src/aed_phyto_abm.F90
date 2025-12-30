@@ -790,11 +790,11 @@ INTEGER   :: i, v
 integer, parameter :: iTopt = 1        !Trait index for Topt
 integer, parameter :: iSize = 2        !Trait index for Cdiv: carbon-weighted cellular carbon content threshold for division
 integer, parameter :: ialphaChl = 3    !Trait index for optimal light
-integer, parameter :: iC = 4           !Trait index for Topt
-integer, parameter :: iNO3 = 5         !Trait index for Size (ESD)
-integer, parameter :: iP = 6    !Trait index for optimal light
-integer, parameter :: iChl = 7        !Trait index for Topt
-integer, parameter :: iNum = 8        !Trait index for Size (ESD)
+integer, parameter :: iC = 4           !Trait index for internal C
+integer, parameter :: iNO3 = 5         !Trait index for internal NO3
+integer, parameter :: iP = 6           !Trait index for internal P
+integer, parameter :: iChl = 7         !Trait index for internal chl
+integer, parameter :: iNum = 8         !Trait index for number of cells per particle
 
 !
 !-------------------------------------------------------------------------------
