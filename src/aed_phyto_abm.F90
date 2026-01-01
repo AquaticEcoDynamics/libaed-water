@@ -911,8 +911,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
    ! PAR IS NOT WORKING! THIS SHOULD BE PULLING id_par AND IT CAN'T BECAUSE THAT IS 0 EVERYWHERE
    ! THIS NEEDS TO BE RESOLVED BEFORE WE CAN USE THE ABM FOR SCIENCING
-   par =  _STATE_VAR_S_(data%id_I0) ! _STATE_VAR_(data%id_par) local photosynth. active radiation
-   
+   par =  _STATE_VAR_(data%id_par) ! _STATE_VAR_S_(data%id_I0) local photosynth. active radiation
    no3 = _STATE_VAR_(data%id_nit)        ! local no3
    frp = _STATE_VAR_(data%id_frp)        ! local frp
 
