@@ -550,6 +550,8 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
       DO prey_i = 1,data%zoops(zoop_i)%num_prey
          IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey .EQ. _OGMPOC_) THEN
             IF (poc > zero_) THEN
+                ! Units case 1: 
+                !                          mmC/m3/d          * [(mmN/m3)/(mmC/m3)] == mmN/m3/d 
                 grazing_n = grazing_n + grazing_prey(prey_i) * pon/poc
                 grazing_p = grazing_p + grazing_prey(prey_i) * pop/poc
             ELSE
@@ -560,9 +562,16 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
             phy_i = phy_i + 1
             phy_INcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i))
             phy_IPcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i))
+            ! Units case 2: 
+            !                          mmC/m3/d          / (mmC/m3)     *  (mmN/m3)        / (mgN/mmN)  == (mmN)^2/mgN/m3/d  ---> Inconsistent with other cases
             grazing_n = grazing_n + grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i) /14.0
+            ! Suggested to remove the /14.0 conversion so that
+            !                          mmC/m3/d          / (mmC/m3)     *  (mmN/m3)                     == mmN/m3/d
+            ! Same applies for P (31.0)
             grazing_p = grazing_p + grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i) /31.0
          ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:15).EQ.'aed_zooplankton') THEN
+            ! Units case 3: 
+            !                          mmC/m3/d          * (mmN/mmC)                    == mmN/m3/d 
             grazing_n = grazing_n + grazing_prey(prey_i) * data%zoops(zoop_i)%INC_zoo
             grazing_p = grazing_p + grazing_prey(prey_i) * data%zoops(zoop_i)%IPC_zoo
          ENDIF
