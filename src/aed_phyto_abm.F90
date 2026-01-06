@@ -72,13 +72,10 @@ MODULE aed_phyto_abm
                  id_cov_ta, id_cov_tl, id_cov_al, id_N_birth,  &
                  id_N_mutate, id_IPAR, id_NPPc, id_cells,      &
                  id_N_death
-      INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl, ip_mu_C, ip_fit
+      INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
-
-      AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
-      AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
 
       ! Phytoplankton parameters
       INTEGER  :: num_phytos
@@ -473,19 +470,6 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    INTEGER            :: n_zones = 0
    AED_REAL           :: active_zones(1000) = 0
 
-
-!  %% NAMELIST    %%  /aed_phyto_abm/
-!  %% Last Checked 20/08/2021
-   AED_REAL :: vvel_new = 0.
-   AED_REAL :: vvel_old = 0.
-   AED_REAL :: decay_rate_new = 0.
-   AED_REAL :: decay_rate_old = 0.
-   AED_REAL :: mass_limit = 10.
-   AED_REAL :: X_cdw = 0.5
-   AED_REAL :: X_nc = 0.1
-   AED_REAL :: X_pc = 0.01
-   AED_REAL :: X_dwww = 1.0
-
 !  From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
 !                                             ! 1 = basic diagnostic outputs
@@ -510,11 +494,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
                     resus_link, n_zones, active_zones, diag_level,             &
                     theta_mpb_growth,theta_mpb_resp,                           &
-                    phyto_particle_link, R_mpbb,                               &
-                    vvel_new, vvel_old, &
-                    decay_rate_new, decay_rate_old, &
-                    mass_limit, &
-                    X_dwww, X_cdw, X_nc, X_pc
+                    phyto_particle_link, R_mpbb                               
 !-------------------------------------------------------------------------------
 !BEGIN
 
@@ -531,23 +511,9 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
      STOP
    ENDIF
 
-   ! Set module parameters
-   data%vvel_new       = vvel_new/secs_per_day
-   data%vvel_old       = vvel_old/secs_per_day
-   data%decay_rate_new = decay_rate_new/secs_per_day
-   data%decay_rate_old = decay_rate_old/secs_per_day
-   data%mass_limit     = mass_limit
-   data%X_dwww         = X_dwww
-   data%X_cdw          = X_cdw
-   data%X_nc           = X_nc
-   data%X_pc           = X_pc
-
-
    ! Store group parameter values in the phyto derived type
    CALL aed_phytoplankton_load_params(data,dbase,                                &
                                       num_phytos,the_phytos,settling,resuspension)
-
-
 
    ! Register particle state variables (phytoplankton agents)
 
@@ -587,13 +553,6 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
    !real :: LnalphaChl = -2.3  !log(0.1) !Ln alphaChl (slope of the P-I curve; unit: (W m-2)-1 (gChl molC)-1 d-1 instead of micro mol quanta m-2 s-1)
    data%ip_LnalphaChl = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_lnalphachl', '(W m-2)-1 (gChl molC)-1 d-1', 'slope of the P-I curve',initial = data%phytos(1)%Lnalphachl) !-2.3
-
-   !real :: mu_C = 0.d0              !Carbon-specific growth rate
-   data%ip_mu_C = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_mu_c', '??', 'carbon-specific growth rate',initial = 0.d0)
-
-   !real :: fitness = 0.d0     !Fitness represented by net growth rate (growth - mortality)
-   data%ip_fit = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_fit', '??', 'fitness represented by net growth rate (growth - mortality)',initial = 0.d0)
-
 
 
    ! Diagnostic outputs for particle properties
@@ -908,9 +867,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
    ! Local environmental conditions in this layer
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
-
-   ! PAR IS NOT WORKING! THIS SHOULD BE PULLING id_par AND IT CAN'T BECAUSE THAT IS 0 EVERYWHERE
-   ! THIS NEEDS TO BE RESOLVED BEFORE WE CAN USE THE ABM FOR SCIENCING
    par =  _STATE_VAR_(data%id_par) ! _STATE_VAR_S_(data%id_I0) local photosynth. active radiation
    no3 = _STATE_VAR_(data%id_nit)        ! local no3
    frp = _STATE_VAR_(data%id_frp)        ! local frp
@@ -1048,9 +1004,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1 !ML leaving this PIBM code because of questions below re: NPP diagnostic
          _DIAG_VAR_(data%id_NPPc) = _DIAG_VAR_(data%id_NPPc) + dC_ * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz * 12.d0 * dtdays !Unit: mgC m-3 d-1 ML why multiplied by 12? and also multiplying by dtdays means this is hr-1 (timestep) not d-1
 
-         ! Save carbon-specific growth rate
-         p(i)%ptm_state(data%ip_mu_C) = dC_ / p(i)%ptm_state(data%ip_c)
-
          ! Update cellular C, N, and Chl
          p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)   + dC_   * dtdays !Unit: pmol C cell-1 hr-1
          p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)   + dN_   * dtdays !Unit: pmol N cell-1 hr-1
@@ -1151,10 +1104,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
          ENDIF
-
-         !Save fitness of each particle (per day) !ML not sure what the purpose of this diagnostic is
-         p(i)%ptm_state(data%ip_fit) = (p(i)%ptm_state(data%ip_c)*p(i)%ptm_state(data%ip_num)*1d-9/Hz - BC(j))/BC(j)/dtdays
-
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
