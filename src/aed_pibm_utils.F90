@@ -151,7 +151,10 @@ real, parameter :: b = 0.88
 
 !the parameters of a and b are derived from pg C cell-1 to volume; so we need to
 !convert the carbon unit from pmol C cell-1 to pg C cell-1
-
+!ML Maranon et al. (2013) developed log-log regressions so also need to convert back to not-log space
+!although still not totally sure for this equation why this is formulated this way;
+!I would think it should be ((12d0 * p_C)**b)*(10.d0**a);
+!possibly it's different because Maranon et al. used RMA regression?
 y = (12d0 * p_C/10.d0**a)**(1d0/b)
 return
 end function PHY_C2Vol
@@ -271,8 +274,8 @@ REAL function temp_Topt(tC, mumax0, Topt_) result(y)
 !Function of a rate depending on Temperature and optimal temperature (Topt_) modified from Chen Ecol. Mod. (2022)
 IMPLICIT NONE
 real, intent(in) :: mumax0    !Maximal rate normalized to an optimal temperature of 15 ºC
-real, intent(in) :: tC         !Environmental temperature in ºC
-real, intent(in) :: Topt_   !Optimal temperature in ºC
+real, intent(in) :: tC        !Environmental temperature in ºC
+real, intent(in) :: Topt_     !Optimal temperature in ºC
 
 real, parameter   :: Ea0   = 0.98
 real, parameter   :: Ed0   = 2.3
@@ -304,7 +307,8 @@ Eh = Ed+Ea
 x    = TK(TC)
 theta = TK(Topt_)
 b = x - theta
-y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b))
+y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b)) !ML this doesn't match PIBM manuscript
+                                                            !   manuscript has the first Ea as Eh (Ea + Ed)
 return
 END FUNCTION JOHNSON
 
@@ -453,15 +457,15 @@ real, intent(in)  :: P                !Current cellular phosphorus [pmol P cell-
 real, intent(in)  :: Chl              !Current cellular Chl [pg C cell-1]
 real, intent(in)  :: Cdiv             !Cellular carbon content threshold for division [pmol cell-1]
 
-real, intent(in)  :: Topt_            !Optimal temperature [degree C]
-real, intent(in)  :: alphaChl_        !Slope of the P-I curve [Unit the same as aI0]
+real, intent(in)  :: Topt_            !Optimal temperature [degree C] ML T_opt in aed_phyto_pars.csv
+real, intent(in)  :: alphaChl_        !Slope of the P-I curve [Unit the same as aI0] ML Lnalphachl in aed_phyto_pars.csv
 real, intent(in)   :: RC     != 0.1d0   Basic C respiration rate [d-1] ML pull to nml
 real, intent(in)   :: RN     != 0.1d0   Basic N respiration rate [d-1] ML pull to nml
 real, intent(in)   :: RP     != 0.1d0   Basic P respiration rate [d-1] ML pull to nml
 real, intent(in)   :: RChl   != 0.1d0   Basic Chl respiration rate [d-1] ML pull to nml
 real, intent(in)   :: zeta_N != 3.0d0   Cost of biosynthesis [mol C mol N-1] ML pull to nml
 real, intent(in)   :: zeta_P != 3.0d0   Cost of biosynthesis [mol C mol P-1] ML pull to nml
-real, intent(in)   :: a1 != 0.d0        Allometric exponent between mumax and alphaChl
+real, intent(in)   :: a1     != 0.d0    Allometric exponent between mumax and alphaChl
 real, intent(in)   :: mu0    !=  5.00   Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
 real, intent(in)   :: nx != 1.d0
 real, intent(in)   :: thetaNmax != 3d0  ML pull this out to nml
@@ -554,6 +558,9 @@ Vol = PHY_C2Vol(CDiv)
 ESD_ = (6.d0*Vol/pi)**0.3333333
 
 !Nitrate half-saturation constant of phyto growth based on cell volume [uM]:
+!Allometric relationship from Edwards et al. 2012
+!ML also developed on log scale hence why these do not look like linear equations;
+!they are formulated to use log parameters on linear scale (10^log_intercept * X^log_slope)
 KN   = KN_a * Vol**KN_b
 KPho = KPho_a * Vol**KPho_b
 
@@ -583,9 +590,13 @@ dQP = QPmax - QPmin
 
 !Maximal growth rate as a function of temperature under resource (nutrient and light) replete conditions:
 !mu0 should be a function of alphaChl
+!ML mu0 is R_growth in the aed_phyto_pars.csv;
+!I don't see any mention or explanation of this equation anywhere in PIBM documentation
 muT = mu0 * exp(a1 * (alphaChl_ - .1)) !0.1 is the average alphaChl value
 
 !Temperature dependent maximal growth rate at 1 ug C cell-1
+!ML from Chen 2022; this function calls JOHNSON, TK, and alloscale functions;
+!corresponds to eq.10 in PIBM manuscript
 muT = temp_Topt(Temp, muT, Topt_)
 
 !Apply the size-scaling relationship following Wirtz (2011)
@@ -613,7 +624,7 @@ RChlT = respiration(ESD_, RChlT)
 Lno3 = (QN - QNmin) / dQN
 Lfrp = (QP - QPmin) / dQP
 
-if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then
+if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then !if QN or QP is already at minimum, no photosynthesis occurs
    PC = 0d0
 else
    !Maximal photosynthesis rate (regulated by QN and QP) [d-1]:
