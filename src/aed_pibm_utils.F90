@@ -227,7 +227,7 @@ real, intent(in) :: Pmax0
 real, parameter :: a_p = 0.27
 
 !End of declaration
-
+!ML this corresonds to eq. 13 in PIBM ms
 y = Pmax0/(1.d0 + a_p *ESD)
 
 return
@@ -238,9 +238,11 @@ implicit none
 real, intent(in):: ESD
 real, intent(in):: r_s !respiration rate (d-1) at V_s
 
+!ML this value of b_rho is the value for green algae from Wirtz 2011
 real, parameter :: b_rho = 0.d0 !Size scaling of C density
 
 !Cell volume when rho_dia = rho_green
+!ML this value pulled from Wirtz 2011
 real, parameter :: V_s = 8.d0 !micron^3
 
 real :: V, ESD_s
@@ -248,6 +250,7 @@ real :: V, ESD_s
 V = pi/6.d0*ESD**3
 ESD_s = (6.d0*V_s/pi)**0.333333
 
+!ML this is a combination of eq. 14 in PIBM ms and respiration term from eq. 14 in Wirtz 2011
 y = r_s*ESD_s/ESD * (V/V_s)**b_rho
 
 return
@@ -307,8 +310,8 @@ Eh = Ed+Ea
 x    = TK(TC)
 theta = TK(Topt_)
 b = x - theta
-y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b)) !ML this doesn't match PIBM manuscript
-                                                            !   manuscript has the first Ea as Eh (Ea + Ed)
+y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b)) !ML this doesn't match PIBM manuscript;
+                                                            !manuscript has the first Ea as Eh (Ea + Ed) and not sure why 1 is added?
 return
 END FUNCTION JOHNSON
 
@@ -363,9 +366,9 @@ real, parameter  :: Kappa = 0.469  !Exponent of effective cross-section equation
 real, parameter  :: Kd    = 5d-6   !Damage constant of a photosynthetic unit [nd]
 
 real, parameter  :: WtouE = 4.57   !Constant to convert PAR units from [Wm-2] to [uE m-2 s-1]
-real, parameter  :: a_ = 2d-5      !The constant a in the equation relating Kr and alphaChl
-real, parameter  :: b_ = 5d-7      !The constant b in the equation relating Kr and alphaChl
-real, parameter  :: v_ = -6.64     !The constant v in the equation relating Kr and alphaChl
+real, parameter  :: a_ = 2d-5      !The constant a in the equation relating Kr and alphaChl ML Moore et al. 1998
+real, parameter  :: b_ = 5d-7      !The constant b in the equation relating Kr and alphaChl ML Moore et al. 1998
+real, parameter  :: v_ = -6.64     !The constant v in the equation relating Kr and alphaChl ML Moore et al. 1998
 real             :: Kr0            !Repair constant of a photosynthetic unit [s-1] under nutrient saturated conditions which depends on alpha to impose a tradeoff
 real             :: Kr             !Nutrient dependent Repair constant of a photosynthetic unit [s-1]
 real             :: K              !Ratio of damage to repair constants [s]
@@ -600,23 +603,29 @@ muT = mu0 * exp(a1 * (alphaChl_ - .1)) !0.1 is the average alphaChl value
 muT = temp_Topt(Temp, muT, Topt_)
 
 !Apply the size-scaling relationship following Wirtz (2011)
+!ML eq. 13 in PIBM manuscript; eq. 14 in Wirtz; coefficients drawn from Wirtz
+!effectively this ONLY decreases muT, because muT is divided by 1 + scalar
 muT = Pmax_size(ESD_, muT)
 
 !Assuming the same temperature dependence of nutrient uptake rate as on photosynthesis rate.
 !QNmax/QNmin may be also a function of temperature which needs being further investigated.
 Vcref  = muT * QNmax
-Vcrefp  = muT * QPmax
+Vcrefp = muT * QPmax
 
 !Assume the same temperature dependence of respiration as on photosynthetic rate (long-term adaptation; Barton et al. 2020):
+!ML these two lines correspond to third term on right-hand side (RHS) of eq. 1 in PIBM paper
 RcT   = temp_Topt(Temp, RC,   Topt_)
 RcT   = respiration(ESD_, RcT)
 
+!ML these two lines correspond to second term on RHS of eq. 2 in PIBM paper
 RNT   = temp_Topt(Temp, RN,   Topt_)
 RNT   = respiration(ESD_, RNT)
 
+!ML these two lines newly added to GLM-AED-ABM to have P mirror N
 RPT   = temp_Topt(Temp, RP,   Topt_)
 RPT   = respiration(ESD_, RPT)
 
+!ML these two lines correspond to second term on RHS of eq. 3 in PIBM paper
 RChlT = temp_Topt(Temp, RChl, Topt_)
 RChlT = respiration(ESD_, RChlT)
 
@@ -627,14 +636,21 @@ Lfrp = (QP - QPmin) / dQP
 if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then !if QN or QP is already at minimum, no photosynthesis occurs
    PC = 0d0
 else
-   !Maximal photosynthesis rate (regulated by QN and QP) [d-1]:
+   !Maximal photosynthesis rate (regulated by temperature, QN, and QP) [d-1]:
+   !ML corresponds to eq. 5 in PIBM ms;
+   !the min() was added to account for both N and P limitation in GLM-AED-ABM
    PCmax = muT * min(Lno3,Lfrp)
 
    !Light saturation parameter [W m-2 d-1]:
+   !ML to go into eq. 4 in PIBM ms
+   !from here to 'PC = PCmax * SI' corresponds to eq. 4 in PIBM ms
+   !which is drawn from eq. 4 in Geider et al. 1998
    Ik = PCmax / alphachl_ / theta
 
    !Calculate the fraction of open PSU [nd]:
    if (PAR > 0.) then !Photoinhibition
+   !ML corresponds to eq. 6 in PIBM ms
+   !which is drawn from Han 2002 and Nikolaou et al. 2016 eq. 9
       A = Ainf(PAR, alphachl_, QN, QNmin, QNmax, QP, QPmin, QPmax, theta)
    else
       A = 1d0
@@ -658,29 +674,36 @@ Endif
 if (PAR <= 0d0) then
    rhochl   = rhoChl_L
 else
+   !ML corresponds to eq. 9 in PIBM ms
    rhochl   = thetaNmax * PC / alphachl_ / theta / PAR ! ML leaving this as regulated by Chl:N ratio for now
    rhoChl_L = rhochl
 endif
 
 !DIN uptake rate by phytoplankton [mol N mol C-1 d-1]:
+!ML corresponds to eq. 8 in PIBM ms
 VCN = Vcref * (NO3 - NO3_min)/ (NO3 + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
 VCN = max(VCN, 0d0)
 
 !FRP uptake rate by phytoplankton [mol P mol C-1 d-1]:
+!ML newly added for GLM-AED-ABM
 VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp already temperature dependent
 VCP = max(VCP, 0d0)
 
 !Changes of cellular carbon [d-1]:
-dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) !ML biosynthesis cost probably too high here now that P is added; check params
+!ML corresponds to eq. 1 in PIBM ms
+dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) 
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell
+!ML corresponds to eq. 2 in PIBM ms
 dN = N * (VCN/QN - RNT)
 
 !Changes of cellular phosphorus [pmol P cell-1 d-1]:
+!ML newly added for GLM-AED-ABM
 dP = P * (VCP/QP - RPT)
 
 !Changes of cellular Chl [d-1]:
+!ML corresponds to eq. 3 in PIBM ms
 dChl = Chl * (rhochl*VCN / theta - RChlT)
 
 return
