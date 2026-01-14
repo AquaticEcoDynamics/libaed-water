@@ -255,6 +255,25 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('KN_b')          ; pd(dcol)%KN_b          = extract_double(values(ccol))
             CASE ('KPho_a')        ; pd(dcol)%KPho_a        = extract_double(values(ccol))
             CASE ('KPho_b')        ; pd(dcol)%KPho_b        = extract_double(values(ccol))
+            CASE ('a_c2vol')       ; pd(dcol)%a_c2vol       = extract_double(values(ccol))
+            CASE ('b_c2vol')       ; pd(dcol)%b_c2vol       = extract_double(values(ccol))
+            CASE ('a_pmax')        ; pd(dcol)%a_pmax        = extract_double(values(ccol))
+            CASE ('rho')           ; pd(dcol)%rho           = extract_double(values(ccol))
+            CASE ('rho_star')      ; pd(dcol)%rho_star      = extract_double(values(ccol))
+            CASE ('b_rho')         ; pd(dcol)%b_rho         = extract_double(values(ccol))
+            CASE ('V_s')           ; pd(dcol)%V_s           = extract_double(values(ccol))
+            CASE ('Ea0')           ; pd(dcol)%Ea0           = extract_double(values(ccol))
+            CASE ('Ed0')           ; pd(dcol)%Ed0           = extract_double(values(ccol))
+            CASE ('Ei')            ; pd(dcol)%Ei            = extract_double(values(ccol))
+            CASE ('beta')          ; pd(dcol)%beta          = extract_double(values(ccol))
+            CASE ('phi')           ; pd(dcol)%phi           = extract_double(values(ccol))
+            CASE ('Tau')           ; pd(dcol)%Tau           = extract_double(values(ccol))
+            CASE ('Beta_Ainf')     ; pd(dcol)%Beta_Ainf     = extract_double(values(ccol))
+            CASE ('Kappa')         ; pd(dcol)%Kappa         = extract_double(values(ccol))
+            CASE ('Kd_Ainf')       ; pd(dcol)%Kd_Ainf       = extract_double(values(ccol))
+            CASE ('a_')            ; pd(dcol)%a_            = extract_double(values(ccol))
+            CASE ('b_')            ; pd(dcol)%b_            = extract_double(values(ccol))
+            CASE ('v_')            ; pd(dcol)%v_            = extract_double(values(ccol))
 
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
@@ -410,6 +429,25 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%KN_b          = pd(list(i))%KN_b
        data%phytos(i)%KPho_a        = pd(list(i))%KPho_a
        data%phytos(i)%KPho_b        = pd(list(i))%KPho_b
+       data%phytos(i)%a_c2vol       = pd(list(i))%a_c2vol
+       data%phytos(i)%b_c2vol       = pd(list(i))%b_c2vol
+       data%phytos(i)%a_pmax        = pd(list(i))%a_pmax
+       data%phytos(i)%rho           = pd(list(i))%rho
+       data%phytos(i)%rho_star      = pd(list(i))%rho_star
+       data%phytos(i)%b_rho         = pd(list(i))%b_rho
+       data%phytos(i)%V_s           = pd(list(i))%V_s
+       data%phytos(i)%Ea0           = pd(list(i))%Ea0
+       data%phytos(i)%Ed0           = pd(list(i))%Ed0
+       data%phytos(i)%Ei            = pd(list(i))%Ei
+       data%phytos(i)%beta          = pd(list(i))%beta
+       data%phytos(i)%phi           = pd(list(i))%phi
+       data%phytos(i)%Tau           = pd(list(i))%Tau
+       data%phytos(i)%Beta_Ainf     = pd(list(i))%Beta_Ainf
+       data%phytos(i)%Kappa         = pd(list(i))%Kappa
+       data%phytos(i)%Kd_Ainf       = pd(list(i))%Kd_Ainf
+       data%phytos(i)%a_            = pd(list(i))%a_
+       data%phytos(i)%b_            = pd(list(i))%b_
+       data%phytos(i)%v_            = pd(list(i))%v_
 
     ENDDO
     DEALLOCATE(pd)
@@ -1028,7 +1066,27 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                                       data%phytos(1)%KN_a,                      & ! KN_a     (user-specified parameter)
                                       data%phytos(1)%KN_b,                      & ! KN_b     (user-specified parameter)
                                       data%phytos(1)%KPho_a,                    & ! KPho_a   (user-specified parameter)
-                                      data%phytos(1)%KPho_b)                      ! KPho_b   (user-specified parameter)
+                                      data%phytos(1)%KPho_b,                    & ! KPho_b   (user-specified parameter)
+                                      data%phytos(1)%a_c2vol,                   & ! a_c2vol  (user-specified parameter)
+                                      data%phytos(1)%b_c2vol,                   & ! b_c2vol  (user-specified parameter)
+                                      data%phytos(1)%a_pmax,                    & ! a_pmax   (user-specified parameter)
+                                      data%phytos(1)%rho,                       & ! rho      (user-specified parameter)
+                                      data%phytos(1)%rho_star,                  & ! rho_star (user-specified parameter)
+                                      data%phytos(1)%b_rho,                     & ! b_rho    (user-specified parameter)
+                                      data%phytos(1)%V_s,                       & ! V_s      (user-specified parameter)
+                                      data%phytos(1)%Ea0,                       & ! Ea0      (user-specified parameter)
+                                      data%phytos(1)%Ed0,                       & ! Ed0      (user-specified parameter)
+                                      data%phytos(1)%Ei,                        & ! Ei       (user-specified parameter)
+                                      data%phytos(1)%beta,                      & ! beta     (user-specified parameter)
+                                      data%phytos(1)%phi,                       & ! phi      (user-specified parameter)
+                                      data%phytos(1)%T_std,                     & ! T_std    (user-specified parameter)
+                                      data%phytos(1)%Tau,                       & ! Tau      (user-specified parameter)
+                                      data%phytos(1)%Beta_Ainf,                 & ! Beta_Ainf(user-specified parameter)
+                                      data%phytos(1)%Kappa,                     & ! Kappa    (user-specified parameter)
+                                      data%phytos(1)%Kd_Ainf,                   & ! Kd_Ainf  (user-specified parameter)
+                                      data%phytos(1)%a_,                        & ! a_       (user-specified parameter)
+                                      data%phytos(1)%b_,                        & ! b_       (user-specified parameter)
+                                      data%phytos(1)%v_)                          ! v_    (user-specified parameter)
 
          ! cumulate N and P uptake and oxy flux after running physiology function
          uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1

@@ -66,12 +66,11 @@ public :: Pmax_size, respiration
 CONTAINS
 
 !Function converting phytoplankton carbon to volume (unit: micron^3) with the parameters obtained from Maranon et al. (2013)
-pure real function PHY_C2Vol(p_C) result(y)
+pure real function PHY_C2Vol(p_C, a_c2vol, b_c2vol) result(y)
 implicit none
 real, intent(in)  :: p_C !Phytoplankton carbon (pmol C/cell)
-
-real, parameter :: a = -0.69
-real, parameter :: b = 0.88
+real, intent(in)  :: a_c2vol != -0.69
+real, intent(in)  :: b_c2vol != 0.88
 
 !the parameters of a and b are derived from pg C cell-1 to volume; so we need to
 !convert the carbon unit from pmol C cell-1 to pg C cell-1
@@ -79,38 +78,41 @@ real, parameter :: b = 0.88
 !although still not totally sure for this equation why this is formulated this way;
 !I would think it should be ((12d0 * p_C)**b)*(10.d0**a);
 !possibly it's different because Maranon et al. used RMA regression?
-y = (12d0 * p_C/10.d0**a)**(1d0/b)
+y = (12d0 * p_C/10.d0**a_c2vol)**(1d0/b_c2vol)
 return
 end function PHY_C2Vol
 
-pure real function Pmax_size(ESD, Pmax0) result(y)
+pure real function Pmax_size(ESD, Pmax0, a_pmax, rho, rho_star) result(y)
 implicit none
 real, intent(in) :: ESD
-
-!Pmax0: Maximal photosynthesis rate (d-1)
-real, intent(in) :: Pmax0
+real, intent(in) :: Pmax0 !Pmax0: Maximal photosynthesis rate (d-1)
+real, intent(in) :: a_pmax
+real, intent(in) :: rho
+real, intent(in) :: rho_star
 
 !Constant in Eqn. 14 of Wirtz (2011) (a' = (rho*/rho)^.333*a) in which a = 0.34, rho* = 0.25, and rho = 0.5
-real, parameter :: a_p = 0.27
+real             :: a_p 
 
 !End of declaration
+
+a_p = ((rho_star/rho)**0.333)*a_pmax !0.27
 !ML this corresonds to eq. 13 in PIBM ms
 y = Pmax0/(1.d0 + a_p *ESD)
 
 return
 End function Pmax_size
 
-pure real function respiration(ESD, r_s) result(y)
+pure real function respiration(ESD, r_s, b_rho, V_s) result(y)
 implicit none
 real, intent(in):: ESD
 real, intent(in):: r_s !respiration rate (d-1) at V_s
 
 !ML this value of b_rho is the value for green algae from Wirtz 2011
-real, parameter :: b_rho = 0.d0 !Size scaling of C density
+real, intent(in) :: b_rho != 0.d0 Size scaling of C density
 
 !Cell volume when rho_dia = rho_green
 !ML this value pulled from Wirtz 2011
-real, parameter :: V_s = 8.d0 !micron^3
+real, intent(in) :: V_s != 8.d0 !micron^3
 
 real :: V, ESD_s
 
@@ -123,49 +125,50 @@ y = r_s*ESD_s/ESD * (V/V_s)**b_rho
 return
 end function
 
-REAL function temp_Topt(tC, mumax0, Topt_) result(y)
+REAL function temp_Topt(tC, mumax0, Topt_, Ea0, Ed0, Ei, beta, phi, T_std) result(y)
 !Function of a rate depending on Temperature and optimal temperature (Topt_) modified from Chen Ecol. Mod. (2022)
 IMPLICIT NONE
 real, intent(in) :: mumax0    !Maximal rate normalized to an optimal temperature of 15 ºC
 real, intent(in) :: tC        !Environmental temperature in ºC
 real, intent(in) :: Topt_     !Optimal temperature in ºC
 
-real, parameter   :: Ea0   = 0.98 ! ML Chen 2022 Table 1
-real, parameter   :: Ed0   = 2.3  ! ML Chen 2022 is cited for this but Chen 2022 uses Eh and Eh0, not Ed and Ed0
-real, parameter   :: Ei    = 0.22 ! ML Chen 2022 Table 1
-real, parameter   :: beta  =-0.2  !Exponent for Ea0 ML Chen 2022 Table 1
-real, parameter   :: phi   = 0.27  !Exponent for Ed ML again, Chen 2022 uses Eh so not sure where this value comes from
+real, intent(in)  :: Ea0   != 0.98  ML Chen 2022 Table 1
+real, intent(in)  :: Ed0   != 2.3   ML Chen 2022 is cited for this but Chen 2022 uses Eh and Eh0, not Ed and Ed0
+real, intent(in)  :: Ei    != 0.22  ML Chen 2022 Table 1
+real, intent(in)  :: beta  !=-0.2   Exponent for Ea0 ML Chen 2022 Table 1
+real, intent(in)  :: phi   != 0.27  Exponent for Ed ML again, Chen 2022 uses Eh so not sure where this value comes from
+real, intent(in)  :: T_std !needed for TK function which is called by JOHNSON function which is called here
 
 real :: Ed, Ea, mumax
 
-mumax = alloscale(Topt_, mumax0,  Ei)
-Ea    = alloscale(Topt_, Ea0,  beta)
-Ed    = alloscale(Topt_, Ed0,  phi)
-y     = JOHNSON(tC, mumax, Ea, Ed, Topt_)
+mumax = alloscale(Topt_, mumax0,  Ei, T_std)
+Ea    = alloscale(Topt_, Ea0,  beta, T_std)
+Ed    = alloscale(Topt_, Ed0,  phi, T_std)
+y     = JOHNSON(tC, mumax, Ea, Ed, Topt_, T_std)
 return
 END function temp_Topt
 
-REAL FUNCTION JOHNSON(tC, mumax, Ea, Ed, Topt_) RESULT(y)
+REAL FUNCTION JOHNSON(tC, mumax, Ea, Ed, Topt_, T_std) RESULT(y)
 !Temperature function following Dell et al. PNAS (2011) and Chen & Laws L&O (2017)
 IMPLICIT NONE
 !Both tC and Topt_ are in ºC
-real,   intent(in)     :: tC, mumax, Ea, Ed, Topt_
-real,   parameter   :: kb   = 8.62D-5 ! ML Boltzman's constant
-real,   parameter   :: T0   = 273.15D0 ! ML conversion factor to Kelvin
-real,   parameter   :: Tref = 15D0 ! ML reference temperature; in theory maybe this could be changed
+real,   intent(in)   :: tC, mumax, Ea, Ed, Topt_, T_std
+!real,   parameter    :: kb   = 8.62D-5 ! ML Boltzman's constant
+!real,   parameter   :: T0   = 273.15D0 ! ML conversion factor to Kelvin
+!real,   parameter   :: Tref = 15D0 ! ML reference temperature; in theory maybe this could be changed
 real                         :: Eh, x, theta, b
 
 if (Ed .le. 0d0) stop "Ed must be greater than zero!"
 Eh = Ed+Ea
-x    = TK(TC)
-theta = TK(Topt_)
+x    = TK(TC, T_std)
+theta = TK(Topt_, T_std)
 b = x - theta
 y = mumax*(Ea/Ed + 1.d0) * exp(Ea*b)/(1.D0+Ea/ED*exp(Eh*b)) !ML this doesn't match PIBM manuscript;
                                                             !manuscript has the first Ea as Eh (Ea + Ed) and not sure why 1 is added?
 return
 END FUNCTION JOHNSON
 
-PURE REAL FUNCTION TK(TC)
+PURE REAL FUNCTION TK(TC, T_std)
 IMPLICIT NONE
 !DESCRIPTION:
 !The temperature dependence of plankton rates are fomulated according to the Arrhenuis equation.
@@ -174,20 +177,22 @@ IMPLICIT NONE
 !
 !INPUT PARAMETERS:
 REAL, INTENT (IN) :: TC
+REAL, INTENT (IN) :: T_std
 ! boltzman constant constant [ eV /K ]
 REAL, PARAMETER   :: kb = 8.62d-5 !ML Boltzman's constant
-REAL, PARAMETER   :: Tr = 15.0 ! ML reference temperature; in theory maybe this could be changed
+!REAL, PARAMETER   :: Tr = 15.0 ! ML reference temperature; in theory maybe this could be changed
 
-TK = -(1./kb)*(1./(273.15 + tC) - 1./(273.15 + Tr))
+TK = -(1./kb)*(1./(273.15 + tC) - 1./(273.15 + T_std))
 return
 END FUNCTION TK
 
-PURE REAL FUNCTION alloscale(Topt_, mu0p, alpha)
+PURE REAL FUNCTION alloscale(Topt_, mu0p, alpha, T_std)
 IMPLICIT NONE
 real, intent(in) :: Topt_     !Topt in ºC
 real, intent(in) :: mu0p  !Normalized growth rate
 real, intent(in) :: alpha    !Exponent of thermal traits normalized to z
-alloscale =  mu0p * exp(TK(Topt_) * alpha)
+real, intent(in) :: T_std
+alloscale =  mu0p * exp(TK(Topt_, T_std) * alpha)
 END FUNCTION alloscale
 
 !------------------------------------------------------------------------------------------------
@@ -195,7 +200,7 @@ END FUNCTION alloscale
 !Han (2001) (J. Theor. Biol.)
 !Assuming that acclimation to photoinhibition is at the time-scale of ms.
 !------------------------------------------------------------------------------------------------
-PURE REAL FUNCTION Ainf(PAR_, alpha_, QN_, QNmin_, QNmax_, QP_, QPmin_, QPmax_, theta_)
+PURE REAL FUNCTION Ainf(PAR_, alpha_, QN_, QNmin_, QNmax_, QP_, QPmin_, QPmax_, theta_, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
 
 implicit none
 
@@ -211,15 +216,15 @@ real, intent(in) :: QPmax_         !Maximal P:C ratio
 
 real, intent(in) :: theta_         !Chl:C ratio [mg Chl mmol C]
 
-real, parameter  :: Tau   = 5.5d-3 !Turnover time of the electron transport chain [s]
-real, parameter  :: Beta  = 0.492  !Pre-exponential factor of effective cross-section eq [m2 uE-1 (g Chl)^(1/Kappa) (g C)^(-1/Kappa)]
-real, parameter  :: Kappa = 0.469  !Exponent of effective cross-section equation [nd]
-real, parameter  :: Kd    = 5d-6   !Damage constant of a photosynthetic unit [nd]
+real, intent(in)  :: Tau   != 5.5d-3 Turnover time of the electron transport chain [s]
+real, intent(in)  :: Beta_Ainf  != 0.492  Pre-exponential factor of effective cross-section eq [m2 uE-1 (g Chl)^(1/Kappa) (g C)^(-1/Kappa)]
+real, intent(in)  :: Kappa != 0.469  Exponent of effective cross-section equation [nd]
+real, intent(in)  :: Kd_Ainf    != 5d-6   Damage constant of a photosynthetic unit [nd]
 
 real, parameter  :: WtouE = 4.57   !Constant to convert PAR units from [Wm-2] to [uE m-2 s-1]
-real, parameter  :: a_ = 2d-5      !The constant a in the equation relating Kr and alphaChl ML Moore et al. 1998
-real, parameter  :: b_ = 5d-7      !The constant b in the equation relating Kr and alphaChl ML Moore et al. 1998
-real, parameter  :: v_ = -6.64     !The constant v in the equation relating Kr and alphaChl ML Moore et al. 1998
+real, intent(in)  :: a_ != 2d-5      The constant a in the equation relating Kr and alphaChl ML Moore et al. 1998
+real, intent(in)  :: b_ != 5d-7      The constant b in the equation relating Kr and alphaChl ML Moore et al. 1998
+real, intent(in)  :: v_ != -6.64     The constant v in the equation relating Kr and alphaChl ML Moore et al. 1998
 real             :: Kr0            !Repair constant of a photosynthetic unit [s-1] under nutrient saturated conditions which depends on alpha to impose a tradeoff
 real             :: Kr             !Nutrient dependent Repair constant of a photosynthetic unit [s-1]
 real             :: K              !Ratio of damage to repair constants [s]
@@ -242,7 +247,7 @@ alpha_new = alpha_ /WtouE/864d2
 thetaA = theta_ / 12d0     ![mg Chl mmol C] to [g Chl g C-1]
 
 !Effective cross-section of the PSU [m2 uE-1] Nikolaou et al. (2016)
-Sigma = Beta * thetaA**Kappa
+Sigma = Beta_Ainf * thetaA**Kappa
 
 !Repair constant of a photosynthetic unit [s-1], following Han et al. (2001):
 
@@ -259,7 +264,7 @@ if (Kr < 1d-10) then
   Ainf = 0.d0
 else
   !Ratio of damage to repair constants [s]:
-  K  = Kd / Kr
+  K  = Kd_Ainf / Kr
 
   !Calculate photoinhibition [nd]:
   Ainf = 1d0 / (1d0 + Tau * Sigma * PARWm2 + K * Tau * Sigma**2 * PARWm2**2)
@@ -287,7 +292,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -301,7 +306,7 @@ real,    parameter :: NO3_min = 0.01  !Minimal NO3 concentration ML in the envir
 real,    parameter :: FRP_min = 0.01/16.*1.  !Minimal FRP concentration ML in the environment (mmol/m3)
 
 !Declaration on variables:
-real, intent(in)  :: Temp             !Associated temperarure [degree C]
+real, intent(in)  :: Temp             !Associated temperature [degree C]
 real, intent(in)  :: PAR              !Associated PAR [W m-2]
 real, intent(in)  :: NO3              !Associated NO3 concentration [mmol N m-3]
 real, intent(in)  :: FRP              !Associated FRP concentration [mmol P m-3]
@@ -343,6 +348,38 @@ real, intent(in)   :: KN_b   != 0.33d0      Allometric exponent for KN ML pull t
 !KPho is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
 real, intent(in)   :: KPho_a   != 0.14d0      Normalization constant for KPho ML pull to nml
 real, intent(in)   :: KPho_b   != 0.33d0      Allometric exponent for KPho ML pull to nml
+
+!Additional parameters for functions that are called within this subroutine (PHY_C2Vol, Pmax_size, respiration, temp_Topt, JOHNSON, TK, Ainf)
+
+!Parameters for PHY_C2Vol function:
+real, intent(in)   :: a_c2vol   
+real, intent(in)   :: b_c2vol 
+
+!Parameters for Pmax_size function:
+real, intent(in)   :: a_pmax   
+real, intent(in)   :: rho 
+real, intent(in)   :: rho_star
+
+!Parameters for respiration function:
+real, intent(in)   :: b_rho   
+real, intent(in)   :: V_s 
+
+!Parameters for temp_Topt function: 
+real, intent(in)   :: Ea0   
+real, intent(in)   :: Ed0 
+real, intent(in)   :: Ei
+real, intent(in)   :: beta 
+real, intent(in)   :: phi
+real, intent(in)   :: T_std
+
+!Parameters for Ainf function: 
+real, intent(in)   :: Tau   
+real, intent(in)   :: Beta_Ainf 
+real, intent(in)   :: Kappa
+real, intent(in)   :: Kd_Ainf 
+real, intent(in)   :: a_
+real, intent(in)   :: b_
+real, intent(in)   :: v_
 
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
 real, intent(out) :: dP               !Changes in the cellular phosphorus content [pmol P cell-1 d-1]
@@ -407,7 +444,7 @@ QP = P/C
 theta = Chl/C
 
 !Convert phytoplankton CDiv to Volume:
-Vol = PHY_C2Vol(CDiv)
+Vol = PHY_C2Vol(CDiv, a_c2vol, b_c2vol)
 
 !Convert Volume to ESD:
 ESD_ = (6.d0*Vol/pi)**0.3333333
@@ -452,12 +489,12 @@ muT = mu0 * exp(a1 * (alphaChl_ - .1)) !0.1 is the average alphaChl value
 !Temperature dependent maximal growth rate at 1 ug C cell-1
 !ML from Chen 2022; this function calls JOHNSON, TK, and alloscale functions;
 !corresponds to eq.10 in PIBM manuscript
-muT = temp_Topt(Temp, muT, Topt_)
+muT = temp_Topt(Temp, muT, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
 
 !Apply the size-scaling relationship following Wirtz (2011)
 !ML eq. 13 in PIBM manuscript; eq. 14 in Wirtz; coefficients drawn from Wirtz
 !effectively this ONLY decreases muT, because muT is divided by 1 + scalar
-muT = Pmax_size(ESD_, muT)
+muT = Pmax_size(ESD_, muT, a_pmax, rho, rho_star)
 
 !Assuming the same temperature dependence of nutrient uptake rate as on photosynthesis rate.
 !QNmax/QNmin may be also a function of temperature which needs being further investigated.
@@ -466,20 +503,20 @@ Vcrefp = muT * QPmax
 
 !Assume the same temperature dependence of respiration as on photosynthetic rate (long-term adaptation; Barton et al. 2020):
 !ML these two lines correspond to third term on right-hand side (RHS) of eq. 1 in PIBM paper
-RcT   = temp_Topt(Temp, RC,   Topt_)
-RcT   = respiration(ESD_, RcT)
+RcT   = temp_Topt(Temp, RC,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+RcT   = respiration(ESD_, RcT, b_rho, V_s)
 
 !ML these two lines correspond to second term on RHS of eq. 2 in PIBM paper
-RNT   = temp_Topt(Temp, RN,   Topt_)
-RNT   = respiration(ESD_, RNT)
+RNT   = temp_Topt(Temp, RN,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+RNT   = respiration(ESD_, RNT, b_rho, V_s)
 
 !ML these two lines newly added to GLM-AED-ABM to have P mirror N
-RPT   = temp_Topt(Temp, RP,   Topt_)
-RPT   = respiration(ESD_, RPT)
+RPT   = temp_Topt(Temp, RP,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+RPT   = respiration(ESD_, RPT, b_rho, V_s)
 
 !ML these two lines correspond to second term on RHS of eq. 3 in PIBM paper
-RChlT = temp_Topt(Temp, RChl, Topt_)
-RChlT = respiration(ESD_, RChlT)
+RChlT = temp_Topt(Temp, RChl, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+RChlT = respiration(ESD_, RChlT, b_rho, V_s)
 
 !Nutrient limitation [nd]:
 Lno3 = (QN - QNmin) / dQN
@@ -503,7 +540,7 @@ else
    if (PAR > 0.) then !Photoinhibition
    !ML corresponds to eq. 6 in PIBM ms
    !which is drawn from Han 2002 and Nikolaou et al. 2016 eq. 9
-      A = Ainf(PAR, alphachl_, QN, QNmin, QNmax, QP, QPmin, QPmax, theta)
+      A = Ainf(PAR, alphachl_, QN, QNmin, QNmax, QP, QPmin, QPmax, theta, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
    else
       A = 1d0
    endif
