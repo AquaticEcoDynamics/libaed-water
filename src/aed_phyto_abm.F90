@@ -744,7 +744,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 !DECLARATIONS FROM PIBM Par2PHY SUBROUTINE
    use params,          only : NTrait, nu, sigma
    use mGf90,           only : srand_mtGaus
-   USE Trait_functions, only : TEMPBOL, PHY_C2Vol, palatability
+   USE Trait_functions, only : PHY_C2Vol
 
    IMPLICIT NONE
 
@@ -991,11 +991,44 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          ! call the PIBM function that is the primary engine for phytoplankton physiology
          ! this is located in aed_pibm_utils.F90
-         call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem), p(i)%ptm_state(data%ip_par), p(i)%ptm_state(data%ip_no3), p(i)%ptm_state(data%ip_frp), p(i)%ptm_state(data%ip_Topt),&
-               p(i)%ptm_state(data%ip_c), p(i)%ptm_state(data%ip_n), p(i)%ptm_state(data%ip_p), p(i)%ptm_state(data%ip_chl), p(i)%ptm_state(data%ip_cdiv), exp(p(i)%ptm_state(data%ip_LnalphaChl)),&
-               dC_, dN_, dP_, dChl_, ESD_, data%phytos(1)%RC, data%phytos(1)%RN, data%phytos(1)%RP, data%phytos(1)%RChl, data%phytos(1)%zeta_N, data%phytos(1)%zeta_P, data%phytos(1)%a1,&
-               data%phytos(1)%R_growth, data%phytos(1)%nx, data%phytos(1)%thetaNmax, data%phytos(1)%QNmin_a, data%phytos(1)%QNmin_b, data%phytos(1)%QNmax_a, data%phytos(1)%QNmax_b, &
-               data%phytos(1)%QPmin_a, data%phytos(1)%QPmin_b, data%phytos(1)%QPmax_a, data%phytos(1)%QPmax_b, data%phytos(1)%KN_a, data%phytos(1)%KN_b, data%phytos(1)%KPho_a, data%phytos(1)%KPho_b)
+         call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem),              & ! Temp     (environmental temperature)
+                                      p(i)%ptm_state(data%ip_par),              & ! PAR      (environmental PAR)
+                                      p(i)%ptm_state(data%ip_no3),              & ! NO3      (environmental NO3)
+                                      p(i)%ptm_state(data%ip_frp),              & ! FRP      (environmental FRP)
+                                      p(i)%ptm_state(data%ip_c),                & ! C        (C in particle)
+                                      p(i)%ptm_state(data%ip_n),                & ! N        (N in particle)
+                                      p(i)%ptm_state(data%ip_p),                & ! P        (P in particle)
+                                      p(i)%ptm_state(data%ip_chl),              & ! Chl      (Chl in particle)
+                                      p(i)%ptm_state(data%ip_Topt),             & ! Topt     (parameter + mutating trait; optimum temperature)
+                                      p(i)%ptm_state(data%ip_cdiv),             & ! Cdiv     (parameter + mutating trait; carbon threshold for cell division)
+                                      exp(p(i)%ptm_state(data%ip_LnalphaChl)),  & ! alphaChl (parameter + mutating trait; slope of the PI curve)
+                                      dC_,                                      & ! dC       (change in C; returned by function)
+                                      dN_,                                      & ! dN       (change in N; returned by function)
+                                      dP_,                                      & ! dP       (change in P; returned by function)
+                                      dChl_,                                    & ! dChl     (change in Chl; returned by function)
+                                      ESD_,                                     & ! ESD      (ESD of cells in particle; returned by function)
+                                      data%phytos(1)%RC,                        & ! RC       (user-specified parameter)
+                                      data%phytos(1)%RN,                        & ! RN       (user-specified parameter)
+                                      data%phytos(1)%RP,                        & ! RP       (user-specified parameter)
+                                      data%phytos(1)%RChl,                      & ! RChl     (user-specified parameter)
+                                      data%phytos(1)%zeta_N,                    & ! zeta_N   (user-specified parameter)
+                                      data%phytos(1)%zeta_P,                    & ! zeta_P   (user-specified parameter)
+                                      data%phytos(1)%a1,                        & ! a1       (user-specified parameter)         
+                                      data%phytos(1)%R_growth,                  & ! mu0      (user-specified parameter)
+                                      data%phytos(1)%nx,                        & ! nx       (user-specified parameter)
+                                      data%phytos(1)%thetaNmax,                 & ! thetaNmax(user-specified parameter)
+                                      data%phytos(1)%QNmin_a,                   & ! QNmin_a  (user-specified parameter)
+                                      data%phytos(1)%QNmin_b,                   & ! QNmin_b  (user-specified parameter)
+                                      data%phytos(1)%QNmax_a,                   & ! QNmax_a  (user-specified parameter)
+                                      data%phytos(1)%QNmax_b,                   & ! QNmax_b  (user-specified parameter)
+                                      data%phytos(1)%QPmin_a,                   & ! QPmin_a  (user-specified parameter)
+                                      data%phytos(1)%QPmin_b,                   & ! QPmin_b  (user-specified parameter)
+                                      data%phytos(1)%QPmax_a,                   & ! QPmax_a  (user-specified parameter)
+                                      data%phytos(1)%QPmax_b,                   & ! QPmax_b  (user-specified parameter)
+                                      data%phytos(1)%KN_a,                      & ! KN_a     (user-specified parameter)
+                                      data%phytos(1)%KN_b,                      & ! KN_b     (user-specified parameter)
+                                      data%phytos(1)%KPho_a,                    & ! KPho_a   (user-specified parameter)
+                                      data%phytos(1)%KPho_b)                      ! KPho_b   (user-specified parameter)
 
          ! cumulate N and P uptake and oxy flux after running physiology function
          uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
