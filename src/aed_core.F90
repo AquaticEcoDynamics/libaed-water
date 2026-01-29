@@ -9,7 +9,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013-2025 - The University of Western Australia                  #
+!#  Copyright 2013-2026 : The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -126,6 +126,7 @@ MODULE aed_core
       LOGICAL           :: zavg, zavg_req
       INTEGER           :: particle_link
       INTEGER           :: index
+      LOGICAL           :: rezero
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -317,34 +318,41 @@ END SUBROUTINE display_var
 
 
 !###############################################################################
-INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, n_p)
+INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, n_p, quiet)
 !-------------------------------------------------------------------------------
 ! Status of the aed model library core routines
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    INTEGER,INTENT(out) :: n_v, n_sv, n_d, n_sd
    INTEGER,INTENT(out),OPTIONAL :: n_p
+   LOGICAL,INTENT(in),OPTIONAL :: quiet
 !
 !LOCALS
    INTEGER :: i
+   LOGICAL :: chatty = .TRUE.
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   write(log, *)
-   write(log, *) ' ---------------------- AED Variables Summary ----------------------'
-   write(log, *) 'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
-   write(log, *)
-   write(log, *) 'ENVIRONMENT:'
-   DO i=1,n_aed_vars
-      IF ( all_vars(i)%var_type == V_EXTERNAL ) CALL display_var(all_vars(i), i)
-   ENDDO
+   IF ( PRESENT(quiet) ) chatty = .NOT. quiet
 
-   write(log, *)
-   write(log, *) 'STATE:'
+   IF ( chatty ) THEN
+      write(log, *)
+      write(log, *) ' ---------------------- AED Variables Summary ----------------------'
+      write(log, *) 'Var name           | Module           | Type | ID | Usage (ie who linked to me)'
+      write(log, *)
+      write(log, *) 'ENVIRONMENT:'
+      DO i=1,n_aed_vars
+         IF ( all_vars(i)%var_type == V_EXTERNAL ) CALL display_var(all_vars(i), i)
+      ENDDO
+
+      write(log, *)
+      write(log, *) 'STATE:'
+   ENDIF
+
    n_vars = 0 ; n_sheet_vars = 0
    DO i=1,n_aed_vars
       IF ( all_vars(i)%var_type == V_STATE ) THEN
-         CALL display_var(all_vars(i), i)
+         IF ( chatty ) CALL display_var(all_vars(i), i)
          IF ( all_vars(i)%sheet ) THEN
             n_sheet_vars = n_sheet_vars + 1
             all_vars(i)%index = n_sheet_vars
@@ -354,14 +362,18 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, n_p)
          ENDIF
       ENDIF
    ENDDO
-   IF (n_sheet_vars + n_vars <= 0 ) write(log, *) "  No state variables"
 
-   write(log, *)
-   write(log, *) 'DIAGNOSTIC:'
+   IF ( chatty ) THEN
+      IF (n_sheet_vars + n_vars <= 0 ) write(log, *) "  No state variables"
+
+      write(log, *)
+      write(log, *) 'DIAGNOSTIC:'
+   ENDIF
+
    n_diags = 0 ; n_sheet_diags = 0;
    DO i=1,n_aed_vars
       IF ( all_vars(i)%var_type == V_DIAGNOSTIC ) THEN
-         CALL display_var(all_vars(i), i)
+         IF ( chatty ) CALL display_var(all_vars(i), i)
          IF ( all_vars(i)%sheet ) THEN
             n_sheet_diags = n_sheet_diags + 1
             all_vars(i)%index = n_sheet_diags
@@ -371,23 +383,30 @@ INTEGER FUNCTION aed_core_status(n_v, n_sv, n_d, n_sd, n_p)
          ENDIF
       ENDIF
    ENDDO
-   IF (n_sheet_diags + n_diags <= 0 ) write(log, *) "  No diagnostic variables"
 
-   write(log, *)
-   write(log, *) 'PARTICLES:'
+   IF ( chatty ) THEN
+      IF (n_sheet_diags + n_diags <= 0 ) write(log, *) "  No diagnostic variables"
+
+      write(log, *)
+      write(log, *) 'PARTICLES:'
+   ENDIF
+
    n_ptm_vars = 0
    DO i=1,n_aed_vars
       IF ( all_vars(i)%var_type == V_PARTICLE ) THEN
-         CALL display_var(all_vars(i), i)
+         IF ( chatty ) CALL display_var(all_vars(i), i)
          n_ptm_vars = n_ptm_vars + 1
          all_vars(i)%index = n_ptm_vars
       ENDIF
    ENDDO
-   IF (n_ptm_vars <= 0 ) write(log, *) "  No particle variables"
 
-   write(log, *)
-   write(log, *) ' -------------------------------------------------------------------'
-   write(log, *)
+   IF ( chatty ) THEN
+      IF (n_ptm_vars <= 0 ) write(log, *) "  No particle variables"
+
+      write(log, *)
+      write(log, *) ' -------------------------------------------------------------------'
+      write(log, *)
+   ENDIF
 
    n_v = n_vars;  n_sv = n_sheet_vars
    n_d = n_diags; n_sd = n_sheet_diags
@@ -654,11 +673,13 @@ END FUNCTION aed_define_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
+FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: zavg
+   LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep,
+   										 !use this flag to not rezero
 !
 !LOCALS
    INTEGER :: ret
@@ -682,17 +703,26 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg) RESULT(ret)
       all_vars(ret)%zavg_req = .FALSE.
    ENDIF
 
+   IF ( PRESENT(rezero) ) THEN
+      all_vars(ret)%rezero = rezero
+   ELSE
+      all_vars(ret)%rezero = .TRUE.
+   ENDIF
+
+
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESULT(ret)
+FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezero) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: surf
    LOGICAL,INTENT(in),OPTIONAL :: zavg
+   LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep,
+   										 !use this flag to not rezero
 !
 !LOCALS
    INTEGER :: ret
@@ -722,6 +752,12 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg) RESUL
    ELSE
       all_vars(ret)%zavg = .FALSE.
       all_vars(ret)%zavg_req = .FALSE.
+   ENDIF
+
+   IF ( PRESENT(rezero) ) THEN
+      all_vars(ret)%rezero = rezero
+   ELSE
+      all_vars(ret)%rezero = .TRUE.
    ENDIF
 
    ret = n_aed_vars

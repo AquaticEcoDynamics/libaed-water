@@ -8,7 +8,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2013-2025 - The University of Western Australia                  #
+!#  Copyright 2013-2026 : The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -185,7 +185,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: Fsed_ch4_dry     = zero_
    AED_REAL          :: Fsed_ch4_ebb_dry = zero_
 
-   LOGICAL           :: simStemCH4
+   LOGICAL           :: simStemCH4       = .false.
    INTEGER           :: stem_model       = 0
    AED_REAL          :: theta_stm_ch4    = one_
    AED_REAL          :: Fstm_ch4         = zero_
@@ -942,7 +942,7 @@ SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
 
    IF (.NOT. data%simStemCH4 ) RETURN
 
-   IF ( data%use_stm_model_ch4 ) THEN
+   IF ( data%stem_model==2 .and. data%use_stm_model_ch4 ) THEN
       Fstm_ch4 = _DIAG_VAR_S_(data%id_Fstm_ch4) / secs_per_day
    ELSE
       Fstm_ch4 = data%Fstm_ch4
