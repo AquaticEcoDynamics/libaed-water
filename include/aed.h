@@ -9,7 +9,7 @@
  #                                                                             #
  #      http://aquatic.science.uwa.edu.au/                                     #
  #                                                                             #
- #  Copyright 2013-2025 - The University of Western Australia                  #
+ #  Copyright 2013-2026 : The University of Western Australia                  #
  #                                                                             #
  #   AED is free software: you can redistribute it and/or modify               #
  #   it under the terms of the GNU General Public License as published by      #
@@ -28,7 +28,7 @@
 #ifndef _AED_H_
 #define _AED_H_
 
-#define AED_VERSION  "2.3.2"
+#define AED_VERSION  "2.3.7"
 
 /* aed_phytoplankton and aed_zooplankton constants */
 #define MAX_PHYTO_TYPES 256
