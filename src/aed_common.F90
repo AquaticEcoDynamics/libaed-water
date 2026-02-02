@@ -69,7 +69,7 @@ MODULE aed_common
    PUBLIC aed_light_extinction, aed_light_shading
    PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
    PUBLIC aed_bio_drag, aed_inflow_update
-   PUBLIC aed_particle_bgc, aed_initialize_particle
+   PUBLIC aed_particle_bgc, aed_initialize_particle, aed_split_particle
 
    !#---------------------------------------------------------------------------
 
@@ -673,6 +673,25 @@ SUBROUTINE aed_initialize_particle(ppid, p)
       model => model%next
    ENDDO
 END SUBROUTINE aed_initialize_particle
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_split_particle(ppid, p)
+!-------------------------------------------------------------------------------
+   INTEGER,INTENT(inout) :: ppid
+   TYPE (aed_ptm_t),INTENT(inout) :: p(:)
+!
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      PTRACE("aed_split_particle->",trim(model%aed_model_name))
+      CALL model%split_particle(ppid, p)
+      model => model%next
+   ENDDO
+END SUBROUTINE aed_split_particle
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

@@ -92,6 +92,7 @@ MODULE aed_core
          procedure :: light_shading      => aed_light_shading
          procedure :: bio_drag           => aed_bio_drag
          procedure :: initialize_particle=> aed_initialize_particle
+         procedure :: split_particle     => aed_split_particle
          procedure :: particle_bgc       => aed_particle_bgc
          procedure :: mobility           => aed_mobility
 !        procedure :: validate           => aed_validate
@@ -1282,6 +1283,18 @@ SUBROUTINE aed_initialize_particle(data,ppid,p)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_initialize_particle ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_initialize_particle
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_split_particle(data,ppid,p)
+!-------------------------------------------------------------------------------
+   CLASS (aed_model_data_t),INTENT(in) :: data
+   INTEGER,INTENT(inout) :: ppid
+   TYPE (aed_ptm_t), INTENT(inout) :: p(:)
+!-------------------------------------------------------------------------------
+!print*,"Default aed_split_particle ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_split_particle
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

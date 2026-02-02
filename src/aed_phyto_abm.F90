@@ -89,6 +89,7 @@ MODULE aed_phyto_abm
 !        PROCEDURE :: calculate_dry       => aed_calculate_dry_phyto_abm
 !        PROCEDURE :: equilibrate         => aed_equilibrate_phyto_abm
          PROCEDURE :: initialize_particle => aed_particle_initialize_phyto_abm
+         PROCEDURE :: split_particle      => aed_split_particle_phyto_abm
          PROCEDURE :: particle_bgc        => aed_particle_bgc_phyto_abm
 !        PROCEDURE :: mobility            => aed_mobility_phyto_abm
          PROCEDURE :: light_extinction    => aed_light_extinction_phyto_abm
@@ -274,6 +275,8 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('a_')            ; pd(dcol)%a_            = extract_double(values(ccol))
             CASE ('b_')            ; pd(dcol)%b_            = extract_double(values(ccol))
             CASE ('v_')            ; pd(dcol)%v_            = extract_double(values(ccol))
+            CASE ('simSplit')      ; pd(dcol)%simSplit      = extract_integer(values(ccol))
+            CASE ('n_split')       ; pd(dcol)%n_split       = extract_double(values(ccol))
 
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
@@ -448,6 +451,8 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%a_            = pd(list(i))%a_
        data%phytos(i)%b_            = pd(list(i))%b_
        data%phytos(i)%v_            = pd(list(i))%v_
+       data%phytos(i)%simSplit      = pd(list(i))%simSplit
+       data%phytos(i)%n_split       = pd(list(i))%n_split
 
     ENDDO
     DEALLOCATE(pd)
@@ -781,6 +786,92 @@ END SUBROUTINE aed_particle_initialize_phyto_abm
 
 
 !###############################################################################
+SUBROUTINE aed_split_particle_phyto_abm( data,ppid,p )
+
+!ARGUMENTS
+   CLASS (aed_phyto_abm_data_t),INTENT(in) :: data
+   TYPE(aed_ptm_t), DIMENSION(:), INTENT(inout) :: p
+   INTEGER,INTENT(inout) :: ppid
+
+!
+
+!LOCALS
+INTEGER   :: i, j, pid, new_prt
+AED_REAL  :: div
+LOGICAL   :: pass
+
+!
+
+!-------------------------------------------------------------------------------
+!BEGIN
+IF (data%phytos(1)%simSplit > 0) THEN
+   j=1
+   DO i = 1, ppid
+      IF ( p(i)%ptm_istat(STAT) > 0 ) THEN
+         IF(p(i)%ptm_state(data%ip_num) > data%phytos(1)%n_split) THEN !ML eventually this number (4d12) should be a parameter; also this line should be adjusted to search for ip_num somehow rather than hardcoding n_ptm_env + 10
+            pass = .FALSE.
+            DO WHILE(j < ppid .AND. pass .eqv. .FALSE.)
+               IF(p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN
+                  pass = .TRUE.
+                  new_prt = j
+               ENDIF
+               j = j + 1
+               IF (j >= ppid) STOP 'aed_calculate_particles(): ERROR no more particles available for splitting'
+            ENDDO
+            
+            IF(j < ppid) THEN
+   	  	      !first duplicate all attributes except PTID
+               p(new_prt)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
+               p(new_prt)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
+               p(new_prt)%ptm_istat(IDX3) = p(i)%ptm_istat(IDX3)
+               p(new_prt)%ptm_istat(LAYR) = p(i)%ptm_istat(LAYR)
+               p(new_prt)%ptm_istat(FLAG) = p(i)%ptm_istat(FLAG)
+               p(new_prt)%ptm_env(MASS) = p(i)%ptm_env(MASS)
+               p(new_prt)%ptm_env(DIAM) = p(i)%ptm_env(DIAM)
+               p(new_prt)%ptm_env(DENS) = p(i)%ptm_env(DENS)
+               p(new_prt)%ptm_env(VVEL) = p(i)%ptm_env(VVEL)
+               p(new_prt)%ptm_env(HGHT) = p(i)%ptm_env(HGHT)
+               p(new_prt)%ptm_state(data%ip_par) = p(i)%ptm_state(data%ip_par)
+               p(new_prt)%ptm_state(data%ip_tem) = p(i)%ptm_state(data%ip_tem)
+               p(new_prt)%ptm_state(data%ip_no3) = p(i)%ptm_state(data%ip_no3)
+               p(new_prt)%ptm_state(data%ip_nh4) = p(i)%ptm_state(data%ip_nh4)
+               p(new_prt)%ptm_state(data%ip_frp) = p(i)%ptm_state(data%ip_frp)
+               p(new_prt)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c)
+               p(new_prt)%ptm_state(data%ip_n) = p(i)%ptm_state(data%ip_n)
+               p(new_prt)%ptm_state(data%ip_p) = p(i)%ptm_state(data%ip_p)
+               p(new_prt)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl)
+               p(new_prt)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num)
+               p(new_prt)%ptm_state(data%ip_Cdiv) = p(i)%ptm_state(data%ip_Cdiv)
+               p(new_prt)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
+               p(new_prt)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
+
+               !then split the number of cells for both old and new particles
+               p(new_prt)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
+               p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
+
+               !then get a new PTID for new particle
+               IF(p(new_prt)%ptm_istat(PTID) < 0) THEN
+                  p(new_prt)%ptm_istat(PTID) = new_prt;
+               ELSE
+                  div = REAL(p(new_prt)%ptm_istat(PTID) / ppid)
+                  pid = FLOOR(div)
+                  p(new_prt)%ptm_istat(PTID) = ppid + pid*ppid + (new_prt - pid*ppid)
+               ENDIF
+            ELSE
+               STOP 'aed_calculate_particles(): ERROR no more particles available for splitting'
+            ENDIF
+         ENDIF !end need to split query loop
+      ENDIF !end particle status loop
+   ENDDO !end particle loop
+ELSE
+   return
+END IF !end simSplit query loop
+
+END SUBROUTINE aed_split_particle_phyto_abm
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
 SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
 !DECLARATIONS FROM PIBM Par2PHY SUBROUTINE
@@ -1105,7 +1196,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                                       data%phytos(1)%Kd_Ainf,                   & ! Kd_Ainf  (user-specified parameter)
                                       data%phytos(1)%a_,                        & ! a_       (user-specified parameter)
                                       data%phytos(1)%b_,                        & ! b_       (user-specified parameter)
-                                      data%phytos(1)%v_)                          ! v_    (user-specified parameter)
+                                      data%phytos(1)%v_)                          ! v_  (user-specified parameter)
 
          ! cumulate N and P uptake and oxy flux after running physiology function
          uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
