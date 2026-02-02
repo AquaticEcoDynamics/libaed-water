@@ -72,8 +72,8 @@ MODULE aed_phyto_abm
                  id_cov_ta, id_cov_tl, id_cov_al, id_N_birth,  &
                  id_N_mutate, id_IPAR, id_NPPc, id_cells,      &
                  id_N_death
-      INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl
-      INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_pon, id_d_frp, id_d_pop, id_d_poc
+      INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_nh4, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl
+      INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_amm, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
 
@@ -564,6 +564,9 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    !real    :: NO3 = 0.1   associated nutrient                                  _PTM_VAR_
    data%ip_no3 = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_no3', 'mmol N', 'particle layer NO3')
 
+   !real    :: NH4         associated nutrient                                  _PTM_VAR_
+   data%ip_nh4 = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_nh4', 'mmol N', 'particle layer NH4')
+
    !real    :: FRP = 0.1   associated nutrient                                  _PTM_VAR_
    data%ip_frp = aed_define_ptm_variable(TRIM(data%phytos(1)%p_name)//'_frp', 'mmol P', 'particle layer FRP')
 
@@ -649,11 +652,12 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_IPAR = aed_define_diag_variable('IPAR', 'umol/m2/s', 'daily integrated PAR at each depth')
    data%id_NPPc = aed_define_diag_variable('NPPc', '(mg C m-3 d-1)', 'C-based phytoplankton production')
    data%id_cells = aed_define_diag_variable('id_cells', 'number', 'cells/m3')
-   data%id_d_nit = aed_define_diag_variable('id_d_nit', 'mmol N/m3/day', 'daily flux of NO3 from particles in a layer')
-   data%id_d_pon = aed_define_diag_variable('id_d_pon', 'mmol N/m3/day', 'daily flux of PON from particles in a layer')
-   data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP from particles in a layer')
-   data%id_d_pop = aed_define_diag_variable('id_d_pop', 'mmol P/m3/day', 'daily flux of POP from particles in a layer')
-   data%id_d_poc = aed_define_diag_variable('id_d_poc', 'mmol C/m3/day', 'daily flux of POC from particles in a layer')
+   data%id_d_nit = aed_define_diag_variable('id_d_nit', 'mmol N/m3/day', 'daily flux of NO3 due to particles in a layer')
+   data%id_d_amm = aed_define_diag_variable('id_d_amm', 'mmol N/m3/day', 'daily flux of NH4 due to particles in a layer')
+   data%id_d_pon = aed_define_diag_variable('id_d_pon', 'mmol N/m3/day', 'daily flux of PON due to particles in a layer')
+   data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP due to particles in a layer')
+   data%id_d_pop = aed_define_diag_variable('id_d_pop', 'mmol P/m3/day', 'daily flux of POP due to particles in a layer')
+   data%id_d_poc = aed_define_diag_variable('id_d_poc', 'mmol C/m3/day', 'daily flux of POC due to particles in a layer')
    data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O2/m3/day','oxygen production')
    
    ! Linked state variables
@@ -798,7 +802,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    AED_REAL :: oxy_flux
    AED_REAL :: decay, area, thickness
 
-   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, frp, pw, mu, pw20, mu20
+   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, nh4, frp, pw, mu, pw20, mu20
    AED_REAL :: f_T, Iz, f_I, Respiration, Mu_net
 
    AED_REAL, PARAMETER :: buoyancy_age = 86400.
@@ -835,10 +839,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real    :: Graz  = 0.
    real    :: dC_   = 0.
    real    :: dN_   = 0.
+   real    :: dNO3_   = 0.
+   real    :: dNH4_   = 0.
    real    :: dP_   = 0.
    real    :: dChl_ = 0.
    real    :: ESD_ = 0.    ! equivalent spherical diameter (micron)
-   real    :: uptake= 0.   !Total NO3 uptake
+   real    :: uptake= 0.   !Total DIN uptake
+   real    :: uptake_NO3= 0.   !Total NO3 uptake
+   real    :: uptake_NH4= 0.   !Total NH4 uptake
    real    :: uptake_P = 0.   !Total FRP uptake
    real    :: pp_DZ = 0.
    real    :: pp_DZP = 0.
@@ -851,8 +859,10 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real    :: FZoo(NZOO) = 0.   !The total amount of palatable prey (in Nitrogen)
                              !for each zooplankton size class
    real    :: phyV = 0.   !Phytoplankton cell volume
-   real    :: RES     = 0.
-   real    :: RES_P   = 0.
+   real    :: RES     = 0. !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES_NO3     = 0. !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES_NH4     = 0. !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES_P   = 0.  !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
    real    :: EGES  = 0.
    real    :: gbar  = 0.
    real    :: INGES(NZOO) = 0.
@@ -907,6 +917,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
    par =  _STATE_VAR_(data%id_par) ! _STATE_VAR_S_(data%id_I0) local photosynth. active radiation
    no3 = _STATE_VAR_(data%id_nit)        ! local no3
+   nh4 = _STATE_VAR_(data%id_amm)        ! local nh4
    frp = _STATE_VAR_(data%id_frp)        ! local frp
 
 !------------------------------------------------------
@@ -928,6 +939,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    ! initialize flux diagnostics at 0
    _DIAG_VAR_(data%id_d_pon) = zero_
    _DIAG_VAR_(data%id_d_nit) = zero_
+   _DIAG_VAR_(data%id_d_amm) = zero_
    _DIAG_VAR_(data%id_d_pop) = zero_
    _DIAG_VAR_(data%id_d_frp) = zero_
    _DIAG_VAR_(data%id_d_poc) = zero_
@@ -1011,6 +1023,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
    ! Calculate total phytoplankton nitrogen uptake, mortality, and PP (must after calculation of num(t+dt))
    uptake  = 0d0
+   uptake_NO3  = 0d0
+   uptake_NH4  = 0d0
    uptake_P  = 0d0
    Pmort   = 0d0
    Pmort_P   = 0d0
@@ -1025,13 +1039,16 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          p(i)%ptm_state(data%ip_par) = par
          p(i)%ptm_state(data%ip_tem) = WaterTemperature
          p(i)%ptm_state(data%ip_no3) = no3
+         p(i)%ptm_state(data%ip_nh4) = nh4
          p(i)%ptm_state(data%ip_frp) = frp
 
          ! call the PIBM function that is the primary engine for phytoplankton physiology
          ! this is located in aed_pibm_utils.F90
          call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem),              & ! Temp     (environmental temperature)
                                       p(i)%ptm_state(data%ip_par),              & ! PAR      (environmental PAR)
+                                      p(i)%ptm_state(data%ip_no3) + p(i)%ptm_state(data%ip_nh4),              & ! NO3 + NH4    (environmental DIN)
                                       p(i)%ptm_state(data%ip_no3),              & ! NO3      (environmental NO3)
+                                      p(i)%ptm_state(data%ip_nh4),              & ! NH4      (environmental NH4)
                                       p(i)%ptm_state(data%ip_frp),              & ! FRP      (environmental FRP)
                                       p(i)%ptm_state(data%ip_c),                & ! C        (C in particle)
                                       p(i)%ptm_state(data%ip_n),                & ! N        (N in particle)
@@ -1042,6 +1059,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                                       exp(p(i)%ptm_state(data%ip_LnalphaChl)),  & ! alphaChl (parameter + mutating trait; slope of the PI curve)
                                       dC_,                                      & ! dC       (change in C; returned by function)
                                       dN_,                                      & ! dN       (change in N; returned by function)
+                                      dNO3_,                                    & ! dNO3     (change in N from NO3; returned by function)
+                                      dNH4_,                                    & ! dNH4     (change in N from NH4; returned by function)
                                       dP_,                                      & ! dP       (change in P; returned by function)
                                       dChl_,                                    & ! dChl     (change in Chl; returned by function)
                                       ESD_,                                     & ! ESD      (ESD of cells in particle; returned by function)
@@ -1090,6 +1109,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          ! cumulate N and P uptake and oxy flux after running physiology function
          uptake   =   uptake + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
+         uptake_NO3   =   uptake_NO3 + dNO3_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
+         uptake_NH4   =   uptake_NH4 + dNH4_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
          uptake_P =   uptake_P + dP_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol P d-1
          oxy_flux =   oxy_flux + dC_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol C d-1 (assuming 1:1 stoichiometry with O2)
          !NPPc_(k) = NPPc_(k) + dC_ * p_PHY(i)%num *1d-9/Hz(k)*12.d0*dtdays !Unit: mgC m-3 d-1 !ML leaving this PIBM code because of questions below re: NPP diagnostic
@@ -1199,7 +1220,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   endif !End if of N_ > 0
 
   ! Convert all updates to be per m3 per second
-  uptake = uptake*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1
+  uptake = uptake*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1 (DIN)
+  uptake_NO3 = uptake_NO3*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1 (NO3)
+  uptake_NH4 = uptake_NH4*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1 (NH4)
   uptake_P = uptake_P*1d-9/Hz/secs_per_day !Convert uptake_P to mmol P m-3 s-1
   oxy_flux = oxy_flux*1d-9/Hz/secs_per_day !Convert oxy flux to mmol O2 m-3 s-1
   Pmort  =  Pmort*1d-9/Hz/secs_per_day !Convert Pmort to mmol N m-3 s-1
@@ -1207,8 +1230,11 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   Pmort_C  =  Pmort_C*1d-9/Hz/secs_per_day !Convert Pmort_C to mmol C m-3 s-1
 
   ! Now increment water column properties based on particle fluxes
-  _FLUX_VAR_(data%id_nit)   = _FLUX_VAR_(data%id_nit) + (pp_ND + RES - uptake)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds; pp_ND and RES are zooplankton variables
-  _DIAG_VAR_(data%id_d_nit) = (pp_ND + RES - uptake)  * secs_per_day    ! mmol/m3/day
+  _FLUX_VAR_(data%id_nit)   = _FLUX_VAR_(data%id_nit) + (pp_ND + RES_NO3 - uptake_NO3)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds; pp_ND and RES are zooplankton variables
+  _DIAG_VAR_(data%id_d_nit) = (pp_ND + RES_NO3 - uptake_NO3)  * secs_per_day    ! mmol/m3/day
+  
+  _FLUX_VAR_(data%id_amm)   = _FLUX_VAR_(data%id_amm) + (pp_ND + RES_NH4 - uptake_NH4)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds; pp_ND and RES are zooplankton variables
+  _DIAG_VAR_(data%id_d_amm) = (pp_ND + RES_NH4 - uptake_NH4)  * secs_per_day    ! mmol/m3/day
   
   _FLUX_VAR_(data%id_frp)   = _FLUX_VAR_(data%id_frp) + (pp_PD + RES_P - uptake_P)    ! mmol/m3/s CHECK ML I think this should not be multiplied by dtdays so stays in seconds; pp_PD and RES_P are zooplankton variables
   _DIAG_VAR_(data%id_d_frp) = (pp_PD + RES_P - uptake_P)  * secs_per_day    ! mmol/m3/day
