@@ -1065,7 +1065,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          endif
       endif
    enddo
-
    ! get volume of layer
    Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea)
 
@@ -1113,6 +1112,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    _DIAG_VAR_(data%id_cells) = Abun_ / Hz !Abundances (cells m-3)
 
    ! Calculate total phytoplankton nitrogen uptake, mortality, and PP (must after calculation of num(t+dt))
+   ! Start by setting everything to 0
    uptake  = 0d0
    uptake_NO3  = 0d0
    uptake_NH4  = 0d0
@@ -1357,6 +1357,10 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 ! CODE FROM PIBM Par2PHY SUBROUTINE
 
 ! initialize diag vars at 0
+PHYC = 0
+PHYN = 0
+PHYP = 0
+CHL  = 0
 _DIAG_VAR_(data%id_phyc) = 0.
 _DIAG_VAR_(data%id_phyn) = 0.
 _DIAG_VAR_(data%id_phyp) = 0.
@@ -1366,7 +1370,8 @@ _DIAG_VAR_(data%id_mtopt) = 0.
 _DIAG_VAR_(data%id_mlnalpha) = 0.
 
 !loop through all super-individuals to divide, mutate, and convert into Eulerian concentrations
-DO i = 1, N_  
+IF (N_ > 0) THEN
+   DO i = 1, N_
 
    ! Cell division: if cellular carbon is above the division threshold, it divides
    IF (p(i)%ptm_state(data%ip_c) >= p(i)%ptm_state(data%ip_cdiv)) THEN  !Divide
@@ -1425,7 +1430,8 @@ DO i = 1, N_
    _DIAG_VAR_(data%id_mcdiv)    = _DIAG_VAR_(data%id_mcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * log(p(i)%ptm_state(data%ip_cdiv))
    _DIAG_VAR_(data%id_mtopt)    = _DIAG_VAR_(data%id_mtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_Topt)
    _DIAG_VAR_(data%id_mlnalpha) = _DIAG_VAR_(data%id_mlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_LnalphaChl)
-ENDDO !End of iterating over all super-individuals
+   ENDDO
+ENDIF !End of iterating over all super-individuals
 
 !Calculate Eulerian concentrations of phyto C, N, and Chl, and mean traits and covariances for each layer
 _DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
@@ -1446,23 +1452,25 @@ _DIAG_VAR_(data%id_cov_AL)   = 0d0
 _DIAG_VAR_(data%id_cov_TA)   = 0d0
 _DIAG_VAR_(data%id_cov_TL)   = 0d0
 
-DO i = 1, N_ !ML removing logs from ip_cdiv here too - pretty sure this is a typo given how it is handled in GMK routine OR should be logged everywhere
-   _DIAG_VAR_(data%id_vcdiv)    = _DIAG_VAR_(data%id_vcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
-   _DIAG_VAR_(data%id_vtopt)    = _DIAG_VAR_(data%id_vtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
-   _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))**2
-   _DIAG_VAR_(data%id_cov_TL)   = _DIAG_VAR_(data%id_cov_TL)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
-   _DIAG_VAR_(data%id_cov_AL)   = _DIAG_VAR_(data%id_cov_AL)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))
-   _DIAG_VAR_(data%id_cov_TA)   = _DIAG_VAR_(data%id_cov_TA)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
-ENDDO
+IF (N_ > 0) THEN
+   DO i = 1, N_
+      _DIAG_VAR_(data%id_vcdiv)    = _DIAG_VAR_(data%id_vcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
+      _DIAG_VAR_(data%id_vtopt)    = _DIAG_VAR_(data%id_vtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
+      _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))**2
+      _DIAG_VAR_(data%id_cov_TL)   = _DIAG_VAR_(data%id_cov_TL)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
+      _DIAG_VAR_(data%id_cov_AL)   = _DIAG_VAR_(data%id_cov_AL)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))
+      _DIAG_VAR_(data%id_cov_TA)   = _DIAG_VAR_(data%id_cov_TA)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
+   ENDDO
+ENDIF
 
-if (PHYC > 0d0) then ! need to make sure we are preventing dividing by 0 (case when there are no particles in layer)
+IF (PHYC > 0d0) then ! need to make sure we are preventing dividing by 0 (case when there are no particles in layer)
    _DIAG_VAR_(data%id_vcdiv)    = _DIAG_VAR_(data%id_vcdiv)   / PHYC
    _DIAG_VAR_(data%id_vtopt)    = _DIAG_VAR_(data%id_vtopt)   / PHYC
    _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha)/ PHYC
    _DIAG_VAR_(data%id_cov_TL)   = _DIAG_VAR_(data%id_cov_TL)  / PHYC
    _DIAG_VAR_(data%id_cov_TA)   = _DIAG_VAR_(data%id_cov_TA)  / PHYC
    _DIAG_VAR_(data%id_cov_AL)   = _DIAG_VAR_(data%id_cov_AL)  / PHYC
-  endif
+ENDIF
 
 ! END PIBM Par2PHY CODE
 !------------------------------------------------------
