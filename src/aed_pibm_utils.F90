@@ -61,7 +61,7 @@ implicit none
 private
 
 public :: temp_Topt, PHY_C2Vol, Ainf 
-public :: Pmax_size, respiration
+public :: Pmax_size, respiration, phyto_pN
 
 CONTAINS
 
@@ -274,6 +274,28 @@ return
 END FUNCTION Ainf
 !------------------------------------------------------------------------------------------------
 
+
+!###############################################################################
+PURE REAL FUNCTION phyto_pN(NH4,NO3,KN) RESULT(pN)
+!-------------------------------------------------------------------------------
+! Calculates the relative preference of uptake by phytoplankton of
+! ammonia uptake over nitrate.
+!-------------------------------------------------------------------------------
+   real, intent(in)                         :: NH4
+   real, intent(in)                         :: NO3
+   real, intent(in)                         :: KN
+!
+
+!-------------------------------------------------------------------------------
+!BEGIN
+
+   IF (NH4 > 0.0) THEN
+      pN = NH4*NO3 / ((NH4+KN)*(NO3+KN)) &
+         + NH4*KN / ((NH4+NO3)*(NO3+KN))
+   ENDIF
+END FUNCTION phyto_pN
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 END MODULE
 !###############################################################################
 
@@ -292,23 +314,24 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, NO3, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
 !-------------------------------------------------------------------------------
-USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration
+USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
 !USE params,          only : QNmax_a, QNmax_b, KN_a, KN_b, nx, pi
-!ML USE state_variables, only : NO3_min
 
 implicit none
 
 ! ML took from state_variables.f90
-real,    parameter :: NO3_min = 0.01  !Minimal NO3 concentration ML in the environment (mmol/m3)
+real,    parameter :: DIN_min = 0.01  !Minimal DIN concentration ML in the environment (mmol/m3)
 real,    parameter :: FRP_min = 0.01/16.*1.  !Minimal FRP concentration ML in the environment (mmol/m3)
 
 !Declaration on variables:
 real, intent(in)  :: Temp             !Associated temperature [degree C]
 real, intent(in)  :: PAR              !Associated PAR [W m-2]
+real, intent(in)  :: DIN              !Associated DIN concentration (NO3 + NH4) [mmol N m-3]
 real, intent(in)  :: NO3              !Associated NO3 concentration [mmol N m-3]
+real, intent(in)  :: NH4              !Associated NH4 concentration [mmol N m-3]
 real, intent(in)  :: FRP              !Associated FRP concentration [mmol P m-3]
 real, intent(in)  :: C                !Current cellular carbon [pmol C cell-1]
 real, intent(in)  :: N                !Current cellular nitrogen [pmol N cell-1]
@@ -382,6 +405,8 @@ real, intent(in)   :: b_
 real, intent(in)   :: v_
 
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
+real, intent(out) :: dNO3             !Changes in the cellular nitrogen content from NO3 [pmol N cell-1 d-1]
+real, intent(out) :: dNH4             !Changes in the cellular nitrogen content from NH4 [pmol N cell-1 d-1]
 real, intent(out) :: dP               !Changes in the cellular phosphorus content [pmol P cell-1 d-1]
 real, intent(out) :: dC               !Changes in the cellular carbon content [pmol C cell-1 d-1]
 real, intent(out) :: dChl             !Changes in the cellular Chl content [pg Chl cell-1 d-1]
@@ -422,6 +447,7 @@ real              :: muT    = 0.
 
 !Kn is an allometric function of Vol (Cdiv) (Edwards et al. 2012) [uM]:
 real              :: KN     = 0.      !Half-saturation constant for N [uM]
+real              :: pN_   = 0.       !Preference factor for uptake of NH4 over NO3
 real              :: KPho     = 0.    !Half-saturation constant for P [uM]
 real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't see that this is used
 !End of declaration
@@ -570,7 +596,7 @@ endif
 
 !DIN uptake rate by phytoplankton [mol N mol C-1 d-1]:
 !ML corresponds to eq. 8 in PIBM ms
-VCN = Vcref * (NO3 - NO3_min)/ (NO3 + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
+VCN = Vcref * (DIN - DIN_min)/ (DIN + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
 VCN = max(VCN, 0d0)
 
 !FRP uptake rate by phytoplankton [mol P mol C-1 d-1]:
@@ -586,6 +612,11 @@ dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT)
 !RNT has to be zero to avoid continuous decline of N per cell
 !ML corresponds to eq. 2 in PIBM ms
 dN = N * (VCN/QN - RNT)
+
+!ML add phyto_pN function call here
+pN_ = phyto_pN(NH4, NO3, KN)
+dNH4 = dN * pN_
+dNO3 = dN * (1.- pN_)
 
 !Changes of cellular phosphorus [pmol P cell-1 d-1]:
 !ML newly added for GLM-AED-ABM
