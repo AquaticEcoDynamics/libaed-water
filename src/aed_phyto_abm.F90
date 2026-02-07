@@ -796,7 +796,7 @@ SUBROUTINE aed_split_particle_phyto_abm( data,ppid,p )
 !
 
 !LOCALS
-INTEGER   :: i, j, pid, new_prt
+INTEGER   :: i, j, pid
 AED_REAL  :: div
 LOGICAL   :: pass
 
@@ -805,66 +805,62 @@ LOGICAL   :: pass
 !-------------------------------------------------------------------------------
 !BEGIN
 IF (data%phytos(1)%simSplit > 0) THEN
-   j=1
    DO i = 1, ppid
-      IF ( p(i)%ptm_istat(STAT) > 0 ) THEN
-         IF(p(i)%ptm_state(data%ip_num) > data%phytos(1)%n_split) THEN !ML eventually this number (4d12) should be a parameter; also this line should be adjusted to search for ip_num somehow rather than hardcoding n_ptm_env + 10
-            pass = .FALSE.
-            DO WHILE(j < ppid .AND. pass .eqv. .FALSE.)
-               IF(p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN
-                  pass = .TRUE.
-                  new_prt = j
-               ENDIF
-               j = j + 1
-               IF (j >= ppid) STOP 'aed_calculate_particles(): ERROR no more particles available for splitting'
-            ENDDO
-            
-            IF(j < ppid) THEN
-   	  	      !first duplicate all attributes except PTID
-               p(new_prt)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
-               p(new_prt)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
-               p(new_prt)%ptm_istat(IDX3) = p(i)%ptm_istat(IDX3)
-               p(new_prt)%ptm_istat(LAYR) = p(i)%ptm_istat(LAYR)
-               p(new_prt)%ptm_istat(FLAG) = p(i)%ptm_istat(FLAG)
-               p(new_prt)%ptm_env(MASS) = p(i)%ptm_env(MASS)
-               p(new_prt)%ptm_env(DIAM) = p(i)%ptm_env(DIAM)
-               p(new_prt)%ptm_env(DENS) = p(i)%ptm_env(DENS)
-               p(new_prt)%ptm_env(VVEL) = p(i)%ptm_env(VVEL)
-               p(new_prt)%ptm_env(HGHT) = p(i)%ptm_env(HGHT)
-               p(new_prt)%ptm_state(data%ip_par) = p(i)%ptm_state(data%ip_par)
-               p(new_prt)%ptm_state(data%ip_tem) = p(i)%ptm_state(data%ip_tem)
-               p(new_prt)%ptm_state(data%ip_no3) = p(i)%ptm_state(data%ip_no3)
-               p(new_prt)%ptm_state(data%ip_nh4) = p(i)%ptm_state(data%ip_nh4)
-               p(new_prt)%ptm_state(data%ip_frp) = p(i)%ptm_state(data%ip_frp)
-               p(new_prt)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c)
-               p(new_prt)%ptm_state(data%ip_n) = p(i)%ptm_state(data%ip_n)
-               p(new_prt)%ptm_state(data%ip_p) = p(i)%ptm_state(data%ip_p)
-               p(new_prt)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl)
-               p(new_prt)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num)
-               p(new_prt)%ptm_state(data%ip_Cdiv) = p(i)%ptm_state(data%ip_Cdiv)
-               p(new_prt)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
-               p(new_prt)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
-
-               !then split the number of cells for both old and new particles
-               p(new_prt)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
-               p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
-
-               !then get a new PTID for new particle
-               IF(p(new_prt)%ptm_istat(PTID) < 0) THEN
-                  p(new_prt)%ptm_istat(PTID) = new_prt;
-               ELSE
-                  div = REAL(p(new_prt)%ptm_istat(PTID) / ppid)
-                  pid = FLOOR(div)
-                  p(new_prt)%ptm_istat(PTID) = ppid + pid*ppid + (new_prt - pid*ppid)
-               ENDIF
+      IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > data%phytos(1)%n_split) THEN
+         j = 1
+         DO
+            IF (j > ppid) THEN
+               print *, 'aed_split_particle(): WARNING no more available particles; skipping particle split'
+               RETURN
             ELSE
-               STOP 'aed_calculate_particles(): ERROR no more particles available for splitting'
-            ENDIF
-         ENDIF !end need to split query loop
-      ENDIF !end particle status loop
-   ENDDO !end particle loop
+               IF (p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN
+                  !first duplicate all attributes except PTID
+                  p(j)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
+                  p(j)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
+                  p(j)%ptm_istat(IDX3) = p(i)%ptm_istat(IDX3)
+                  p(j)%ptm_istat(LAYR) = p(i)%ptm_istat(LAYR)
+                  p(j)%ptm_istat(FLAG) = p(i)%ptm_istat(FLAG)
+                  p(j)%ptm_env(MASS) = p(i)%ptm_env(MASS)
+                  p(j)%ptm_env(DIAM) = p(i)%ptm_env(DIAM)
+                  p(j)%ptm_env(DENS) = p(i)%ptm_env(DENS)
+                  p(j)%ptm_env(VVEL) = p(i)%ptm_env(VVEL)
+                  p(j)%ptm_env(HGHT) = p(i)%ptm_env(HGHT)
+                  p(j)%ptm_state(data%ip_par) = p(i)%ptm_state(data%ip_par)
+                  p(j)%ptm_state(data%ip_tem) = p(i)%ptm_state(data%ip_tem)
+                  p(j)%ptm_state(data%ip_no3) = p(i)%ptm_state(data%ip_no3)
+                  p(j)%ptm_state(data%ip_nh4) = p(i)%ptm_state(data%ip_nh4)
+                  p(j)%ptm_state(data%ip_frp) = p(i)%ptm_state(data%ip_frp)
+                  p(j)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c)
+                  p(j)%ptm_state(data%ip_n) = p(i)%ptm_state(data%ip_n)
+                  p(j)%ptm_state(data%ip_p) = p(i)%ptm_state(data%ip_p)
+                  p(j)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl)
+                  p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num)
+                  p(j)%ptm_state(data%ip_Cdiv) = p(i)%ptm_state(data%ip_Cdiv)
+                  p(j)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
+                  p(j)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
+
+                  !then split the number of cells for both old and new particles
+                  p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
+                  p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
+
+                  !then get a new PTID for new particle
+                  IF(p(j)%ptm_istat(PTID) < 0) THEN
+                     p(j)%ptm_istat(PTID) = j;
+                  ELSE
+                     div = REAL(p(j)%ptm_istat(PTID) / ppid)
+                     pid = FLOOR(div)
+                     p(j)%ptm_istat(PTID) = ppid + pid*ppid + (j - pid*ppid)
+                  END IF
+                  ! then exit the search for available particles loop and go back to i loop to check if next particle needs to split
+                  EXIT
+               END IF ! end assign new particle if statement
+            END IF ! end check max particle num statement
+            j = j + 1
+         END DO ! end search for available particles loop
+      END IF ! end does particle need to split if statement
+   END DO ! end particle loop 
 ELSE
-   return
+   RETURN
 END IF !end simSplit query loop
 
 END SUBROUTINE aed_split_particle_phyto_abm
