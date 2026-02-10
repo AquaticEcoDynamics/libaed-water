@@ -605,16 +605,16 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_count  = aed_define_diag_variable('total_count', '#', 'layer live particle count')             !#MH  N_ in PIBM
 
    !real      :: PHYC(nlev) = 0d0  !Eulerian concentration of phyto C, mean trait  for each layer
-   data%id_phyc = aed_define_diag_variable('mean_C', 'mmol/m3', 'mean Eulerian concentration of phyto particle C', rezero = .false.)
+   data%id_phyc = aed_define_diag_variable('C', 'mmol/m3', 'layer concentration of phyto particle C', rezero = .false.)
 
    !real      ::    PHY(nlev) = 0d0
-   data%id_phyn = aed_define_diag_variable('mean_N', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
+   data%id_phyn = aed_define_diag_variable('N', 'mmol/m3', 'layer concentration of phyto particle N')
 
    !real      ::    PHY(nlev) = 0d0
-   data%id_phyp = aed_define_diag_variable('mean_P', 'mmol/m3', 'mean Eulerian concentration of phyto particle P')
+   data%id_phyp = aed_define_diag_variable('P', 'mmol/m3', 'layer concentration of phyto particle P')
 
    !real      ::    CHL(nlev) = 0d0
-   data%id_chl = aed_define_diag_variable('mean_Chl', 'mg/m3', 'mean Eulerian concentration of phyto particle Chl')
+   data%id_chl = aed_define_diag_variable('Chl', 'mg/m3', 'layer concentration of phyto particle Chl')
 
    !real      ::   mTopt_(nlev) = 0d0
    data%id_mTopt = aed_define_diag_variable('mean_Topt', 'degrees C/pmol C', 'carbon-weighted mean layer optimal temperature')
@@ -663,7 +663,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP due to particles in a layer')
    data%id_d_pop = aed_define_diag_variable('id_d_pop', 'mmol P/m3/day', 'daily flux of POP due to particles in a layer')
    data%id_d_poc = aed_define_diag_variable('id_d_poc', 'mmol C/m3/day', 'daily flux of POC due to particles in a layer')
-   data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O2/m3/day','oxygen production')
+   data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O/m3/day','oxygen production')
    
    ! Linked state variables
    data%id_oxy = aed_locate_variable('OXY_oxy')
