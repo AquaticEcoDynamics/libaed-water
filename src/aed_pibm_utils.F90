@@ -314,7 +314,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -351,6 +351,7 @@ real, intent(in)   :: a1     != 0.d0    Allometric exponent between mumax and al
 real, intent(in)   :: mu0    !=  5.00   Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
 real, intent(in)   :: nx != 1.d0
 real, intent(in)   :: thetaNmax != 3d0  ML pull this out to nml
+real, intent(in)   :: thetaPmax != 3d0  ML pull this out to nml
 
 !QNmin and QNmax are allometric functions of Vol (Ward et al. 2012) [mol N: mol C]:
 real, intent(in)   :: QNmin_a != 0.07d0     Normalization constant for QNmin [molN:molC] ML pull to nml
@@ -590,7 +591,7 @@ if (PAR <= 0d0) then
    rhochl   = rhoChl_L
 else
    !ML corresponds to eq. 9 in PIBM ms
-   rhochl   = thetaNmax * PC / alphachl_ / theta / PAR ! ML leaving this as regulated by Chl:N ratio for now
+   rhochl   = min(thetaNmax, thetaPmax) * PC / alphachl_ / theta / PAR ! ML this is now regulated by both P and N
    rhoChl_L = rhochl
 endif
 
@@ -624,7 +625,7 @@ dP = P * (VCP/QP - RPT)
 
 !Changes of cellular Chl [d-1]:
 !ML corresponds to eq. 3 in PIBM ms
-dChl = Chl * (rhochl*VCN / theta - RChlT)
+dChl = Chl * (rhochl*min(VCN, VCP) / theta - RChlT)
 
 return
 END subroutine GMK98_Ind_TempSizeLight

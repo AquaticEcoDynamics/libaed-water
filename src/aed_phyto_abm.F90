@@ -244,6 +244,7 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
             CASE ('nx')            ; pd(dcol)%nx            = extract_double(values(ccol))
             CASE ('thetaNmax')     ; pd(dcol)%thetaNmax     = extract_double(values(ccol))
+            CASE ('thetaPmax')     ; pd(dcol)%thetaPmax     = extract_double(values(ccol))
             CASE ('QNmin_a')       ; pd(dcol)%QNmin_a       = extract_double(values(ccol))
             CASE ('QNmin_b')       ; pd(dcol)%QNmin_b       = extract_double(values(ccol))
             CASE ('QNmax_a')       ; pd(dcol)%QNmax_a       = extract_double(values(ccol))
@@ -420,6 +421,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%mort_prob     = pd(list(i))%mort_prob
        data%phytos(i)%nx            = pd(list(i))%nx
        data%phytos(i)%thetaNmax     = pd(list(i))%thetaNmax
+       data%phytos(i)%thetaPmax     = pd(list(i))%thetaPmax
        data%phytos(i)%QNmin_a       = pd(list(i))%QNmin_a
        data%phytos(i)%QNmin_b       = pd(list(i))%QNmin_b
        data%phytos(i)%QNmax_a       = pd(list(i))%QNmax_a
@@ -1161,6 +1163,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                                       data%phytos(1)%R_growth,                  & ! mu0      (user-specified parameter)
                                       data%phytos(1)%nx,                        & ! nx       (user-specified parameter)
                                       data%phytos(1)%thetaNmax,                 & ! thetaNmax(user-specified parameter)
+                                      data%phytos(1)%thetaPmax,                 & ! thetaPmax(user-specified parameter)
                                       data%phytos(1)%QNmin_a,                   & ! QNmin_a  (user-specified parameter)
                                       data%phytos(1)%QNmin_b,                   & ! QNmin_b  (user-specified parameter)
                                       data%phytos(1)%QNmax_a,                   & ! QNmax_a  (user-specified parameter)
