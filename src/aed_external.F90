@@ -42,6 +42,7 @@
 #define NO_DEV
 #endif
 
+#define _UNUSED(x) if (.FALSE.) print*,shape(x)
 
 !+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#++#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#+#
 
@@ -62,9 +63,11 @@ FUNCTION aed_new_ben_model(modelname) RESULT(model)
 USE aed_core
 !-------------------------------------------------------------------------------
    CHARACTER(*),INTENT(in) :: modelname
+!LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
 !BEGIN
+   _UNUSED(modelname)
    NULLIFY(model)
 END FUNCTION aed_new_ben_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -100,9 +103,11 @@ FUNCTION aed_new_rip_model(modelname) RESULT(model)
 USE aed_core
 !-------------------------------------------------------------------------------
    CHARACTER(*),INTENT(in) :: modelname
+!LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
 !BEGIN
+   _UNUSED(modelname)
    NULLIFY(model)
 END FUNCTION aed_new_rip_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -139,12 +144,12 @@ USE aed_core
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: modelname
-!
 !LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   _UNUSED(modelname)
    NULLIFY(model)
 END FUNCTION aed_new_dmo_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -179,9 +184,11 @@ FUNCTION aed_new_dev_model(modelname) RESULT(model)
 USE aed_core
 !-------------------------------------------------------------------------------
    CHARACTER(*),INTENT(in) :: modelname
+!LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
 !BEGIN
+   _UNUSED(modelname)
    NULLIFY(model)
 END FUNCTION aed_new_dev_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -216,9 +223,11 @@ FUNCTION aed_new_lgt_model(modelname) RESULT(model)
 USE aed_core
 !-------------------------------------------------------------------------------
    CHARACTER(*),INTENT(in) :: modelname
+!LOCALS
    CLASS (aed_model_data_t),POINTER :: model
 !-------------------------------------------------------------------------------
 !BEGIN
+   _UNUSED(modelname)
    NULLIFY(model)
 END FUNCTION aed_new_lgt_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
