@@ -244,6 +244,7 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
             CASE ('nx')            ; pd(dcol)%nx            = extract_double(values(ccol))
             CASE ('thetaNmax')     ; pd(dcol)%thetaNmax     = extract_double(values(ccol))
+            CASE ('thetaPmax')     ; pd(dcol)%thetaPmax     = extract_double(values(ccol))
             CASE ('QNmin_a')       ; pd(dcol)%QNmin_a       = extract_double(values(ccol))
             CASE ('QNmin_b')       ; pd(dcol)%QNmin_b       = extract_double(values(ccol))
             CASE ('QNmax_a')       ; pd(dcol)%QNmax_a       = extract_double(values(ccol))
@@ -420,6 +421,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%mort_prob     = pd(list(i))%mort_prob
        data%phytos(i)%nx            = pd(list(i))%nx
        data%phytos(i)%thetaNmax     = pd(list(i))%thetaNmax
+       data%phytos(i)%thetaPmax     = pd(list(i))%thetaPmax
        data%phytos(i)%QNmin_a       = pd(list(i))%QNmin_a
        data%phytos(i)%QNmin_b       = pd(list(i))%QNmin_b
        data%phytos(i)%QNmax_a       = pd(list(i))%QNmax_a
@@ -605,16 +607,16 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_count  = aed_define_diag_variable('total_count', '#', 'layer live particle count')             !#MH  N_ in PIBM
 
    !real      :: PHYC(nlev) = 0d0  !Eulerian concentration of phyto C, mean trait  for each layer
-   data%id_phyc = aed_define_diag_variable('mean_C', 'mmol/m3', 'mean Eulerian concentration of phyto particle C', rezero = .false.)
+   data%id_phyc = aed_define_diag_variable('C', 'mmol/m3', 'layer concentration of phyto particle C', rezero = .false.)
 
    !real      ::    PHY(nlev) = 0d0
-   data%id_phyn = aed_define_diag_variable('mean_N', 'mmol/m3', 'mean Eulerian concentration of phyto particle N')
+   data%id_phyn = aed_define_diag_variable('N', 'mmol/m3', 'layer concentration of phyto particle N')
 
    !real      ::    PHY(nlev) = 0d0
-   data%id_phyp = aed_define_diag_variable('mean_P', 'mmol/m3', 'mean Eulerian concentration of phyto particle P')
+   data%id_phyp = aed_define_diag_variable('P', 'mmol/m3', 'layer concentration of phyto particle P')
 
    !real      ::    CHL(nlev) = 0d0
-   data%id_chl = aed_define_diag_variable('mean_Chl', 'mg/m3', 'mean Eulerian concentration of phyto particle Chl')
+   data%id_chl = aed_define_diag_variable('Chl', 'mg/m3', 'layer concentration of phyto particle Chl')
 
    !real      ::   mTopt_(nlev) = 0d0
    data%id_mTopt = aed_define_diag_variable('mean_Topt', 'degrees C/pmol C', 'carbon-weighted mean layer optimal temperature')
@@ -663,7 +665,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_d_frp = aed_define_diag_variable('id_d_frp', 'mmol P/m3/day', 'daily flux of FRP due to particles in a layer')
    data%id_d_pop = aed_define_diag_variable('id_d_pop', 'mmol P/m3/day', 'daily flux of POP due to particles in a layer')
    data%id_d_poc = aed_define_diag_variable('id_d_poc', 'mmol C/m3/day', 'daily flux of POC due to particles in a layer')
-   data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O2/m3/day','oxygen production')
+   data%id_d_oxy = aed_define_diag_variable('oxy_flux', 'mmol O/m3/day','oxygen production')
    
    ! Linked state variables
    data%id_oxy = aed_locate_variable('OXY_oxy')
@@ -1161,6 +1163,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                                       data%phytos(1)%R_growth,                  & ! mu0      (user-specified parameter)
                                       data%phytos(1)%nx,                        & ! nx       (user-specified parameter)
                                       data%phytos(1)%thetaNmax,                 & ! thetaNmax(user-specified parameter)
+                                      data%phytos(1)%thetaPmax,                 & ! thetaPmax(user-specified parameter)
                                       data%phytos(1)%QNmin_a,                   & ! QNmin_a  (user-specified parameter)
                                       data%phytos(1)%QNmin_b,                   & ! QNmin_b  (user-specified parameter)
                                       data%phytos(1)%QNmax_a,                   & ! QNmax_a  (user-specified parameter)
