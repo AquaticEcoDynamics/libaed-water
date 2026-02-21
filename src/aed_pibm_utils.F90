@@ -288,10 +288,11 @@ PURE REAL FUNCTION phyto_pN(NH4,NO3,KN) RESULT(pN)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-
    IF (NH4 > 0.0) THEN
       pN = NH4*NO3 / ((NH4+KN)*(NO3+KN)) &
          + NH4*KN / ((NH4+NO3)*(NO3+KN))
+   ELSE
+      pN = 0.
    ENDIF
 END FUNCTION phyto_pN
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

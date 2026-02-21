@@ -111,9 +111,7 @@ else
   MDBG_FFLAGS=-fsanitize=address
   OMPFLAG=-fopenmp
   OPT_FFLAGS=-O3
-  # we use std=f2008ts rather than f2008 because ts removes some type checking
-  # restrictions on interoperabilty routines (which were wrong anyway...)
-  FFLAGS=-Wall -J ${moddir} -ffree-line-length-none -std=f2008ts
+  FFLAGS=-Wall -J ${moddir} -ffree-line-length-none -std=f2018
   ifeq ($(OSTYPE),Msys)
     FFLAGS+=-D_WIN32
   endif
