@@ -548,7 +548,7 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
       grazing_p = zero_
       phy_i = 0
       DO prey_i = 1,data%zoops(zoop_i)%num_prey
-         IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey .EQ. _OGMPOC_) THEN
+         IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:3) .EQ. _OGMPOC_) THEN
             IF (poc > zero_) THEN
                 grazing_n = grazing_n + grazing_prey(prey_i) * pon/poc
                 grazing_p = grazing_p + grazing_prey(prey_i) * pop/poc
@@ -664,7 +664,7 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
             _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) =                         &
                        _FLUX_VAR_(data%zoops(zoop_i)%id_prey(prey_i)) +              &
                        ( -1.0 * grazing_prey(prey_i))
-            IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey .EQ. _OGMPOC_) THEN
+            IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:3) .EQ. _OGMPOC_) THEN
                IF (poc > zero_) THEN
                   _FLUX_VAR_(data%id_Nmorttarget) =     &
                           _FLUX_VAR_(data%id_Nmorttarget) + ( -1.0 * grazing_prey(prey_i) * pon/poc)
