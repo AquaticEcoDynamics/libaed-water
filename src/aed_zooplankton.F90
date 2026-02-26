@@ -494,20 +494,21 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
 
       ! Get the growth rate (/ s)
       ! grazing is in units of mass consumed/mass zoops/unit time
-      grazing = data%zoops(zoop_i)%Rgrz_zoo * fGrazing_Limitation * f_T
+      grazing = data%zoops(zoop_i)%Rgrz_zoo * fGrazing_Limitation * f_T ! Units: /d
 
       ! Now determine available prey and limit grazing amount to
       ! availability of prey
       ! food is total amount of food in units of mass/unit volume/unit time
-      food = grazing * zoo
+      food = grazing * zoo ! Units: mmC/m3/d
       IF (Ctotal_prey < data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
          food = zero_
          grazing = food / zoo
+		 ! The next ELSEIF statement compares food (mmC/m3/d) with available prey (mmC/m3)
+		 ! Units missing a factor of time? Or implicit assumption of one day of grazing?
       ELSEIF (food > Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
-         food = Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo
-         grazing = food / zoo
+         food = Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ! Units: food units have changed from mmC/m3/d to just mmC/m3
+         grazing = food / zoo ! Units: grazing has changed to dimensionless (mmC/m3)/ (mmC/m3)
       ENDIF
-
 
       ! Now determine prey composition based on preference factors and
       ! availability of prey
