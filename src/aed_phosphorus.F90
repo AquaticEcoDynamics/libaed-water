@@ -95,6 +95,8 @@ MODULE aed_phosphorus
 
 ! MODULE GLOBALS
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                             !     except diagnostics required by
+                                             !     state calculations/coupling
                                               ! 1 = basic diagnostic outputs
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
@@ -156,6 +158,8 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
    AED_REAL          :: atm_frp_conc = zero_
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except diagnostics required by
+!                                             !     state calculations/coupling
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
 !                                             ! 3 = other metrics
@@ -263,23 +267,33 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
      ENDIF
 
      !-- Check diagnostics specific for adsorbed phosphate
-     data%id_frpads_set = aed_define_diag_variable('frp_ads_set','mmol P/m3/d',&
-                                           'adsobed PO4 sedimentation flux')
-     data%id_frpads_res = aed_define_sheet_diag_variable('frp_ads_res','mmol P/m2/d',&
-                                           'adsobed PO4 resuspension flux')
-     data%id_frpads_swi = aed_define_sheet_diag_variable('frp_ads_swi','mmol P/m2/d',&
-                                           'adsobed PO4 net flux at the swi')
-     data%id_frp_srp = aed_define_diag_variable('frp_srp','mmol P/m3/d',       &
-                                           'PO4 adsorption rate')
+     data%id_frpads_set = 0
+     data%id_frpads_res = 0
+     data%id_frpads_swi = 0
+     data%id_frp_srp    = 0
+     IF (diag_level>0) THEN
+        data%id_frpads_set = aed_define_diag_variable('frp_ads_set','mmol P/m3/d',&
+                                              'adsobed PO4 sedimentation flux')
+        data%id_frpads_res = aed_define_sheet_diag_variable('frp_ads_res','mmol P/m2/d',&
+                                              'adsobed PO4 resuspension flux')
+        data%id_frpads_swi = aed_define_sheet_diag_variable('frp_ads_swi','mmol P/m2/d',&
+                                              'adsobed PO4 net flux at the swi')
+        data%id_frp_srp = aed_define_diag_variable('frp_srp','mmol P/m3/d',       &
+                                              'PO4 adsorption rate')
+     ENDIF
 
    ENDIF
 
    ! Register diagnostic variables
-   data%id_sed_frp = aed_define_sheet_diag_variable('frp_dsf','mmol P/m2/d', &
-                                         'PO4 exchange across sed/water interface')
-   IF( simWetDeposition .OR. simDryDeposition ) THEN
-    data%id_atm_dep = aed_define_sheet_diag_variable('dip_atm','mmol P/m2/d', &
-                                         'DIP atmospheric deposition flux')
+   data%id_sed_frp = 0
+   data%id_atm_dep = 0
+   IF (diag_level>0) THEN
+      data%id_sed_frp = aed_define_sheet_diag_variable('frp_dsf','mmol P/m2/d', &
+                                            'PO4 exchange across sed/water interface')
+      IF( simWetDeposition .OR. simDryDeposition ) THEN
+       data%id_atm_dep = aed_define_sheet_diag_variable('dip_atm','mmol P/m2/d', &
+                                            'DIP atmospheric deposition flux')
+      ENDIF
    ENDIF
 
    ! Register environmental dependencies
@@ -416,10 +430,12 @@ SUBROUTINE aed_calculate_surface_phosphorus(data,column,layer_idx)
     !-----------------------------------------------
     ! Also store deposition across the atm/water interface as a
     ! diagnostic variable (mmmol/m2/day).
-   IF (data%simPO4Adsorption) THEN !# id_frpads is not set unless simPO4Adsorption is true
-        _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_frp) + _FLUX_VAR_T_(data%id_frpads)) * secs_per_day
-   ELSE
-        _DIAG_VAR_S_(data%id_atm_dep) = _FLUX_VAR_T_(data%id_frp) * secs_per_day
+   IF (data%id_atm_dep>0) THEN
+    IF (data%simPO4Adsorption) THEN !# id_frpads is not set unless simPO4Adsorption is true
+       _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_frp) + _FLUX_VAR_T_(data%id_frpads)) * secs_per_day
+    ELSE
+       _DIAG_VAR_S_(data%id_atm_dep) = _FLUX_VAR_T_(data%id_frp) * secs_per_day
+    ENDIF
    ENDIF
   ENDIF
 
@@ -495,16 +511,17 @@ SUBROUTINE aed_calculate_benthic_phosphorus(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_frp) = _FLUX_VAR_B_(data%id_ben_frp) + (-frp_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   _DIAG_VAR_S_(data%id_sed_frp) = frp_flux * secs_per_day
+    IF (data%id_sed_frp>0) _DIAG_VAR_S_(data%id_sed_frp) = frp_flux * secs_per_day
 
    IF (data%simPO4Adsorption) THEN
      Fsed_pip = zero_
      IF( data%resuspension > 0 ) THEN
        sedpipfr = 100./1e6 ! 100mg/kg
        Fsed_pip = _DIAG_VAR_S_(data%id_l_resus) * sedpipfr * 1e3/30.91   ! g/m2/s * gP/gSed * mmol/mol / g/mol = mmol/m2/s
-       _DIAG_VAR_S_(data%id_frpads_res) = Fsed_pip
+          IF (data%id_frpads_res>0) _DIAG_VAR_S_(data%id_frpads_res) = Fsed_pip
      ENDIF
-     _DIAG_VAR_S_(data%id_frpads_swi) = _DIAG_VAR_(data%id_frpads_set)*dz + Fsed_pip*secs_per_day
+       IF (data%id_frpads_swi>0 .AND. data%id_frpads_set>0) &
+            _DIAG_VAR_S_(data%id_frpads_swi) = _DIAG_VAR_(data%id_frpads_set)*dz + Fsed_pip*secs_per_day
    ENDIF
 
 
@@ -542,7 +559,7 @@ SUBROUTINE aed_mobility_phosphorus(data,column,layer_idx,mobility)
    ENDIF
    mobility(data%id_frpads) = vvel
 
-   _DIAG_VAR_(data%id_frpads_set) = (vvel/dz)*_STATE_VAR_(data%id_frpads)*secs_per_day
+   IF (data%id_frpads_set>0) _DIAG_VAR_(data%id_frpads_set) = (vvel/dz)*_STATE_VAR_(data%id_frpads)*secs_per_day
 
 END SUBROUTINE aed_mobility_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

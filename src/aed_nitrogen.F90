@@ -108,6 +108,8 @@ MODULE aed_nitrogen
 
 ! MODULE GLOBALS
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                              !     except diagnostics required by
+                              !     state calculations/coupling
                                               ! 1 = basic diagnostic outputs
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
@@ -203,6 +205,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except diagnostics required by
+!                                             !     state calculations/coupling
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
 !                                             ! 3 = other metrics
@@ -354,26 +358,31 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    IF (data%use_sed_model_n2o .and. simN2O>0 .and. simExposed ) &
      data%id_Fsed_n2o_dry = aed_locate_sheet_variable( TRIM(Fsed_n2o_variable)//'_dry' )
 
+  data%id_sed_amm = 0 ; data%id_sed_nit = 0 ; data%id_sed_n2o = 0 ; data%id_sed_no2 = 0
+  data%id_nitrf   = 0 ; data%id_denit   = 0 ; data%id_n2op    = 0 ; data%id_anammox = 0
+  data%id_dnra    = 0 ; data%id_atm_n2o = 0 ; data%id_atm_dep = 0
 
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
-   data%id_sed_amm = aed_define_sheet_diag_variable('amm_dsf','mmol N/m2/d','ammonium sediment flux')
-   data%id_sed_nit = aed_define_sheet_diag_variable('nit_dsf','mmol N/m2/d','nitrate sediment flux')
-   IF( simN2O>0 )data%id_sed_n2o = aed_define_sheet_diag_variable('n2o_dsf','mmol N/m2/d','n2o sediment flux')
-   IF( simN2O>1 )data%id_sed_no2 = aed_define_sheet_diag_variable('no2_dsf','mmol N/m2/d','no2 sediment flux')
+  IF (diag_level>0) THEN
+    data%id_sed_amm = aed_define_sheet_diag_variable('amm_dsf','mmol N/m2/d','ammonium sediment flux')
+    data%id_sed_nit = aed_define_sheet_diag_variable('nit_dsf','mmol N/m2/d','nitrate sediment flux')
+    IF( simN2O>0 )data%id_sed_n2o = aed_define_sheet_diag_variable('n2o_dsf','mmol N/m2/d','n2o sediment flux')
+    IF( simN2O>1 )data%id_sed_no2 = aed_define_sheet_diag_variable('no2_dsf','mmol N/m2/d','no2 sediment flux')
 
-   data%id_nitrf   = aed_define_diag_variable('nitrif','mmol N/m3/d','nitrification rate')
-   data%id_denit   = aed_define_diag_variable('denit','mmol N/m3/d','de-nitrification rate')
-   data%id_anammox = aed_define_diag_variable('anammox','mmol N/m3/d','anammox rate')
-   data%id_dnra    = aed_define_diag_variable('dnra','mmol N/m3/d','dnra rate')
-   IF( simN2O>0 )data%id_n2op    = aed_define_diag_variable('n2oprod','mmol N/m3/d','n2o prod rate')
+    data%id_nitrf   = aed_define_diag_variable('nitrif','mmol N/m3/d','nitrification rate')
+    data%id_denit   = aed_define_diag_variable('denit','mmol N/m3/d','de-nitrification rate')
+    data%id_anammox = aed_define_diag_variable('anammox','mmol N/m3/d','anammox rate')
+    data%id_dnra    = aed_define_diag_variable('dnra','mmol N/m3/d','dnra rate')
+    IF( simN2O>0 )data%id_n2op    = aed_define_diag_variable('n2oprod','mmol N/m3/d','n2o prod rate')
 
-   IF( simN2O>0 ) THEN
-    data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux', surf=.TRUE.)
-   ENDIF
-   IF( simWetDeposition .OR. simDryDeposition ) THEN
-    data%id_atm_dep = aed_define_sheet_diag_variable('din_atm','mmol N/m2/d','din atmospheric deposition flux', surf=.TRUE.)
-   ENDIF
+    IF( simN2O>0 ) THEN
+     data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux', surf=.TRUE.)
+    ENDIF
+    IF( simWetDeposition .OR. simDryDeposition ) THEN
+     data%id_atm_dep = aed_define_sheet_diag_variable('din_atm','mmol N/m2/d','din atmospheric deposition flux', surf=.TRUE.)
+    ENDIF
+  ENDIF
 
    !---------------------------------------------------------------------------+
    ! Register environmental dependencies
@@ -482,11 +491,11 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
                         Xon1*nitrousation - Xon2*nitritation - Xon3*nitratation
 
     !# Set diagnostics, based on this sub-model
-    _DIAG_VAR_(data%id_nitrf)   = ammonium_oxidation * secs_per_day
-    _DIAG_VAR_(data%id_anammox) = deammonification * secs_per_day
-    _DIAG_VAR_(data%id_n2op)    = nitrousation* secs_per_day
-    _DIAG_VAR_(data%id_denit)   = zero_ * secs_per_day     ! Heterotrophic done in OGM
-    _DIAG_VAR_(data%id_dnra)    = zero_ * secs_per_day     ! Heterotrophic done in OGM
+    IF (data%id_nitrf>0)   _DIAG_VAR_(data%id_nitrf)   = ammonium_oxidation * secs_per_day
+    IF (data%id_anammox>0) _DIAG_VAR_(data%id_anammox) = deammonification * secs_per_day
+    IF (data%id_n2op>0)    _DIAG_VAR_(data%id_n2op)    = nitrousation* secs_per_day
+    IF (data%id_denit>0)   _DIAG_VAR_(data%id_denit)   = zero_ * secs_per_day     ! Heterotrophic done in OGM
+    IF (data%id_dnra>0)    _DIAG_VAR_(data%id_dnra)    = zero_ * secs_per_day     ! Heterotrophic done in OGM
 
    ELSE
      !# Simple model
@@ -545,12 +554,12 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
 
      !-----------------------------------------------
      ! Export diagnostic variables
-     _DIAG_VAR_(data%id_nitrf)   = nitrification * secs_per_day
-     _DIAG_VAR_(data%id_denit)   = denitrification * secs_per_day
-     _DIAG_VAR_(data%id_anammox) = anammox * secs_per_day
-     _DIAG_VAR_(data%id_dnra)    = dnra * secs_per_day
+     IF (data%id_nitrf>0)   _DIAG_VAR_(data%id_nitrf)   = nitrification * secs_per_day
+     IF (data%id_denit>0)   _DIAG_VAR_(data%id_denit)   = denitrification * secs_per_day
+     IF (data%id_anammox>0) _DIAG_VAR_(data%id_anammox) = anammox * secs_per_day
+     IF (data%id_dnra>0)    _DIAG_VAR_(data%id_dnra)    = dnra * secs_per_day
      IF( data%simN2O==1 ) THEN
-       _DIAG_VAR_(data%id_n2op) = (denit_n2o_prod + nit_n2o_prod) * secs_per_day
+       IF (data%id_n2op>0) _DIAG_VAR_(data%id_n2op) = (denit_n2o_prod + nit_n2o_prod) * secs_per_day
      ENDIF
 
    ENDIF
@@ -629,7 +638,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
      !-----------------------------------------------
      ! Also store N2O flux across the atm/water interface as a
      ! diagnostic variable (mmmol/m2/d).
-     _DIAG_VAR_S_(data%id_atm_n2o) = n2o_atm_flux * secs_per_day
+      IF (data%id_atm_n2o>0) _DIAG_VAR_S_(data%id_atm_n2o) = n2o_atm_flux * secs_per_day
   ENDIF
 
   !----------------------------------------------------------------------------+
@@ -658,7 +667,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
     !-----------------------------------------------
     ! Also store deposition across the atm/water interface as a
     ! diagnostic variable (mmmol/m2/day).
-    _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_nox) + _FLUX_VAR_T_(data%id_amm)) * secs_per_day
+    IF (data%id_atm_dep>0) _DIAG_VAR_S_(data%id_atm_dep) = (_FLUX_VAR_T_(data%id_nox) + _FLUX_VAR_T_(data%id_amm)) * secs_per_day
   ENDIF
 
 END SUBROUTINE aed_calculate_surface_nitrogen
@@ -759,9 +768,9 @@ SUBROUTINE aed_calculate_benthic_nitrogen(data,column,layer_idx)
 
    !-----------------------------------------------
    ! Store sediment flux as diagnostic variable (mmol N/m2/day)
-   _DIAG_VAR_S_(data%id_sed_amm) = amm_flux*secs_per_day
-   _DIAG_VAR_S_(data%id_sed_nit) = nit_flux*secs_per_day
-   IF( data%simN2O>0 ) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux*secs_per_day
+  IF (data%id_sed_amm>0) _DIAG_VAR_S_(data%id_sed_amm) = amm_flux*secs_per_day
+  IF (data%id_sed_nit>0) _DIAG_VAR_S_(data%id_sed_nit) = nit_flux*secs_per_day
+  IF (data%simN2O>0 .and. data%id_sed_n2o>0) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux*secs_per_day
 
    !----------------------------------------------- NEEDS ADDING
    ! Set sink and source terms for the benthos (change per surface area per sec)
@@ -811,11 +820,11 @@ SUBROUTINE aed_calculate_dry_nitrogen(data,column,layer_idx)
      n2o_flux = Fsed_n2o * (data%theta_sed_dry**(temp-20.0))
 
      ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
-     IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux * secs_per_day
+    IF (data%id_sed_n2o>0) _DIAG_VAR_S_(data%id_sed_n2o) = n2o_flux * secs_per_day
 
      !# Store N2O flux across the soil-atm interface into
      !  diagnostic variable (mmmol/m2/d)
-     IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_n2o) = n2o_flux * secs_per_day
+    IF (data%id_atm_n2o>0) _DIAG_VAR_S_(data%id_atm_n2o) = n2o_flux * secs_per_day
 
   END IF
 
