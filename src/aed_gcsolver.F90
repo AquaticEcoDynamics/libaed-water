@@ -3917,7 +3917,7 @@ END SUBROUTINE UpdateUnknownsWithdX
     DOUBLETYPE, DIMENSION(:),   INTENT(INOUT) :: RES                           !
                                                                                !
     !-- Local                                                                  !
-    DOUBLETYPE :: Z, SN, ZU, ZV, CUV, XMAX, XMIN, PIVOT, TPIVOT, ABS           !
+    DOUBLETYPE :: Z, SN, ZU, ZV, CUV, XMAX, XMIN, PIVOT, TPIVOT !, ABS           !
     REAL (DP)   :: SUM, DBLE                                                   !
     DOUBLETYPE :: CU(2,NKLMD)                                                  !
                                                                                !

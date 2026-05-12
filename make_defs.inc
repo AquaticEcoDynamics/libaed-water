@@ -96,7 +96,7 @@ else ifeq ($(F90),ifx)
   endif
 else ifeq ($(F90),flang)
   ifeq ($(OSTYPE),FreeBSD)
-    INCLUDES+=-I../ancillary/freebsd/mod
+    INCLUDES+=-I../ancillary/mod
   endif
   DEBUG_FFLAGS=-g
   OMPFLAG=-fopenmp
@@ -106,6 +106,18 @@ else ifeq ($(F90),flang)
     FFLAGS+=-Mbounds
   endif
   FFLAGS+=-r8
+else ifeq ($(F90),flang-new)
+  ifeq ($(OSTYPE),FreeBSD)
+    INCLUDES+=-I../ancillary/mod
+  endif
+  DEBUG_FFLAGS=-g
+  OMPFLAG=-fopenmp
+  OPT_FFLAGS=-O3
+  FFLAGS=-module-dir ${moddir}
+  ifeq ($(WITH_CHECKS),true)
+    FFLAGS+=-Mbounds
+  endif
+  FFLAGS+=-fdefault-real-8 -fdefault-double-8
 else
   DEBUG_FFLAGS=-g -fbacktrace
   MDBG_FFLAGS=-fsanitize=address
