@@ -234,13 +234,13 @@ SUBROUTINE aed_define_tracer(data, namlst)
    IF ( settling > 1 ) THEN
       data%id_rho = aed_locate_global('density')
    ENDIF
+
    IF ( resuspension > 0 ) THEN
       data%id_taub = aed_locate_sheet_global('taub')
       data%id_E_sedzone = aed_locate_sheet_global('material')
       data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m2',  'taub diagnostic')
       data%id_resus =  aed_define_sheet_diag_variable('resus','g/m2/s', 'resuspension rate')
    ENDIF
-
 END SUBROUTINE aed_define_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -352,7 +352,6 @@ SUBROUTINE aed_calculate_benthic_tracer(data,column,layer_idx)
       ! Transfer sediment flux value to model.
       _FLUX_VAR_(data%id_trc(i)) = _FLUX_VAR_(data%id_trc(i)) + ss_flux + resus_flux
    ENDDO
-
 END SUBROUTINE aed_calculate_benthic_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -374,7 +373,7 @@ SUBROUTINE aed_light_extinction_tracer(data,column,layer_idx,extinction)
 !
 !-----------------------------------------------------------------------
 !BEGIN
-   DO ss_i=1,ubound(data%id_trc,1)
+   DO ss_i=1,data%num_tracers
       ! Retrieve current (local) state variable values.
       ss = _STATE_VAR_(data%id_trc(ss_i))
 
@@ -383,7 +382,6 @@ SUBROUTINE aed_light_extinction_tracer(data,column,layer_idx,extinction)
    ENDDO
 END SUBROUTINE aed_light_extinction_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
@@ -447,7 +445,6 @@ SUBROUTINE aed_mobility_tracer(data,column,layer_idx,mobility)
       mobility(data%id_trc(i)) = vvel
       _DIAG_VAR_(data%id_trc_vvel(i)) = vvel * secs_per_day
    ENDDO
-
 END SUBROUTINE aed_mobility_tracer
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
