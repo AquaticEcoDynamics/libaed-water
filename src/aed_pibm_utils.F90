@@ -609,7 +609,8 @@ VCP = max(VCP, 0d0)
 
 !Changes of cellular carbon [d-1]:
 !ML corresponds to eq. 1 in PIBM ms
-dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) 
+! dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) 
+dC = 0 ! SCB edit to test dev env
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell
@@ -623,11 +624,12 @@ dNO3 = dN * (1.- pN_)
 
 !Changes of cellular phosphorus [pmol P cell-1 d-1]:
 !ML newly added for GLM-AED-ABM
-dP = P * (VCP/QP - RPT)
+! dP = P * (VCP/QP - RPT)
 
 !Changes of cellular Chl [d-1]:
 !ML corresponds to eq. 3 in PIBM ms
-dChl = Chl * (rhochl*min(VCN, VCP) / theta - RChlT)
+! dChl = Chl * (rhochl*min(VCN, VCP) / theta - RChlT)
+dChl = 0 ! SCB edit to test if dev env working - keep it constant
 
 return
 END subroutine GMK98_Ind_TempSizeLight
