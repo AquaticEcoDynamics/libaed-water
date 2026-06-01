@@ -815,7 +815,7 @@ IF (data%phytos(1)%simSplit > 0) THEN
                print *, 'aed_split_particle(): WARNING no more available particles; skipping particle split'
                RETURN
             ELSE
-               IF (p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN
+               IF (p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN ! SCB - inactive, and exited via outflows?
                   !first duplicate all attributes except PTID
                   p(j)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
                   p(j)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
@@ -1003,7 +1003,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    ENDIF
 
    ! Local environmental conditions in this layer
-   WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
+   WaterTemperature = _STATE_VAR_(data%id_tem) !22  !water temperature
    par =  _STATE_VAR_(data%id_par) ! _STATE_VAR_S_(data%id_I0) local photosynth. active radiation
    no3 = _STATE_VAR_(data%id_nit)        ! local no3
    nh4 = _STATE_VAR_(data%id_amm)        ! local nh4
@@ -1043,19 +1043,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    IF (AllocateStatus /= 0) STOP "*** Problem in allocating index_***"
 
    do i = 1, N_PAR 
-      if (_PTM_STAT_(i,STAT) == 1) then !Ignore dead super-individuals
+      if (_PTM_STAT_(i,STAT) == 1) then !Ignore dead super-individuals ! SCB - ADD water column flag check here?
          N_ = N_ + 1
          if (N_ == 1) then
              allocate(scratch(1), stat=Allocatestatus)
              IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
-             scratch(1) = _PTM_STAT_(i,STAT)
+             scratch(1) = i ! _PTM_STAT_(i,STAT) ! SCB - note that Claude identified this as a likely bug - this was the recommended fix
 
             !Update index_ and scratch has been deallocated
             call move_alloc(scratch, index_)
          else
              allocate(scratch(size(index_) + 1), stat=Allocatestatus)
              IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
-             scratch(1:size(index_))   = index_
+             scratch(1:size(index_)) = index_
              scratch(size(index_) + 1) = i
 
             !Update index_ and scratch has been deallocated
@@ -1271,7 +1271,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          END SELECT
 
          !# PHYTOPLANKTON MORTALITY
-         ! If celular carbon is lower than the subsistence threshold (Cmin), it dies:
+         ! If cellular carbon is lower than the subsistence threshold (Cmin), it dies:
          Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
@@ -1370,7 +1370,10 @@ _DIAG_VAR_(data%id_mlnalpha) = 0.
 
 !loop through all super-individuals to divide, mutate, and convert into Eulerian concentrations
 IF (N_ > 0) THEN
-   DO i = 1, N_
+   ! DO i = 1, N_ ! SCB - previously, we looped through the first N_ indeces
+   
+   DO j = 1, N_ ! SCB - new: we loop through all active particles.
+   i = index_(j)
 
    ! Cell division: if cellular carbon is above the division threshold, it divides
    IF (p(i)%ptm_state(data%ip_c) >= p(i)%ptm_state(data%ip_cdiv)) THEN  !Divide
@@ -1425,7 +1428,7 @@ IF (N_ > 0) THEN
    PHYC = PHYC + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c)
    PHYN = PHYN + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_n)
    PHYP = PHYP + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_p)
-   CHL  = CHL  + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_chl)
+   CHL  = CHL + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_chl)
    _DIAG_VAR_(data%id_mcdiv)    = _DIAG_VAR_(data%id_mcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * log(p(i)%ptm_state(data%ip_cdiv))
    _DIAG_VAR_(data%id_mtopt)    = _DIAG_VAR_(data%id_mtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_Topt)
    _DIAG_VAR_(data%id_mlnalpha) = _DIAG_VAR_(data%id_mlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_LnalphaChl)
@@ -1433,10 +1436,10 @@ IF (N_ > 0) THEN
 ENDIF !End of iterating over all super-individuals
 
 !Calculate Eulerian concentrations of phyto C, N, and Chl, and mean traits and covariances for each layer
-_DIAG_VAR_(data%id_phyc) = PHYC * 1d-9/Hz   !Convert Unit to mmol/m^3
-_DIAG_VAR_(data%id_phyn) = PHYN * 1d-9/Hz   !Convert Unit to mmol/m^3
-_DIAG_VAR_(data%id_phyp) = PHYP * 1d-9/Hz   !Convert Unit to mmol/m^3
-_DIAG_VAR_(data%id_chl)  = CHL  * 1d-9/Hz   !Convert Unit to mg Chl/m^3
+_DIAG_VAR_(data%id_phyc) = PHYC * 1d-9 / Hz   !Convert Unit to mmol/m^3
+_DIAG_VAR_(data%id_phyn) = PHYN * 1d-9 / Hz   !Convert Unit to mmol/m^3
+_DIAG_VAR_(data%id_phyp) = PHYP * 1d-9 / Hz   !Convert Unit to mmol/m^3
+_DIAG_VAR_(data%id_chl)  = CHL * 1d-9 / Hz   !Convert Unit to mg Chl/m^3
 if (PHYC > 0.) then   ! need to make sure we are preventing dividing by 0 (case when there are no particles in layer)
    _DIAG_VAR_(data%id_mcdiv)    = _DIAG_VAR_(data%id_mcdiv)    / PHYC
    _DIAG_VAR_(data%id_mtopt)    = _DIAG_VAR_(data%id_mtopt)    / PHYC
@@ -1453,12 +1456,12 @@ _DIAG_VAR_(data%id_cov_TL)   = 0d0
 
 IF (N_ > 0) THEN
    DO i = 1, N_
-      _DIAG_VAR_(data%id_vcdiv)    = _DIAG_VAR_(data%id_vcdiv)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
-      _DIAG_VAR_(data%id_vtopt)    = _DIAG_VAR_(data%id_vtopt)    + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
+      _DIAG_VAR_(data%id_vcdiv) = _DIAG_VAR_(data%id_vcdiv) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
+      _DIAG_VAR_(data%id_vtopt) = _DIAG_VAR_(data%id_vtopt) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
       _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))**2
-      _DIAG_VAR_(data%id_cov_TL)   = _DIAG_VAR_(data%id_cov_TL)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
-      _DIAG_VAR_(data%id_cov_AL)   = _DIAG_VAR_(data%id_cov_AL)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))
-      _DIAG_VAR_(data%id_cov_TA)   = _DIAG_VAR_(data%id_cov_TA)   + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
+      _DIAG_VAR_(data%id_cov_TL) = _DIAG_VAR_(data%id_cov_TL) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
+      _DIAG_VAR_(data%id_cov_AL) = _DIAG_VAR_(data%id_cov_AL) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv)) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))
+      _DIAG_VAR_(data%id_cov_TA) = _DIAG_VAR_(data%id_cov_TA) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha)) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))
    ENDDO
 ENDIF
 
