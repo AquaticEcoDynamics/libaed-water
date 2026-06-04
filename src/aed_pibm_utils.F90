@@ -456,6 +456,8 @@ real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't 
 
 if (C .le. 0d0) then
    dN   = 0.d0
+   dNO3 = 0.d0
+   dNH4 = 0.d0
    dP   = 0.d0
    dC   = 0.d0
    dChl = 0.d0

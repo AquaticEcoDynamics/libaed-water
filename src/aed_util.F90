@@ -1074,7 +1074,7 @@ SUBROUTINE InitialTemp(m,depth,wv,topTemp,botTemp,nSPinUpDays,tNew)
            ti = ti-24
            da = da+1
         ENDIF
-        tn(0) = 5.0 ! topTemp !ta+am*sin(.261799*(ti-6))
+        tn(0) = topTemp !ta+am*sin(.261799*(ti-6))
         DO i=1, m
             c(i) = -k(i)*f
             a(i+1) = c(i)
