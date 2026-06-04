@@ -137,8 +137,10 @@ MODULE aed_organic_matter
 ! MODULE GLOBALS
    LOGICAL  :: extra_diag = .false.
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              !     except diagnostics required
+                                              !     for state calculations
                                               ! 1 = basic diagnostic outputs
-                                              ! 2 = flux rates, and supporitng
+                                              ! 2 = flux rates, and supporting
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
 
@@ -283,8 +285,10 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    !-- From Module Globals
 !  LOGICAL  :: extra_diag = .FALSE.      !## Obsolete Use diag_level = 10
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except diagnostics required
+!                                             !     for state calculations
 !                                             ! 1 = basic diagnostic outputs
-!                                             ! 2 = flux rates, and supporitng
+!                                             ! 2 = flux rates, and supporting
 !                                             ! 3 = other metrics
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST    %%  /aed_organic_matter/
@@ -623,7 +627,10 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_don_miner  = 0 ; data%id_pop_miner  = 0 ; data%id_dop_miner  = 0
    data%id_denit      = 0 ; data%id_bod        = 0 ; data%id_photolysis = 0
    data%id_docr_miner = 0 ; data%id_donr_miner = 0 ; data%id_dopr_miner = 0
-   data%id_cpom_bdown = 0
+   data%id_cpom_bdown = 0 ; data%id_cdom       = 0 ; data%id_floc       = 0
+   data%id_sed_toc    = 0 ; data%id_sed_ton    = 0 ; data%id_sed_top    = 0
+   data%id_sedomfr    = 0 ; data%id_pom_vvel   = 0 ; data%id_cpom_vvel  = 0
+   data%id_anaerobic  = 0
 
     IF ( diag_level>0 ) THEN
       data%id_cdom    = aed_define_diag_variable(      'cdom'     ,'/m'         ,'Chromophoric DOM')
@@ -667,7 +674,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      IF (simRpools) data%id_cpom_vvel = aed_define_diag_variable('cpom_vvel','m/d','CPOM vertical velocity')
 
    ENDIF
-   IF(data%simFlocculation>0) THEN
+    IF(data%simFlocculation>0 .AND. diag_level>1) THEN
      data%id_floc = aed_define_diag_variable('doc_floc','mmol C/m3/d','DOC flocculation')
    ENDIF
 
@@ -748,11 +755,9 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
       vis = _STATE_VAR_(data%id_vis) * att
       uva = _STATE_VAR_(data%id_uva) * att
       uvb = _STATE_VAR_(data%id_uvb) * att
-      cdom = _DIAG_VAR_(data%id_cdom)
+      cdoc = MIN(doc+docr,1.e4)
+      cdom = 0.35*exp(0.1922*(cdoc)*(12./1e3))
    ENDIF
-
-!  IF (data%id_n_den>0) denitrification = _DIAG_VAR_(data%id_n_den) / secs_per_day
-   IF (data%id_denit>0) denitrification = _DIAG_VAR_(data%id_denit) / secs_per_day
 
    IF (data%use_oxy) THEN
       oxy = _STATE_VAR_(data%id_oxy) ! oxygen
@@ -1007,7 +1012,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
      _DIAG_VAR_(data%id_cdom) = 0.35*exp(0.1922*(cdoc)*(12./1e3))
    ENDIF
 
-   IF(data%simFlocculation>0) THEN
+    IF(data%id_floc>0) THEN
      _DIAG_VAR_(data%id_floc) = doc_floc*secs_per_day
    ENDIF
 

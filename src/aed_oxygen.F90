@@ -95,6 +95,8 @@ MODULE aed_oxygen
 
 ! MODULE GLOBALS
    INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
+                                         !     except diagnostics required by
+                                         !     state calculations/coupling
                                           ! 1 = basic diagnostic outputs
                                           ! 2-10 = most diagnostic outputs
                                           ! >10 = debug/checking outputs
@@ -192,6 +194,8 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 
 ! %% From Module Globals
 !  INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
+!                                         !     except diagnostics required by
+!                                         !     state calculations/coupling
 !                                         ! 1 = basic diagnostic outputs
 !                                         ! 2-10 = most diagnostic outputs
 !                                         ! >10 = debug/checking outputs
@@ -224,6 +228,12 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    ! Register state variables
    data%id_oxy = aed_define_variable('oxy','mmol O2/m3','oxygen',     &
                                     oxy_initial,minimum=oxy_min,maximum=oxy_max)
+
+   data%id_oxy_sat = 0
+   data%id_sed_oxy = 0
+   data%id_atm_oxy_exch = 0
+   data%id_sed_oxy_pel = 0
+   data%id_atm_oxy_exch3d = 0
 
    ! Register the link to external variables
    IF (data%use_sed_model) data%id_Fsed_oxy = aed_locate_sheet_variable(Fsed_oxy_variable)
@@ -323,14 +333,12 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    _FLUX_VAR_T_(data%id_oxy) = oxy_atm_flux
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
-   IF (diag_level>0) THEN
-     _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
-     _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
-   ENDIF
+    IF (data%id_atm_oxy_exch>0) _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
+    IF (data%id_oxy_sat>0)      _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
-   IF (diag_level>9) &
-     _DIAG_VAR_(data%id_atm_oxy_exch3d) = oxy_atm_flux * secs_per_day / _STATE_VAR_(data%id_lht)
+    IF (data%id_atm_oxy_exch3d>0) &
+       _DIAG_VAR_(data%id_atm_oxy_exch3d) = oxy_atm_flux * secs_per_day / _STATE_VAR_(data%id_lht)
 
 END SUBROUTINE aed_calculate_surface_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -365,7 +373,7 @@ SUBROUTINE aed_calculate_oxygen(data,column,layer_idx)
    coxy_sat = f_pres * aed_oxygen_sat(salt,temp)
 
    ! Export diagnostic variables
-   IF (diag_level>0) _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
+   IF (data%id_oxy_sat>0) _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
 
 END SUBROUTINE aed_calculate_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -431,8 +439,8 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_oxy) = _FLUX_VAR_B_(data%id_ben_oxy) + (-oxy_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   IF (diag_level>0)   _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
-   IF (diag_level>9) THEN
+    IF (data%id_sed_oxy>0) _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
+    IF (data%id_sed_oxy_pel>0) THEN
      dz = _STATE_VAR_(data%id_lht)
      _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day / dz
    ENDIF

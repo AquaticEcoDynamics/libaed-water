@@ -111,8 +111,11 @@ MODULE aed_sedflux
 
 ! MODULE GLOBALS
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              !     except sediment-flux link
+                                              !     variables required by other
+                                              !     module state calculations
                                               ! 1 = basic diagnostic outputs
-                                              ! 2 = flux rates, and supporitng
+                                              ! 2 = flux rates, and supporting
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
 
@@ -409,9 +412,11 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 
 !  %% NAMELIST   %%  /aed_sedflux/
    CHARACTER(len=64) :: sedflux_model=''
+   ! Use module-global default unless overridden in namelist.
+   ! 0 keeps only required sediment-flux link variables active.
 !  %% END NAMELIST   %%  /aed_sedflux/
 
-   NAMELIST /aed_sedflux/ sedflux_model
+   NAMELIST /aed_sedflux/ sedflux_model, diag_level
 
 !  %% NAMELIST   %%  /aed_sed_constant/
    INTEGER  :: nzones = 1
@@ -439,8 +444,11 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Ktau_0           = MISVAL
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except sediment-flux link
+!                                             !     variables required by other
+!                                             !     module state calculations
 !                                             ! 1 = basic diagnostic outputs
-!                                             ! 2 = flux rates, and supporitng
+!                                             ! 2 = flux rates, and supporting
 !                                             ! 3 = other metrics
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_sed_constant/
@@ -561,8 +569,11 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    data%id_Ktau_0 = 0
 
 
-   ! Register state variables
-   ! NOTE the "_sheet_"  which specifies the variable is benthic.
+   ! Register sediment-flux link variables.
+   ! NOTE: these are also consumed by other AED modules via
+   ! aed_locate_sheet_variable(...), so they remain available at diag_level=0
+   ! whenever configured (value provided, i.e. > MISVAL).
+   ! NOTE the "_sheet_" which specifies the variable is benthic.
    IF ( Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol O2/m2/d',  &
                                           'flux rate of oxygen across the swi')
@@ -632,28 +643,28 @@ SUBROUTINE aed_define_sedflux(data, namlst)
                                           'critical shear stress modifier')
 
    IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
-      CALL aed_set_const_var(data%id_Fsed_oxy)
-      CALL aed_set_const_var(data%id_Fsed_rsi)
-      CALL aed_set_const_var(data%id_Fsed_amm)
-      CALL aed_set_const_var(data%id_Fsed_nit)
-      CALL aed_set_const_var(data%id_Fsed_frp)
-      CALL aed_set_const_var(data%id_Fsed_pon)
-      CALL aed_set_const_var(data%id_Fsed_don)
-      CALL aed_set_const_var(data%id_Fsed_pop)
-      CALL aed_set_const_var(data%id_Fsed_dop)
-      CALL aed_set_const_var(data%id_Fsed_poc)
-      CALL aed_set_const_var(data%id_Fsed_doc)
-      CALL aed_set_const_var(data%id_Fsed_feii)
-      CALL aed_set_const_var(data%id_Fsed_dic)
-      CALL aed_set_const_var(data%id_Fsed_ch4)
-      CALL aed_set_const_var(data%id_Fsed_ch4_ebb)
-      CALL aed_set_const_var(data%id_Fsed_n2o)
-      CALL aed_set_const_var(data%id_Fsed_dic_dry)
-      CALL aed_set_const_var(data%id_Fsed_ch4_dry)
-      CALL aed_set_const_var(data%id_Fsed_ch4_ebb_dry)
-      CALL aed_set_const_var(data%id_Fsed_n2o_dry)
-      CALL aed_set_const_var(data%id_Fstm_ch4)
-      CALL aed_set_const_var(data%id_Ktau_0)
+      IF (data%id_Fsed_oxy > 0) CALL aed_set_const_var(data%id_Fsed_oxy)
+      IF (data%id_Fsed_rsi > 0) CALL aed_set_const_var(data%id_Fsed_rsi)
+      IF (data%id_Fsed_amm > 0) CALL aed_set_const_var(data%id_Fsed_amm)
+      IF (data%id_Fsed_nit > 0) CALL aed_set_const_var(data%id_Fsed_nit)
+      IF (data%id_Fsed_frp > 0) CALL aed_set_const_var(data%id_Fsed_frp)
+      IF (data%id_Fsed_pon > 0) CALL aed_set_const_var(data%id_Fsed_pon)
+      IF (data%id_Fsed_don > 0) CALL aed_set_const_var(data%id_Fsed_don)
+      IF (data%id_Fsed_pop > 0) CALL aed_set_const_var(data%id_Fsed_pop)
+      IF (data%id_Fsed_dop > 0) CALL aed_set_const_var(data%id_Fsed_dop)
+      IF (data%id_Fsed_poc > 0) CALL aed_set_const_var(data%id_Fsed_poc)
+      IF (data%id_Fsed_doc > 0) CALL aed_set_const_var(data%id_Fsed_doc)
+      IF (data%id_Fsed_feii > 0) CALL aed_set_const_var(data%id_Fsed_feii)
+      IF (data%id_Fsed_dic > 0) CALL aed_set_const_var(data%id_Fsed_dic)
+      IF (data%id_Fsed_ch4 > 0) CALL aed_set_const_var(data%id_Fsed_ch4)
+      IF (data%id_Fsed_ch4_ebb > 0) CALL aed_set_const_var(data%id_Fsed_ch4_ebb)
+      IF (data%id_Fsed_n2o > 0) CALL aed_set_const_var(data%id_Fsed_n2o)
+      IF (data%id_Fsed_dic_dry > 0) CALL aed_set_const_var(data%id_Fsed_dic_dry)
+      IF (data%id_Fsed_ch4_dry > 0) CALL aed_set_const_var(data%id_Fsed_ch4_dry)
+      IF (data%id_Fsed_ch4_ebb_dry > 0) CALL aed_set_const_var(data%id_Fsed_ch4_ebb_dry)
+      IF (data%id_Fsed_n2o_dry > 0) CALL aed_set_const_var(data%id_Fsed_n2o_dry)
+      IF (data%id_Fstm_ch4 > 0) CALL aed_set_const_var(data%id_Fstm_ch4)
+      IF (data%id_Ktau_0 > 0) CALL aed_set_const_var(data%id_Ktau_0)
    ENDIF
 
 END SUBROUTINE aed_define_sedflux
