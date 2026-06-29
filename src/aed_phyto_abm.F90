@@ -1237,7 +1237,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_env(DENS)=min_rho
          ENDIF
 
-         !# PHYTOPLANKTON SETTLING
+         !# PHYTOPLANKTON VVEL updates based on specified settling mode
          SELECT CASE (data%phytos(1)%settling)
 
             CASE ( _MOB_OFF_ )
