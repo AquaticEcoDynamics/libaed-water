@@ -61,6 +61,9 @@ MDBG_FFLAGS=""
 ifeq ($(OSTYPE),Darwin)
   SHARED=-dynamiclib -undefined dynamic_lookup
   so_ext=dylib
+else if ($(OSTYPE),Msys)
+  SHARED=-shared -Wl,-soname,$(OUTLIB).dll
+  so_ext=dll
 else
   SHARED=-shared -Wl,-soname,$(OUTLIB).so.$(SOVERS)
   so_ext=so
