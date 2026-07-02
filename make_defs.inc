@@ -138,11 +138,12 @@ else
 endif
 FFLAGS+=$(DEFINES) $(INCLUDES)
 
+FFLAGS+=-fPIC
 ifeq ($(EXTERNAL_LIBS),shared)
-  FFLAGS+=-fPIC
+# FFLAGS+=-fPIC
   TARGET = ${libdir}/$(OUTLIB).${so_ext}
 else
-  FFLAGS+=-fPIE
+# FFLAGS+=-fPIE
   TARGET = ${libdir}/$(OUTLIB).a
 endif
 
