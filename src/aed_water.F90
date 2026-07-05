@@ -56,6 +56,8 @@ MODULE aed_water
    USE aed_pathogens
    USE aed_pesticides
    USE aed_habitat_water
+   USE aed_methane
+   USE aed_methane_bubbles
 
    IMPLICIT NONE
 
@@ -104,6 +106,8 @@ FUNCTION aed_new_wat_model(modelname) RESULT(model)
       CASE ('aed_totals');         prefix = 'TOT'; ALLOCATE(aed_totals_data_t::model)
       CASE ('aed_dummy');          prefix = 'DUM'; ALLOCATE(aed_dummy_data_t::model)
       CASE ('aed_habitat_water');  prefix = 'HAB'; ALLOCATE(aed_habitat_water_data_t::model)
+      CASE ('aed_methane');        prefix = 'CH4'; ALLOCATE(aed_methane_data_t::model)
+      CASE ('aed_methane_bubbles'); prefix = 'BUB'; ALLOCATE(aed_bubbles_data_t::model)
 !     CASE DEFAULT;                print *,'*** Unknown module ', TRIM(modelname)
    END SELECT
 

@@ -165,6 +165,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    INTEGER           :: co2_piston_model = 1
    INTEGER           :: ch4_piston_model = 1
 
+   LOGICAL           :: simCH4    = .false.
    LOGICAL           :: simCH4ebb
    AED_REAL          :: Fsed_ch4_ebb     = zero_
    CHARACTER(len=64) :: Fsed_ebb_variable=''
@@ -207,7 +208,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    NAMELIST /aed_carbon/ dic_initial,pH_initial,ch4_initial,                   &
                          ionic,Rch4ox,Kch4ox,vTch4ox,                          &
-                         methane_reactant_variable,                            &
+                         methane_reactant_variable, simCH4,                    &
                          Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable,    &
                          Fsed_ch4,Ksed_ch4,theta_sed_ch4,Fsed_ch4_variable,    &
                          atm_co2,atm_ch4,                                      &
@@ -300,8 +301,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
                                        pH_initial,minimum=zero_)
    ENDIF
 
-   IF (ch4_initial>MISVAL) THEN
-      data%simCH4 = .true.
+   data%simCH4 = simCH4
+   IF (data%simCH4) THEN
       data%id_ch4 = aed_define_variable('ch4','mmol C/m3','methane',    &
                                      ch4_initial,minimum=zero_)
       IF( data%simCH4ebb ) THEN
@@ -383,9 +384,9 @@ SUBROUTINE aed_define_carbon(data, namlst)
                             'mmol C/m2/d', 'CH4 exchange across atm/water interface', surf=.TRUE.)
          IF ( data%simCH4ebb ) THEN
             data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m3/d', &
-                            'CH4 ebullition release rate')
+                            'CH4 ebullition release rate', zavg = .TRUE.)
             data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_dis','mmol C/m3/d', &
-                            'CH4 bubble dissolution rate')
+                            'CH4 bubble dissolution rate', zavg= .TRUE.)
             data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_dsf','mmol C/m2/d', &
                             'CH4 ebullition across sed/water interface')
             data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_atm', &

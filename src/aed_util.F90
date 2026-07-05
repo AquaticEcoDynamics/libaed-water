@@ -370,7 +370,7 @@ END FUNCTION water_viscosity
 
 !###############################################################################
 PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
-                                                LA,schmidt_model,piston_model)
+                                   epsilon,kin_vsc,LA,schmidt_model,piston_model)
 !-------------------------------------------------------------------------------
 ! Atmospheric-surface water exchange piston velocity for O2, CO2, N2O, CH4 etc
 !-------------------------------------------------------------------------------
@@ -378,12 +378,13 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    AED_REAL,INTENT(IN)           :: wshgt,wind
    AED_REAL,INTENT(IN)           :: tem,sal
    AED_REAL,INTENT(IN),OPTIONAL  :: vel,depth
+   AED_REAL,INTENT(IN),OPTIONAL  :: epsilon,kin_vsc
    AED_REAL,INTENT(IN),OPTIONAL  :: LA
    INTEGER, INTENT(IN),OPTIONAL  :: schmidt_model, piston_model
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,windsp,vel_l
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,c,windsp,vel_l
    INTEGER  :: schmidt_model_l,piston_model_l
    ! Parameters
    AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
@@ -408,7 +409,7 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
 
    !-----------------------------------------------
    ! Compute k_wind
-   IF (PRESENT(LA)) THEN
+   IF (PRESENT(LA) .AND. LA > 0.0) THEN
 
       ! New option for the calculation of k_wind. Note that this has a
       ! "lake area" (LA) variable included in it.
@@ -505,6 +506,11 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
           a = 5.9*windsp - 49.3
         ENDIF
         k_wind = a * (schmidt/600.0)**(-x)
+      CASE (10)
+        c = 0.50
+        x = 0.50
+        k_wind = c*(epsilon*kin_vsc)**(0.25)*(schmidt)**(-x) ! this is in m/s
+        k_wind = k_wind * 3.6e5
       END SELECT
 
    ENDIF

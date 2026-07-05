@@ -250,7 +250,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                      'oxy_atm', 'mmol O2/m2/d', 'O2 exchange across atm/water interface', surf=.TRUE.)
     IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
-                     'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand')
+                     'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand', zavg=.TRUE.)
 
      data%id_atm_oxy_exch3d = aed_define_diag_variable(      &
                      'oxy_atmv', 'mmol O2/m3/d', 'O2 conc. change due to atmospheric flux')
