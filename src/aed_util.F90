@@ -51,12 +51,21 @@ MODULE aed_util
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC InitialTemp, SoilTemp
+   PUBLIC SoilTempFV, InitialTempFV, soil_props_t
    PUBLIC make_dir_path, param_file_type, CSV_TYPE, NML_TYPE
    PUBLIC find_free_lun, MYTRIM, STOPIT
 !
 
 INTEGER, PARAMETER :: CSV_TYPE = 1
 INTEGER, PARAMETER :: NML_TYPE = 2
+
+!# Soil thermal properties for the cell-centred soil-temperature solver
+!# (mirrors the thermal fields of intertidal_soil.SoilParams).
+TYPE :: soil_props_t
+   AED_REAL :: k_mineral, k_water
+   AED_REAL :: c_mineral, c_water, c_air
+   AED_REAL :: bulk_density, mineral_density, porosity
+END TYPE soil_props_t
 
 !===============================================================================
 CONTAINS
@@ -1180,6 +1189,133 @@ SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp,heatflux)
 
     !print *,"Done SoilTemp"
 END SUBROUTINE SoilTemp
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+! Faithful port of intertidal-soil-py (intertidal_soil/temperature.py
+! soil_temp + initial_temp; conductivity/heat-capacity from soil_params.py).
+! Cell-centred finite volume, fully-implicit (backward Euler), Johansen
+! property-based thermal conductivity, harmonic-mean interface conductivities,
+! Dirichlet top (surfTemp) and bottom (deepTemp) boundary conditions.
+!===============================================================================
+PURE FUNCTION SoilCond(theta, p) RESULT(lam)
+!-------------------------------------------------------------------------------
+   AED_REAL,INTENT(in) :: theta
+   TYPE(soil_props_t),INTENT(in) :: p
+   AED_REAL :: lam, Sr, Ke, k_dry, k_sat
+!-------------------------------------------------------------------------------
+   Sr = MIN(MAX(theta/p%porosity, zero_), one_)
+   Ke = MIN(MAX(LOG10(MAX(Sr, 1e-10)) + one_, zero_), one_)
+   k_dry = (0.135*p%bulk_density*1e3 + 64.7) &
+         / (p%mineral_density*1e3 - 0.947*p%bulk_density*1e3)
+   k_sat = p%k_mineral**(one_ - p%porosity) * p%k_water**p%porosity
+   lam = k_dry + (k_sat - k_dry)*Ke
+END FUNCTION SoilCond
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+PURE FUNCTION SoilCap(theta, p) RESULT(cap)
+!-------------------------------------------------------------------------------
+   AED_REAL,INTENT(in) :: theta
+   TYPE(soil_props_t),INTENT(in) :: p
+   AED_REAL :: cap
+!-------------------------------------------------------------------------------
+   cap = (one_ - p%porosity)*p%c_mineral + theta*p%c_water + (p%porosity - theta)*p%c_air
+END FUNCTION SoilCap
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+SUBROUTINE SoilTempFV(n, d, vwc, surfTemp, deepTemp, dt, props, temp, heatflux)
+!-------------------------------------------------------------------------------
+!  n         : number of interior cells (= n_sed_layers - 2)
+!  d(0:n+1)  : node depths (m); d(0)=0 (surface), d(n+1)=column depth
+!  vwc(1:n)  : volumetric water content per cell
+!  surfTemp  : Dirichlet surface temperature (degC)
+!  deepTemp  : Dirichlet deep-boundary temperature (degC)
+!  dt        : time-step (s)
+!  temp(1:n) : (inout) cell-centred temperature profile (degC)
+!  heatflux  : (out) surface heat flux W/m2 (positive = into soil)
+!-------------------------------------------------------------------------------
+   INTEGER,INTENT(in)  :: n
+   AED_REAL,INTENT(in) :: d(0:n+1), vwc(n), surfTemp, deepTemp, dt
+   TYPE(soil_props_t),INTENT(in) :: props
+   AED_REAL,INTENT(inout) :: temp(n)
+   AED_REAL,INTENT(out)   :: heatflux
+!LOCALS
+   INTEGER  :: i
+   AED_REAL :: dz(n), zc(n), lam(n), cap(n)
+   AED_REAL :: dzc(0:n), ki(0:n)
+   AED_REAL :: a(n), b(n), c(n), rhs(n), cp(n), dp(n), piv, fa, fb, capv
+!-------------------------------------------------------------------------------
+!BEGIN
+   DO i = 1, n
+      dz(i)  = d(i+1) - d(i)
+      zc(i)  = 0.5*(d(i) + d(i+1))
+      lam(i) = SoilCond(vwc(i), props)
+      cap(i) = SoilCap(vwc(i), props)
+   ENDDO
+   !# interface conductivities (0 = surface->cell1 .. n = cellN->deep)
+   dzc(0) = zc(1)            ;  ki(0) = lam(1)
+   DO i = 1, n-1
+      dzc(i) = zc(i+1) - zc(i)
+      ki(i)  = 2.0*lam(i+1)*lam(i) / (lam(i+1) + lam(i) + 1e-30)
+   ENDDO
+   dzc(n) = d(n+1) - zc(n)   ;  ki(n) = lam(n)
+   !# assemble tridiagonal system (Dirichlet top & bottom)
+   a = zero_ ; b = zero_ ; c = zero_ ; rhs = zero_ ; cp = zero_
+   DO i = 1, n
+      capv = cap(i)*dz(i)/dt
+      fb   = ki(i)/dzc(i)         !# conductance to cell below / deep boundary
+      fa   = ki(i-1)/dzc(i-1)     !# conductance from cell above / surface boundary
+      b(i)   = capv + fa + fb
+      rhs(i) = capv*temp(i)
+      IF (i > 1) a(i) = -fa
+      IF (i < n) c(i) = -fb
+      IF (i == 1) rhs(i) = rhs(i) + fa*surfTemp
+      IF (i == n) rhs(i) = rhs(i) + fb*deepTemp
+   ENDDO
+   !# Thomas tridiagonal solve
+   cp(1) = c(1)/b(1)  ;  dp(1) = rhs(1)/b(1)
+   DO i = 2, n
+      piv = b(i) - a(i)*cp(i-1)
+      IF (i < n) cp(i) = c(i)/piv
+      dp(i) = (rhs(i) - a(i)*dp(i-1))/piv
+   ENDDO
+   temp(n) = dp(n)
+   DO i = n-1, 1, -1
+      temp(i) = dp(i) - cp(i)*temp(i+1)
+   ENDDO
+   heatflux = ki(0)/dzc(0) * (surfTemp - temp(1))
+END SUBROUTINE SoilTempFV
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+SUBROUTINE InitialTempFV(n, d, vwc_init, surfTemp, deepTemp, spinup_days, dt, props, temp)
+!-------------------------------------------------------------------------------
+! Spin up the cell-centred profile to quasi-equilibrium (port of initial_temp).
+!-------------------------------------------------------------------------------
+   INTEGER,INTENT(in)  :: n
+   AED_REAL,INTENT(in) :: d(0:n+1), vwc_init, surfTemp, deepTemp, spinup_days, dt
+   TYPE(soil_props_t),INTENT(in) :: props
+   AED_REAL,INTENT(out) :: temp(n)
+!LOCALS
+   INTEGER  :: i, s, nsteps
+   AED_REAL :: vwc(n), hf
+!-------------------------------------------------------------------------------
+!BEGIN
+   DO i = 1, n
+      temp(i) = surfTemp + (deepTemp - surfTemp)*REAL(i-1)/REAL(MAX(n-1,1))
+      vwc(i)  = vwc_init
+   ENDDO
+   nsteps = INT(spinup_days*86400.0/dt)
+   DO s = 1, nsteps
+      CALL SoilTempFV(n, d, vwc, surfTemp, deepTemp, dt, props, temp, hf)
+   ENDDO
+END SUBROUTINE InitialTempFV
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
