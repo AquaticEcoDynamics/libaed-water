@@ -398,7 +398,6 @@ SUBROUTINE aed_define_methane(data, namlst)
    data%id_air_pres = aed_locate_sheet_global('air_pres')
    data%id_area = aed_locate_global('layer_area')
 
-
 END SUBROUTINE aed_define_methane
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -419,6 +418,8 @@ SUBROUTINE aed_calculate_methane(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   ch4oxidation = 0.
+
       ! DIC to be linked to methane oxidation
       dic = _STATE_VAR_(data%id_ch4_oxid_target) 
       ! Retrieve current (local) state variable values.
@@ -507,9 +508,10 @@ SUBROUTINE aed_calculate_surface_methane(data,column,layer_idx)
 
 !-------------------------------------------------------------------------------
 !BEGIN
-
    IF(.NOT.data%simCH4) RETURN
 
+   epsilon = 0.
+   beta = 0.
    Ko = 0.
 
    !----------------------------------------------------------------------------
@@ -621,6 +623,12 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
    AED_REAL :: ox_SWI, ch4_diff_max 
 !-------------------------------------------------------------------------------
 !BEGIN
+   ! These var were used uninitialised :
+   ch4 = 0.
+   ch4_diff = 0.
+   ch4_flux = 0.
+   fsed_ch4_ebb = 0.
+   ebb_flux = 0.
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature

@@ -412,6 +412,8 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
       AED_REAL :: reynold(NGAS), k_ndm(NGAS), peclet(NGAS), nusselt(NGAS)
       AED_REAL :: exlayer
   !-----------------------------------------------------------------------------------
+      gas_state_var = 0.
+
    !External variables
       airpres = _STATE_VAR_S_(data%id_airpres) * 100.0 !KK convert from hPa to Pa
 
