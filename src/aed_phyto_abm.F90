@@ -851,7 +851,7 @@ IF (data%phytos(1)%simSplit > 0) THEN
                   ELSE
                      div = REAL(p(j)%ptm_istat(PTID) / ppid)
                      pid = FLOOR(div)
-                     p(j)%ptm_istat(PTID) = ppid + pid*ppid + (j - pid*ppid)
+                     p(j)%ptm_istat(PTID) = ppid + pid*ppid + j
                   END IF
                   ! then exit the search for available particles loop and go back to i loop to check if next particle needs to split
                   EXIT
