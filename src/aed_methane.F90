@@ -339,6 +339,18 @@ SUBROUTINE aed_define_methane(data, namlst)
    data%id_Q_net  = aed_locate_sheet_global('Q_net')
 
    !# Register diagnostic variables
+   !
+   ! id_sed_ch4_ebb_3d ('ch4_ebb_dsfv') is the one exception that must always
+   ! be registered: aed_methane_bubbles.F90 unconditionally locates
+   ! 'CH4_ch4_ebb_dsfv' with no knowledge of (or gate on) this module's
+   ! diag_level, so gating it here breaks the bubbler ("Undefined variable
+   ! CH4_ch4_ebb_dsfv") whenever diag_level==0. Every other diagnostic below
+   ! is write-only output — its value is never read back, in this module or
+   ! any other — so it is genuinely optional and not required to run the
+   ! model; it stays gated by diag_level>0 at both registration and use.
+   data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m2/s', & !used for bubble dissolution
+                        'CH4 ebullition release rate', zavg=.TRUE., rezero=.FALSE.)
+
    IF (diag_level>0) THEN
      !IF( data%simCH4 ) THEN
        data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol C/m3/d', 'methane oxidation rate')
@@ -348,8 +360,6 @@ SUBROUTINE aed_define_methane(data, namlst)
                             'mmol C/m2/d', 'CH4 exchange across atm/water interface', surf=.TRUE.)
        data%id_ch4_oxic_prod = aed_define_diag_variable('ch4_oxic_prod',  &
                            'mmol/m3/day', 'methane oxic production')
-       data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m2/s', & !used for bubble dissolution
-                            'CH4 ebullition release rate', zavg=.TRUE., rezero=.FALSE.)
        data%id_kCH4 = aed_define_sheet_diag_variable('kCH4',        &
                             'm/s', 'Piston velocity', surf=.TRUE.)
        data%id_beta = aed_define_sheet_diag_variable('beta',        &
@@ -470,7 +480,7 @@ SUBROUTINE aed_calculate_methane(data,column,layer_idx)
       !Oxic methane production [mmol/m3/d]
       prodch4oxic = gpp * data%ch4_oxic_prod
       !print*, "prodch4oxic", prodch4oxic
-      _DIAG_VAR_(data%id_ch4_oxic_prod) = prodch4oxic
+      IF (diag_level>0) _DIAG_VAR_(data%id_ch4_oxic_prod) = prodch4oxic
 
       _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (prodch4oxic/secs_per_day)
 
@@ -558,9 +568,11 @@ SUBROUTINE aed_calculate_surface_methane(data,column,layer_idx)
          vel=vel,depth=depth,epsilon=epsilon,kin_vsc=kin_vsc,LA=data%LA, &
          schmidt_model=data%ch4_schmidt_model,piston_model=data%ch4_piston_model) !need to change it to schmidt model 5?
 
-     _DIAG_VAR_S_(data%id_kCH4) = kCH4
-     _DIAG_VAR_S_(data%id_epsilon) = epsilon
-     _DIAG_VAR_S_(data%id_beta) = beta
+     IF (diag_level>0) THEN
+        _DIAG_VAR_S_(data%id_kCH4) = kCH4
+        _DIAG_VAR_S_(data%id_epsilon) = epsilon
+        _DIAG_VAR_S_(data%id_beta) = beta
+     ENDIF
      
 
      ! Solubility, Ko (mol/L/atm)
@@ -587,7 +599,7 @@ SUBROUTINE aed_calculate_surface_methane(data,column,layer_idx)
      !# Transfer surface exchange value to AED (mmmol/m2) converted by driver.
      _FLUX_VAR_T_(data%id_ch4) = -FCH4
 
-     _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
+     IF (diag_level>0) _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
      
    !----------------------------------------------------------------------------
 
@@ -608,7 +620,7 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
 !
 !LOCALS
    ! Environment
-   AED_REAL :: temp, par, extc, dz, depth, yearday, depth_c, dens, tstart, Tabs, Hch4, air_pres, matz
+   AED_REAL :: temp, par, extc, dz, depth, yearday, depth_c, dens, tstart, Tabs, Hch4, air_pres
    ! State
    AED_REAL :: oxy, pocs, ch4, ch4s
 
@@ -641,16 +653,30 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
    layer_ht = _STATE_VAR_(data%id_layer_ht)
    depth_c = _STATE_VAR_S_(data%id_depth_c)
    layer_area = _STATE_VAR_(data%id_area)
-   matz = _STATE_VAR_S_(data%id_zone)
-   _DIAG_VAR_S_(data%id_tempzon) = temp
+   ! (data%id_zone is never located/assigned anywhere in this module and its
+   ! result was unused — the read was an unconditional dereference of an
+   ! uninitialised variable id, i.e. a guaranteed segfault. Removed.)
+   ! id_tempzon is registered only when diag_level>0 .AND. ebb_model==2 (see
+   ! aed_define_methane); this write must match both conditions.
+   IF ( diag_level>0 .AND. data%ebb_model==2 ) _DIAG_VAR_S_(data%id_tempzon) = temp
    
 
    IF ( data%use_sed_model_ch4 ) THEN
       Fsed_ch4 = _STATE_VAR_S_(data%id_Fsed_ch4) / secs_per_day
-      IF( data%simCH4ebb ) Fsed_ch4_ebb = _STATE_VAR_S_(data%id_Fsed_ch4_ebb) / secs_per_day
    ELSE
       Fsed_ch4 = data%Fsed_ch4
-      IF( data%simCH4ebb ) Fsed_ch4_ebb = data%Fsed_ch4_ebb
+   ENDIF
+
+   IF ( data%simCH4ebb ) THEN
+      ! use_sed_model_ebb (not use_sed_model_ch4) gates id_Fsed_ch4_ebb, since
+      ! that's the flag that determines whether it was ever located (below,
+      ! at data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''); otherwise
+      ! id_Fsed_ch4_ebb is an unset variable id and this read segfaults.
+      IF ( data%use_sed_model_ebb ) THEN
+         Fsed_ch4_ebb = _STATE_VAR_S_(data%id_Fsed_ch4_ebb) / secs_per_day
+      ELSE
+         Fsed_ch4_ebb = data%Fsed_ch4_ebb
+      ENDIF
    ENDIF
 
    IF( data%simCH4ebb ) THEN
@@ -661,14 +687,16 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
          pocs = _STATE_VAR_S_(data%id_poc_s)
 
          poc_set = poc_swi + phy_swi
-         _DIAG_VAR_S_(data%id_poc_set) = poc_swi * secs_per_day
-         _DIAG_VAR_S_(data%id_phy_set) = phy_swi * secs_per_day
+         IF (diag_level>0) THEN
+            _DIAG_VAR_S_(data%id_poc_set) = poc_swi * secs_per_day
+            _DIAG_VAR_S_(data%id_phy_set) = phy_swi * secs_per_day
+         ENDIF
          _FLUX_VAR_B_(data%id_poc_s) = _FLUX_VAR_B_(data%id_poc_s) - (phy_swi) !5.8e-04 need actual settling model average 2.581018e-06
          _FLUX_VAR_B_(data%id_poc_s) = _FLUX_VAR_B_(data%id_poc_s) - (poc_swi)
 
          !POC respiration
          poc_resp = data%Rpoc_resp * pocs * (data%theta_poc_resp**(temp-20.0))
-         _DIAG_VAR_S_(data%id_poc_resp) = poc_resp * secs_per_day
+         IF (diag_level>0) _DIAG_VAR_S_(data%id_poc_resp) = poc_resp * secs_per_day
          _FLUX_VAR_B_(data%id_poc_s) = _FLUX_VAR_B_(data%id_poc_s) - (poc_resp)
 
          !POC burial
@@ -690,14 +718,14 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
          ptotal = air_pres + (dens * 9.81 * depth_hydro_p)
          pN2 = 0.79 * air_pres
          ch4_cr = Hch4 * ((ptotal-pN2)/(8.3144621 * Tabs))
-         _DIAG_VAR_S_(data%id_ch4_crit) = ch4_cr * 1000! mol to mmol
+         IF (diag_level>0) _DIAG_VAR_S_(data%id_ch4_crit) = ch4_cr * 1000! mol to mmol
 
          !ch4 production
          oxy = _STATE_VAR_(data%id_oxy)
          oxy_sed = data%oxy_sed_p * _STATE_VAR_(data%id_oxy) ! sediment oxy ~ X% of bottom layer oxy
          gamma = min(data%Kpocox_sed/(data%Kpocox_sed+oxy_sed), data%gamma_max)
          ch4_prod = gamma * poc_resp
-         _DIAG_VAR_S_(data%id_ch4s_prod) = ch4_prod * secs_per_day
+         IF (diag_level>0) _DIAG_VAR_S_(data%id_ch4s_prod) = ch4_prod * secs_per_day
          _FLUX_VAR_B_(data%id_ch4_s) = _FLUX_VAR_B_(data%id_ch4_s) + (ch4_prod)
          
          !ch4 oxidation
@@ -716,7 +744,7 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
          !original ebullition formulation bubbles get released immadiately when poreater CH4 exceeds critical conc.
          k_HL = log(2.0) / 1800 ! ebullition half life per second !k_HL = 0.000001
          ch4_ebb = MAX(0.0, k_HL * (ch4_pw - 1000*ch4_cr) * data%sed_z) ! mmol/m2/s?
-         _DIAG_VAR_S_(data%id_ch4s_ebb) = ch4_ebb * secs_per_day
+         IF (diag_level>0) _DIAG_VAR_S_(data%id_ch4s_ebb) = ch4_ebb * secs_per_day
          _FLUX_VAR_B_(data%id_ch4_s) = _FLUX_VAR_B_(data%id_ch4_s) - (ch4_ebb)
 
          
@@ -737,9 +765,11 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
          !ch4_diff = max(0.0, (data%ch4_s_diff_coef/data%z_dbl)*(ch4_pwd - ch4)) !* (data%Kch4ox_diff/(oxy+data%Kch4ox_diff))
          ch4_eff = min(ch4_pw, 1000*ch4_cr)
          ch4_diff = max(0.0, (data%ch4_s_diff_coef/data%z_dbl)*(ch4_eff - ch4)) * (data%Kch4ox_diff/(oxy+data%Kch4ox_diff))
-         _DIAG_VAR_S_(data%id_ch4s_diff) = ch4_diff * secs_per_day ! convert to /day
+         IF (diag_level>0) THEN
+            _DIAG_VAR_S_(data%id_ch4s_diff) = ch4_diff * secs_per_day ! convert to /day
+            _DIAG_VAR_S_(data%id_ch4_pw) = ch4_pw
+         ENDIF
          _FLUX_VAR_B_(data%id_ch4_s) = _FLUX_VAR_B_(data%id_ch4_s) - (ch4_diff)
-         _DIAG_VAR_S_(data%id_ch4_pw) = ch4_pw
       ENDIF
    ENDIF
 
@@ -778,17 +808,22 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
          _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*ch4_bub_disf !/ dz
       ENDIF
 
-      IF (diag_level>0) THEN
-         IF ( data%ebb_model == 1) THEN
-            _DIAG_VAR_S_(data%id_ch4_ebb_df) = (ebb_flux*ch4_bub_disf) * secs_per_day ! MH Something wrong with dz here?
-               ! Release the remainder to the atmosphere (mmol/m2/day)
-            _DIAG_VAR_S_(data%id_atm_ch4_ebb) = _DIAG_VAR_S_(data%id_atm_ch4_ebb)+ ebb_flux * (1.-ch4_bub_disf) * secs_per_day
-               ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
-            _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
-               !print*, 'sed_ch4_ebb', _DIAG_VAR_S_(data%id_sed_ch4_ebb)
-         ENDIF
-            ! Note the bubble flux, as the water sees it  (mmol/m2/s)
-            _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux 
+      ! id_sed_ch4_ebb_3d ('ch4_ebb_dsfv') is required unconditionally by the
+      ! bubbler module (aed_methane_bubbles.F90 always locates
+      ! 'CH4_ch4_ebb_dsfv' with no diag_level awareness of its own), so it
+      ! must always be written here regardless of diag_level — unlike the
+      ! named diagnostics below, which are genuinely optional and gated to
+      ! match their diag_level>0-only registration.
+      ! Note the bubble flux, as the water sees it  (mmol/m2/s)
+      _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux
+
+      IF (diag_level>0 .AND. data%ebb_model == 1) THEN
+         _DIAG_VAR_S_(data%id_ch4_ebb_df) = (ebb_flux*ch4_bub_disf) * secs_per_day ! MH Something wrong with dz here?
+            ! Release the remainder to the atmosphere (mmol/m2/day)
+         _DIAG_VAR_S_(data%id_atm_ch4_ebb) = _DIAG_VAR_S_(data%id_atm_ch4_ebb)+ ebb_flux * (1.-ch4_bub_disf) * secs_per_day
+            ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
+         _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+            !print*, 'sed_ch4_ebb', _DIAG_VAR_S_(data%id_sed_ch4_ebb)
       ENDIF
    ENDIF
 
@@ -797,7 +832,7 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
    _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
    
    ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day
-   _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
+   IF (diag_level>0) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
 
 
 END SUBROUTINE aed_calculate_benthic_methane
