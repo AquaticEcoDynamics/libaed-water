@@ -1341,13 +1341,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + oxy_flux  ! mmol/m3/s CHECK would need to add equivalent zoop variables here if added zoops in
   _DIAG_VAR_(data%id_d_oxy) = oxy_flux * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
 
-  ! deallocate things
-  if (allocated(index_))  deallocate(index_)
-  if (allocated(Pmatrix)) deallocate(Pmatrix)
-  if (allocated(BN))      deallocate(BN)
-  if (allocated(BP))      deallocate(BP)
-  if (allocated(BC))      deallocate(BC)
-
 ! END OF CODE FROM PIBM BIOLOGY SUBROUTINE
 !------------------------------------------------------
 
@@ -1455,7 +1448,8 @@ _DIAG_VAR_(data%id_cov_TA)   = 0d0
 _DIAG_VAR_(data%id_cov_TL)   = 0d0
 
 IF (N_ > 0) THEN
-   DO i = 1, N_
+   DO j = 1, N_
+      i = index_(j)
       _DIAG_VAR_(data%id_vcdiv) = _DIAG_VAR_(data%id_vcdiv) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (log(p(i)%ptm_state(data%ip_cdiv)) - _DIAG_VAR_(data%id_mcdiv))**2
       _DIAG_VAR_(data%id_vtopt) = _DIAG_VAR_(data%id_vtopt) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_Topt) - _DIAG_VAR_(data%id_mtopt))**2
       _DIAG_VAR_(data%id_vlnalpha) = _DIAG_VAR_(data%id_vlnalpha) + p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c) * (p(i)%ptm_state(data%ip_LnalphaChl) - _DIAG_VAR_(data%id_mlnalpha))**2
@@ -1473,6 +1467,13 @@ IF (PHYC > 0d0) then ! need to make sure we are preventing dividing by 0 (case w
    _DIAG_VAR_(data%id_cov_TA)   = _DIAG_VAR_(data%id_cov_TA)  / PHYC
    _DIAG_VAR_(data%id_cov_AL)   = _DIAG_VAR_(data%id_cov_AL)  / PHYC
 ENDIF
+
+! deallocate things
+if (allocated(index_))  deallocate(index_)
+if (allocated(Pmatrix)) deallocate(Pmatrix)
+if (allocated(BN))      deallocate(BN)
+if (allocated(BP))      deallocate(BP)
+if (allocated(BC))      deallocate(BC)
 
 ! END PIBM Par2PHY CODE
 !------------------------------------------------------
