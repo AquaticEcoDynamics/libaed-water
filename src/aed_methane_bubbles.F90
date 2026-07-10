@@ -210,7 +210,7 @@ SUBROUTINE aed_define_bubbles(data, namlst)
    CHARACTER(len=64)  :: ch4_diss_target_variable=''
    CHARACTER(len=64)  :: ch4_btmb_target_variable=''
    
-   NAMELIST /aed_methane_bubbles/nradius,ch4_diss_target_variable,ch4_btmb_target_variable
+   NAMELIST /aed_methane_bubbles/nradius,ch4_diss_target_variable,ch4_btmb_target_variable,diag_level
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -244,30 +244,42 @@ SUBROUTINE aed_define_bubbles(data, namlst)
    ALLOCATE(data%gasname(NGAS))
    data%gasname = (/'Wn2 ', 'Wo2 ', 'Wco2', 'Wch4'/)
 
-   data%id_dGama = aed_define_diag_variable('dGama_', 'N/m', 'surface tension')
-   data%id_sed_load = aed_define_diag_variable('ch4_sed', 'mmol/d', "sediment methane")
-   
-   DO r=1,NRLAYER+1
-      CALL aed_int2str(r, rnum)
-      
-      ! Bulk bubble variables, for each bubble size class
-      data%id_Vab(r) = aed_define_diag_variable('Vab_'//rnum, 'units', 'name ')
-      data%id_bNumb(r) = aed_define_diag_variable('bNumb_'//rnum, '', 'bubble amount')
-
-
-      ! Gas specific allocations, for each bubble size class
-      DO g=1,NGAS
-         data%id_Cbg(g,r) = aed_define_diag_variable('Cbg_'//TRIM(data%gasname(g))//'_'//TRIM(rnum), 'units', 'name ')
-      ENDDO
-
-   ENDDO
+   ! id_bsolu/id_bDiff/id_schmidt/id_gas_ex are required regardless of
+   ! diag_level: they are written in one loop and read back later in the same
+   ! calculate_column_bubbles call (lines ~575/576/582/602 for bsolu/bDiff/
+   ! schmidt — the coupled multi-gas bubble physics needs all NGAS gases'
+   ! properties, not just CH4's), and id_gas_ex(4) directly drives
+   ! _FLUX_VAR_(data%id_ch4) (line ~378). Diagnostics that are write-only
+   ! (never read back, in this module or any other) are gated by
+   ! diag_level>0 below, matching their (also-guarded) write sites.
    DO g=1,NGAS
       data%id_bsolu(g) = aed_define_diag_variable('bsolu_'//TRIM(data%gasname(g)), 'mol/m3/Pa', 'gas solubility')
       data%id_bDiff(g) = aed_define_diag_variable('bDiff_'//TRIM(data%gasname(g)), 'm2/s', 'gas diffusivity')
       data%id_schmidt(g) = aed_define_diag_variable('schmidt_'//TRIM(data%gasname(g)), 'm2/s', 'schmidt number')
-      data%id_bubble_fluxes(g) = aed_define_sheet_diag_variable('bub_fluxes_'//TRIM(data%gasname(g)), 'units/m2', 'name ') ! same as bubble_fluxes(NGAS) update name later based on gas names KK: done bu had to shorten bubble_fluxes_ to bub_fluxes
       data%id_gas_ex(g) = aed_define_diag_variable('gas_exchange_'//TRIM(data%gasname(g)), 'unit', 'total gas exchange from bubbles') ! same as m_gasExchange(NGAS,WATER_LAYER+1)
    ENDDO
+
+   IF (diag_level>0) THEN
+      data%id_dGama = aed_define_diag_variable('dGama_', 'N/m', 'surface tension')
+      data%id_sed_load = aed_define_diag_variable('ch4_sed', 'mmol/d', "sediment methane")
+
+      DO r=1,NRLAYER+1
+         CALL aed_int2str(r, rnum)
+
+         ! Bulk bubble variables, for each bubble size class
+         data%id_Vab(r) = aed_define_diag_variable('Vab_'//rnum, 'units', 'name ')
+         data%id_bNumb(r) = aed_define_diag_variable('bNumb_'//rnum, '', 'bubble amount')
+
+         ! Gas specific allocations, for each bubble size class
+         DO g=1,NGAS
+            data%id_Cbg(g,r) = aed_define_diag_variable('Cbg_'//TRIM(data%gasname(g))//'_'//TRIM(rnum), 'units', 'name ')
+         ENDDO
+      ENDDO
+
+      DO g=1,NGAS
+         data%id_bubble_fluxes(g) = aed_define_sheet_diag_variable('bub_fluxes_'//TRIM(data%gasname(g)), 'units/m2', 'name ') ! same as bubble_fluxes(NGAS) update name later based on gas names KK: done bu had to shorten bubble_fluxes_ to bub_fluxes
+      ENDDO
+   ENDIF
 
 
    !# Register external state variable dependencies
@@ -443,7 +455,7 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
       m_btmbflux(4, icol) = _DIAG_VAR_(data%id_btmb_ch4_3d)*1e-3     ! KK mmol to mol; set CH4 bub flux to diag
       m_btmbflux(1, icol) = 0.15 * m_btmbflux(4, icol)                                          !4.96*1e-8                                
       !print*, "diag1", m_btmbflux(4, icol)
-      _DIAG_VAR_(data%id_sed_load) = m_btmbflux(4, icol) * secs_per_day * sumAz * 1000
+      IF (diag_level>0) _DIAG_VAR_(data%id_sed_load) = m_btmbflux(4, icol) * secs_per_day * sumAz * 1000
       !print*, "sed_load", _DIAG_VAR_(data%id_sed_load)
       do rIndx = 1, NRLAYER+1, 1                                                                
          rr = data%m_Rb0(rIndx)
@@ -459,13 +471,15 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
       !print*, "Atmp", Atmp
    end do
 
+   IF (diag_level>0) THEN
    do locIndx = bot, top, 1
       layer_idx = locIndx
       do rIndx = 1, NRLAYER+1, 1
          _DIAG_VAR_(data%id_Vab(rIndx)) = Vab(rIndx,locIndx)
       end do
    end do
-   
+   ENDIF
+
    do icol = 1, nscol, 1
       layer_idx = icol
       temp = _STATE_VAR_(data%id_temp) + 273.15                                        
@@ -483,14 +497,16 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
       end do  
    end do
    
+   IF (diag_level>0) THEN
    do locIndx = bot, top, 1
       layer_idx = locIndx
       do rIndx = 1, NRLAYER+1, 1
          _DIAG_VAR_(data%id_bNumb(rIndx)) = bNumb(rIndx,locIndx)
       end do
    end do
-   
-   
+   ENDIF
+
+
 
    !print*, "This replicates Bubble Module Setup"
    da_sum = 0.0
@@ -653,7 +669,7 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
                   !print*, "sumAzB", sumAz
             end if
             !print*, "gasex", m_gasExchange(4,ii)
-            _DIAG_VAR_(data%id_Cbg(4,rIndx)) = Cbg(4,rIndx,ii)
+            IF (diag_level>0) _DIAG_VAR_(data%id_Cbg(4,rIndx)) = Cbg(4,rIndx,ii)
          end do
          !print*, "gas_exchangemid", m_gasExchange(4,ii)
       end do
@@ -688,7 +704,7 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
    end if
 
 
-   _DIAG_VAR_S_(data%id_bubble_fluxes(4)) = m_topbflux * 1000 * secs_per_day
+   IF (diag_level>0) _DIAG_VAR_S_(data%id_bubble_fluxes(4)) = m_topbflux * 1000 * secs_per_day
    !print*, "top_ch4", _DIAG_VAR_S_(data%id_bubble_fluxes(4))
    
    CONTAINS      
