@@ -42,7 +42,8 @@ real :: nu(NTrait) = [1d-12, 1d-12, 1d-12] !Probability per generation per cell
 real :: sigma(NTrait) = [0.1, 0.1, 0.1]    !Standard deviation of mutation of the three traits
 
 integer, parameter :: NInit = 8            ! Number of traits + initial conditions with variability
-real :: sigma_init(NInit) = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1,0.1, 0.1]    !Standard deviation of variability of the traits/initial conditions
+real :: sigma_init(NInit) = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1,0.1, 0.1]
+                    !Standard deviation of variability of the traits/initial conditions
 
 end module params
 
@@ -55,12 +56,13 @@ Module Trait_functions
 !-------------------------------------------------------------------------------
 use params
 
-!This module provides several functions calculating phytoplankton physiological rates as a function of environmental conditions (e.g., temperature) and traits
+!This module provides several functions calculating phytoplankton physiological rates
+!as a function of environmental conditions (e.g., temperature) and traits
 implicit none
 
 private
 
-public :: temp_Topt, PHY_C2Vol, Ainf 
+public :: temp_Topt, PHY_C2Vol, Ainf
 public :: Pmax_size, respiration, phyto_pN
 
 CONTAINS
@@ -91,7 +93,7 @@ real, intent(in) :: rho
 real, intent(in) :: rho_star
 
 !Constant in Eqn. 14 of Wirtz (2011) (a' = (rho*/rho)^.333*a) in which a = 0.34, rho* = 0.25, and rho = 0.5
-real             :: a_p 
+real             :: a_p
 
 !End of declaration
 
@@ -200,7 +202,8 @@ END FUNCTION alloscale
 !Han (2001) (J. Theor. Biol.)
 !Assuming that acclimation to photoinhibition is at the time-scale of ms.
 !------------------------------------------------------------------------------------------------
-PURE REAL FUNCTION Ainf(PAR_, alpha_, QN_, QNmin_, QNmax_, QP_, QPmin_, QPmax_, theta_, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+PURE REAL FUNCTION Ainf(PAR_, alpha_, QN_, QNmin_, QNmax_, QP_, QPmin_, QPmax_, theta_, Tau, &
+                                                        Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
 
 implicit none
 
@@ -217,7 +220,8 @@ real, intent(in) :: QPmax_         !Maximal P:C ratio
 real, intent(in) :: theta_         !Chl:C ratio [mg Chl mmol C]
 
 real, intent(in)  :: Tau   != 5.5d-3 Turnover time of the electron transport chain [s]
-real, intent(in)  :: Beta_Ainf  != 0.492  Pre-exponential factor of effective cross-section eq [m2 uE-1 (g Chl)^(1/Kappa) (g C)^(-1/Kappa)]
+real, intent(in)  :: Beta_Ainf  != 0.492  Pre-exponential factor of effective cross-section
+                                !eq [m2 uE-1 (g Chl)^(1/Kappa) (g C)^(-1/Kappa)]
 real, intent(in)  :: Kappa != 0.469  Exponent of effective cross-section equation [nd]
 real, intent(in)  :: Kd_Ainf    != 5d-6   Damage constant of a photosynthetic unit [nd]
 
@@ -225,7 +229,8 @@ real, parameter  :: WtouE = 4.57   !Constant to convert PAR units from [Wm-2] to
 real, intent(in)  :: a_ != 2d-5      The constant a in the equation relating Kr and alphaChl ML Moore et al. 1998
 real, intent(in)  :: b_ != 5d-7      The constant b in the equation relating Kr and alphaChl ML Moore et al. 1998
 real, intent(in)  :: v_ != -6.64     The constant v in the equation relating Kr and alphaChl ML Moore et al. 1998
-real             :: Kr0            !Repair constant of a photosynthetic unit [s-1] under nutrient saturated conditions which depends on alpha to impose a tradeoff
+real             :: Kr0            !Repair constant of a photosynthetic unit [s-1] under nutrient
+                                   !saturated conditions which depends on alpha to impose a tradeoff
 real             :: Kr             !Nutrient dependent Repair constant of a photosynthetic unit [s-1]
 real             :: K              !Ratio of damage to repair constants [s]
 real             :: Sigma          !Effective cross-section of the PSU [m2 uE-1]
@@ -306,7 +311,8 @@ Module gmk
 
 use params
 
-!This module provides several functions calculating phytoplankton physiological rates as a function of environmental conditions (e.g., temperature) and traits
+!This module provides several functions calculating phytoplankton physiological
+!rates as a function of environmental conditions (e.g., temperature) and traits
 implicit none
 
 private
@@ -315,7 +321,13 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl,       &
+                     Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_,      &
+                     RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax,        &
+                     thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, &
+                     QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol,  &
+                     a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi,      &
+                     T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -374,34 +386,35 @@ real, intent(in)   :: KN_b   != 0.33d0      Allometric exponent for KN ML pull t
 real, intent(in)   :: KPho_a   != 0.14d0      Normalization constant for KPho ML pull to nml
 real, intent(in)   :: KPho_b   != 0.33d0      Allometric exponent for KPho ML pull to nml
 
-!Additional parameters for functions that are called within this subroutine (PHY_C2Vol, Pmax_size, respiration, temp_Topt, JOHNSON, TK, Ainf)
+!Additional parameters for functions that are called within this subroutine
+!   (PHY_C2Vol, Pmax_size, respiration, temp_Topt, JOHNSON, TK, Ainf)
 
 !Parameters for PHY_C2Vol function:
-real, intent(in)   :: a_c2vol   
-real, intent(in)   :: b_c2vol 
+real, intent(in)   :: a_c2vol
+real, intent(in)   :: b_c2vol
 
 !Parameters for Pmax_size function:
-real, intent(in)   :: a_pmax   
-real, intent(in)   :: rho 
+real, intent(in)   :: a_pmax
+real, intent(in)   :: rho
 real, intent(in)   :: rho_star
 
 !Parameters for respiration function:
-real, intent(in)   :: b_rho   
-real, intent(in)   :: V_s 
+real, intent(in)   :: b_rho
+real, intent(in)   :: V_s
 
-!Parameters for temp_Topt function: 
-real, intent(in)   :: Ea0   
-real, intent(in)   :: Ed0 
+!Parameters for temp_Topt function:
+real, intent(in)   :: Ea0
+real, intent(in)   :: Ed0
 real, intent(in)   :: Ei
-real, intent(in)   :: beta 
+real, intent(in)   :: beta
 real, intent(in)   :: phi
 real, intent(in)   :: T_std
 
-!Parameters for Ainf function: 
-real, intent(in)   :: Tau   
-real, intent(in)   :: Beta_Ainf 
+!Parameters for Ainf function:
+real, intent(in)   :: Tau
+real, intent(in)   :: Beta_Ainf
 real, intent(in)   :: Kappa
-real, intent(in)   :: Kd_Ainf 
+real, intent(in)   :: Kd_Ainf
 real, intent(in)   :: a_
 real, intent(in)   :: b_
 real, intent(in)   :: v_
@@ -610,7 +623,7 @@ VCP = max(VCP, 0d0)
 
 !Changes of cellular carbon [d-1]:
 !ML corresponds to eq. 1 in PIBM ms
-dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) 
+dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT)
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell

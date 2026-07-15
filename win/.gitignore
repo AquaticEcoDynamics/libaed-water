@@ -1,2 +1,5 @@
 *.user
 *.u2d
+.vs
+*.sln
+x64-Release

@@ -89,8 +89,10 @@ MODULE aed_bio_utils
       INTEGER  :: simSplit
       AED_REAL :: X_cinit, X_ninit, X_pinit, X_chlinit, Cdiv, n0, Lnalphachl, mort_prob
       AED_REAL :: RC, RN, RP, RChl, zeta_N, zeta_P, a1
-      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
-      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
+      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a
+      AED_REAL :: QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
+      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta
+      AED_REAL :: phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
    END TYPE phyto_data_t
 
@@ -124,8 +126,10 @@ MODULE aed_bio_utils
       INTEGER  :: simSplit
       AED_REAL :: X_cinit, X_ninit, X_pinit, X_chlinit, Cdiv, n0, Lnalphachl, mort_prob
       AED_REAL :: RC, RN, RP, RChl, zeta_N, zeta_P, a1
-      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
-      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
+      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a
+      AED_REAL :: QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
+      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta
+      AED_REAL :: phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
    END TYPE phyto_param_t
    ! %% END NAMELIST   %% phyto_param_t

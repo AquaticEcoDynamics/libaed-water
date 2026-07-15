@@ -1387,7 +1387,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
                             + mpb_flux + (-Psed_phy_c/secs_per_day) - mpb_burial
      ENDIF
      ! Log this uptake into the bulk community GPP/NCP diagnostics (mmolC/m3/d)
-   IF (data%id_GPP > 0) _DIAG_VAR_(data%id_GPP) =  _DIAG_VAR_(data%id_GPP) + (mpb_prod/dz) * mpb * secs_per_day
+   IF (data%id_GPP > 0) &
+         _DIAG_VAR_(data%id_GPP) =  _DIAG_VAR_(data%id_GPP) + (mpb_prod/dz) * mpb * secs_per_day
    IF (data%id_NCP > 0) _DIAG_VAR_(data%id_NCP) =  _DIAG_VAR_(data%id_NCP) + (mpb_flux/dz) * secs_per_day
 
      ! Update flux terms for O2 (mmolO2/m2/s)
@@ -1409,8 +1410,10 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
         _FLUX_VAR_(data%id_Nupttarget(2)) = &
                      _FLUX_VAR_(data%id_Nupttarget(2)) - mpb_flux * ratio *0.5
         ! log this uptake into the bulk community N uptake diagnostic (mmol N/m3/d)
-      IF (data%id_NUP1 > 0) _DIAG_VAR_(data%id_NUP1)= _DIAG_VAR_(data%id_NUP1)- (mpb_flux/dz) * ratio *0.5 * secs_per_day
-      IF (data%id_NUP2 > 0) _DIAG_VAR_(data%id_NUP2)= _DIAG_VAR_(data%id_NUP2)- (mpb_flux/dz) * ratio *0.5 * secs_per_day
+      IF (data%id_NUP1 > 0) &
+         _DIAG_VAR_(data%id_NUP1)= _DIAG_VAR_(data%id_NUP1)- (mpb_flux/dz) * ratio *0.5 * secs_per_day
+      IF (data%id_NUP2 > 0) &
+         _DIAG_VAR_(data%id_NUP2)= _DIAG_VAR_(data%id_NUP2)- (mpb_flux/dz) * ratio *0.5 * secs_per_day
      ENDIF
      ! Update flux terms for phosphate (mmolP/m2/s)
      IF (data%do_Puptake .and. data%do_mpb/=2) THEN
@@ -1419,7 +1422,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
         _FLUX_VAR_(data%id_Pupttarget(1)) = &
                            _FLUX_VAR_(data%id_Pupttarget(1)) - mpb_flux * ratio
         ! log this uptake into the bulk community P uptake diagnostic (mmol P/m3/d)
-      IF (data%id_PUP > 0) _DIAG_VAR_(data%id_PUP) = _DIAG_VAR_(data%id_PUP) - mpb_flux * ratio * secs_per_day
+      IF (data%id_PUP > 0) &
+           _DIAG_VAR_(data%id_PUP) = _DIAG_VAR_(data%id_PUP) - mpb_flux * ratio * secs_per_day
      ENDIF
 
      ! Now compute resuspension of mpb and distribute into the phytoplankton groups
@@ -1451,7 +1455,8 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
            IF(data%phytos(phy_i)%simINDynamics>0) THEN
              ratio = _DIAG_VAR_S_(data%id_xnc_avg)
              _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + resus * ratio
-             IF (data%id_PhySEDn(phy_i) > 0) _DIAG_VAR_(data%id_PhySEDn(phy_i)) = _DIAG_VAR_(data%id_PhySEDn(phy_i)) + &
+             IF (data%id_PhySEDn(phy_i) > 0) &
+                 _DIAG_VAR_(data%id_PhySEDn(phy_i)) = _DIAG_VAR_(data%id_PhySEDn(phy_i)) + &
                                                                        resus/dz * ratio * secs_per_day
            ENDIF
            IF(data%phytos(phy_i)%simIPDynamics>0) THEN
@@ -1474,8 +1479,10 @@ SUBROUTINE aed_calculate_benthic_phytoplankton(data,column,layer_idx)
 
 !    _DIAG_VAR_S_(data%id_swi_c) =  Psed_phy + (Fsed_phy * secs_per_day)
    IF (data%id_swi_c > 0) _DIAG_VAR_S_(data%id_swi_c) = (Fsed_phy - mpb_burial) * secs_per_day
-   IF (data%id_swi_n > 0) _DIAG_VAR_S_(data%id_swi_n) = (Fsed_phy - mpb_burial) * _DIAG_VAR_S_(data%id_xnc_avg) * secs_per_day
-   IF (data%id_swi_p > 0) _DIAG_VAR_S_(data%id_swi_p) = (Fsed_phy - mpb_burial) * _DIAG_VAR_S_(data%id_xpc_avg) * secs_per_day
+   IF (data%id_swi_n > 0) &
+      _DIAG_VAR_S_(data%id_swi_n) = (Fsed_phy - mpb_burial) * _DIAG_VAR_S_(data%id_xnc_avg) * secs_per_day
+   IF (data%id_swi_p > 0) &
+      _DIAG_VAR_S_(data%id_swi_p) = (Fsed_phy - mpb_burial) * _DIAG_VAR_S_(data%id_xpc_avg) * secs_per_day
 
 
    !---------------------------------------------------------------------------+

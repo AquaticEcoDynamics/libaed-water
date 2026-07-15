@@ -272,7 +272,8 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    ENDIF
 
    IF (diag_level > 0) data%id_set    =  aed_define_diag_variable('set','g/m3/d','total sedimentation flux')
-   IF (diag_level > 0) data%id_ss_swi =  aed_define_sheet_diag_variable('swi','g/m2/d','net flux across the sediment-water interface')
+   IF (diag_level > 0) data%id_ss_swi = &
+                     aed_define_sheet_diag_variable('swi','g/m2/d','net flux across the sediment-water interface')
    IF (diag_level > 0) data%id_swi_dz =  aed_define_sheet_diag_variable('swi_dz','m/d','cum. swi position change')
    IF ( resuspension > 0 ) THEN
       IF (diag_level > 0) data%id_resus = aed_define_sheet_diag_variable('resus','g/m2/s','resuspension rate')
@@ -436,7 +437,8 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
 
 
       ! Log the flux across the sediment-water interface, cumulating over groups
-      IF (data%id_ss_swi > 0) _DIAG_VAR_S_(data%id_ss_swi) = _DIAG_VAR_S_(data%id_ss_swi) - (ss_flux + resus_flux - set_flux) * secs_per_day
+      IF (data%id_ss_swi > 0) _DIAG_VAR_S_(data%id_ss_swi) = &
+                              _DIAG_VAR_S_(data%id_ss_swi) - (ss_flux + resus_flux - set_flux) * secs_per_day
 
       ! Keep track of the cumulative deviation in SWI position due to
       ! resuspension of this particle class

@@ -12,7 +12,7 @@
 !#                                                                             #
 !#      http://aquatic.science.uwa.edu.au/                                     #
 !#                                                                             #
-!#  Copyright 2024 - The University of Western Australia                       #
+!#  Copyright 2024-2026 : The University of Western Australia                  #
 !#                                                                             #
 !#   AED is free software: you can redistribute it and/or modify               #
 !#   it under the terms of the GNU General Public License as published by      #
@@ -33,10 +33,10 @@
 !#                                                                             #
 !###############################################################################
 !#                                                                             #
-! Purpose: this module governs the transportation of bubble (ebullition process) 
-!          in the water, which is mainly from "Modeling bubbles and dissolved gases 
+! Purpose: this module governs the transportation of bubble (ebullition process)
+!          in the water, which is mainly from "Modeling bubbles and dissolved gases
 !          in the ocean" [Liang et al., 2011]. And some parameters are calculated
-!          according to "Bubbles and the air-sea exchange of gases in near-saturation 
+!          according to "Bubbles and the air-sea exchange of gases in near-saturation
 !          conditions" [Woolf, D. and Thorpe, S., 1991].
 !          The bubble dynamics run in single bubble mode.
 !
@@ -74,12 +74,13 @@ MODULE aed_methane_bubbles
       INTEGER :: id_Fsed_oxy, id_Fsed_dic, id_Ebb_flux_ch4
       INTEGER :: NGAS
       INTEGER :: id_ch4_diss_target
-      INTEGER :: id_btmb_ch4_3d 
+      INTEGER :: id_btmb_ch4_3d
       INTEGER :: id_dGama, id_sed_load
       INTEGER :: id_ice_b, id_ice_w
 
 
-      INTEGER,ALLOCATABLE :: id_Vab(:), id_Cbg(:, :), id_bsolu(:), id_bDiff(:), id_schmidt(:), id_bNumb(:), id_bubble_fluxes(:), id_gas_ex(:)
+      INTEGER,ALLOCATABLE :: id_Vab(:), id_Cbg(:, :), id_bsolu(:), id_bDiff(:), &
+                             id_schmidt(:), id_bNumb(:), id_bubble_fluxes(:), id_gas_ex(:)
 
       !# Model parameters
       AED_REAL, ALLOCATABLE :: m_Rb0(:)
@@ -107,11 +108,11 @@ MODULE aed_methane_bubbles
    TYPE (aed_column_t),POINTER :: column(:)
 
    ! Global constants
-   AED_REAL :: inft = 1.d-30                                                                                !KK need to make these globals
+   AED_REAL :: inft = 1.d-30                  !KK need to make these globals
    AED_REAL :: T0 = 273.15
-   AED_REAL :: e8 = 1.d-8    
+   AED_REAL :: e8 = 1.d-8
    AED_REAL :: Gconst = 9.8  !m/s2
-   AED_REAL :: inf = 1.d+30  
+   AED_REAL :: inf = 1.d+30
    AED_REAL :: Pi = 3.14159265d+0
    AED_REAL :: R = 8.314462175d+0  !J/(mole*K)
    AED_REAL :: P0 = 98150.0
@@ -125,7 +126,7 @@ MODULE aed_methane_bubbles
 
 
    !----------------------------------------------------------------------------
-   
+
    TYPE LakeInfo
       integer  :: id                   ! lake id
       integer  :: itype                ! lake type identifier
@@ -176,7 +177,7 @@ MODULE aed_methane_bubbles
 
    !integer :: NWLAYER, NSLAYER, NRLAYER
    !integer :: WATER_LAYER
-   
+
    ! time step (s)
    AED_REAL :: tdelta
 
@@ -197,19 +198,19 @@ SUBROUTINE aed_define_bubbles(data, namlst)
    CLASS (aed_bubbles_data_t),INTENT(inout) :: data
 
    INTEGER :: gas
-   
+
 !
 !LOCALS
    CHARACTER(len=64) :: rnum
    INTEGER  :: r, g
-   
+
    INTEGER           :: status
 
    INTEGER           :: nradius        = 1
 
    CHARACTER(len=64)  :: ch4_diss_target_variable=''
    CHARACTER(len=64)  :: ch4_btmb_target_variable=''
-   
+
    NAMELIST /aed_methane_bubbles/nradius,ch4_diss_target_variable,ch4_btmb_target_variable,diag_level
 
 !-------------------------------------------------------------------------------
@@ -225,22 +226,22 @@ SUBROUTINE aed_define_bubbles(data, namlst)
 
 
    NRLAYER = nradius                        !number of radius groups
-   
-   
 
-       
+
+
+
    !# Register diagnostic variables
-   ALLOCATE(data%id_Cbg(NGAS, NRLAYER+1))   ! bubble gas amount [mol/m3] 
+   ALLOCATE(data%id_Cbg(NGAS, NRLAYER+1))   ! bubble gas amount [mol/m3]
    ALLOCATE(data%id_bsolu(NGAS))            ! gas solubility [mol/m3/Pa]
    ALLOCATE(data%id_bDiff(NGAS))               ! diffusivity [m2/s]
    ALLOCATE(data%id_schmidt(NGAS))             ! schmidt number [m2/s]
-   ALLOCATE(data%id_bNumb(NRLAYER+1))          ! bubble amount 
+   ALLOCATE(data%id_bNumb(NRLAYER+1))          ! bubble amount
    ALLOCATE(data%id_Vab(NRLAYER+1))         ! bouyant velocity  [m/s]
    ALLOCATE(data%id_bubble_fluxes(NGAS))    ! total flux of each gas across bubble sizes
    ALLOCATE(data%id_gas_ex(NGAS))           ! total gas exchange to a water layer for each gas
 
-   
-   
+
+
    ALLOCATE(data%gasname(NGAS))
    data%gasname = (/'Wn2 ', 'Wo2 ', 'Wco2', 'Wch4'/)
 
@@ -256,7 +257,8 @@ SUBROUTINE aed_define_bubbles(data, namlst)
       data%id_bsolu(g) = aed_define_diag_variable('bsolu_'//TRIM(data%gasname(g)), 'mol/m3/Pa', 'gas solubility')
       data%id_bDiff(g) = aed_define_diag_variable('bDiff_'//TRIM(data%gasname(g)), 'm2/s', 'gas diffusivity')
       data%id_schmidt(g) = aed_define_diag_variable('schmidt_'//TRIM(data%gasname(g)), 'm2/s', 'schmidt number')
-      data%id_gas_ex(g) = aed_define_diag_variable('gas_exchange_'//TRIM(data%gasname(g)), 'unit', 'total gas exchange from bubbles') ! same as m_gasExchange(NGAS,WATER_LAYER+1)
+      data%id_gas_ex(g) = aed_define_diag_variable('gas_exchange_'//TRIM(data%gasname(g)), &
+                        'unit', 'total gas exchange from bubbles') ! same as m_gasExchange(NGAS,WATER_LAYER+1)
    ENDDO
 
    IF (diag_level>0) THEN
@@ -277,7 +279,9 @@ SUBROUTINE aed_define_bubbles(data, namlst)
       ENDDO
 
       DO g=1,NGAS
-         data%id_bubble_fluxes(g) = aed_define_sheet_diag_variable('bub_fluxes_'//TRIM(data%gasname(g)), 'units/m2', 'name ') ! same as bubble_fluxes(NGAS) update name later based on gas names KK: done bu had to shorten bubble_fluxes_ to bub_fluxes
+         data%id_bubble_fluxes(g) = aed_define_sheet_diag_variable('bub_fluxes_'//TRIM(data%gasname(g)), 'units/m2', 'name ')
+                             ! same as bubble_fluxes(NGAS) update name later based on gas names
+                             ! KK: done bu had to shorten bubble_fluxes_ to bub_fluxes
       ENDDO
    ENDIF
 
@@ -303,7 +307,7 @@ SUBROUTINE aed_define_bubbles(data, namlst)
    data%id_depth= aed_locate_global('depth')
    data%id_ice_b = aed_locate_sheet_global('delzBlueIce')
    data%id_ice_w = aed_locate_sheet_global('delzWhiteIce')
-   
+
 
    ! BUBBLE JOBS
    allocate(data%m_Rb0(NRLAYER+1))
@@ -318,11 +322,12 @@ CONTAINS
       integer :: rr
 
 
-      minR = 1.0_r8 !2.5_r8     ! mm  !MH > goto nml                            !KK bubbles measured at the surface of the studied lakes had diameters within 5-20 mm
+      minR = 1.0_r8 !2.5_r8     ! mm  !MH > goto nml            !KK bubbles measured at the surface of the
+                                                                !   studied lakes had diameters within 5-20 mm
       maxR = 5.0_r8 !10.0_r8    ! mm  !MH > goto nml
-      dr = (maxR - minR) / dble(NRLAYER)                                !increment in radius between consecutive layers of bubbles. 
-      data%m_Rb0(:) = (/(minR+dr*(rr-1), rr = 1, NRLAYER+1)/)           
-      data%m_Rb0(:) = 1.0e-3_r8 * data%m_Rb0(:)  ! mm => m              !Convert mm to meters (1e-3 mm/mm)
+      dr = (maxR - minR) / dble(NRLAYER)                        !increment in radius between consecutive layers of bubbles.
+      data%m_Rb0(:) = (/(minR+dr*(rr-1), rr = 1, NRLAYER+1)/)
+      data%m_Rb0(:) = 1.0e-3_r8 * data%m_Rb0(:)  ! mm => m      !Convert mm to meters (1e-3 mm/mm)
       rratio = minR / 0.1_r8
       tdelta = 2.0_r8 / (0.1418*rratio**2 + 0.05579*rratio + 0.7794)
       !m_iceBubblePool = 0.0_r8
@@ -335,7 +340,7 @@ END SUBROUTINE aed_define_bubbles
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################
-SUBROUTINE aed_initialize_bubbles(data, column, layer_idx) 
+SUBROUTINE aed_initialize_bubbles(data, column, layer_idx)
    !-------------------------------------------------------------------------------
    !ARGUMENTS
       CLASS (aed_bubbles_data_t),INTENT(in) :: data
@@ -387,10 +392,8 @@ SUBROUTINE aed_calculate_bubbles(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !BEGIN
 
-   _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + _DIAG_VAR_(data%id_gas_ex(4))/secs_per_day
-   
-
-   
+   _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + &
+                              _DIAG_VAR_(data%id_gas_ex(4))/secs_per_day
 
 END SUBROUTINE aed_calculate_bubbles
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -414,7 +417,8 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
       AED_REAL :: gama, pos
       AED_REAL :: ice_water_interface
       AED_REAL :: ratio(NGAS), ndm(NGAS), Vbg(NGAS), Cbg1(NRLAYER+1, size(layer_map)), Vbg0(NGAS, NRLAYER+1, size(layer_map))
-      AED_REAL :: flux(NGAS), Cbg_sub(NRLAYER+1, size(layer_map)), gas_ex_up(size(layer_map)), area(size(layer_map)), bNumb(NRLAYER+1, size(layer_map))
+      AED_REAL :: flux(NGAS), Cbg_sub(NRLAYER+1, size(layer_map)), gas_ex_up(size(layer_map))
+      AED_REAL :: area(size(layer_map)), bNumb(NRLAYER+1, size(layer_map))
       !new arrays
       AED_REAL :: Cbg(NGAS, NRLAYER+1, size(layer_map)), m_gasExchange(NGAS, size(layer_map)), m_Az(size(layer_map))
       AED_REAL :: m_btmbflux(NGAS, size(layer_map)), Vab(NRLAYER+1,size(layer_map))
@@ -431,39 +435,41 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
 
    !Layer map
       bot = layer_map(SIZE(layer_map))
-      top = layer_map(1) 
+      top = layer_map(1)
       ice_water_interface = 0.
       nscol = size(layer_map)
 
       m_btmbflux(:, :) = 0.0                          !KK set the bub flux to 0
-      
-      
-   !print*, "This replicates GetBubbleReleaseMagnitude": Producing bubbles based on sediment fluxes                       !con(NGAS,NRLAYER+1)==Vbg(NGAS, NRLAYER+1), unit: umol/(m3*mm)
-      
+
+
+   !print*, "This replicates GetBubbleReleaseMagnitude": Producing bubbles based on sediment fluxes
+   !                      !con(NGAS,NRLAYER+1)==Vbg(NGAS, NRLAYER+1), unit: umol/(m3*mm)
+
    ! LAYER LOOP NEEDED HERE
    do icol = 1, nscol, 1
       layer_idx = icol
-      temp = _STATE_VAR_(data%id_temp) + 273.15                                        
-      vsc = CalcDynamicViscosity(temp)                                                          
+      temp = _STATE_VAR_(data%id_temp) + 273.15
+      vsc = CalcDynamicViscosity(temp)
       gama = CalcSurfaceTension(temp)
       dens = _STATE_VAR_(data%id_dens)
       depth = _STATE_VAR_(data%id_depth)
       sumAz = _STATE_VAR_(data%id_area)
-      pressure = airpres + dens*Gconst*depth                                                    ! KK pressure = m_surfData%pressure + Roul*G*(btmZw(indx)- m_surfData%dzsurf)                                       !pressure = m_surfData%pressure + Roul*G*lake_info%depth
+      pressure = airpres + dens*Gconst*depth   ! KK pressure = m_surfData%pressure + Roul*G*(btmZw(indx)- m_surfData%dzsurf)
+                                               !pressure = m_surfData%pressure + Roul*G*lake_info%depth
       tmp1 = 0.0_r8
       ! Set CH4 bottom bubble flux for layer, using linked flux
       m_btmbflux(4, icol) = _DIAG_VAR_(data%id_btmb_ch4_3d)*1e-3     ! KK mmol to mol; set CH4 bub flux to diag
-      m_btmbflux(1, icol) = 0.15 * m_btmbflux(4, icol)                                          !4.96*1e-8                                
+      m_btmbflux(1, icol) = 0.15 * m_btmbflux(4, icol)               !4.96*1e-8
       !print*, "diag1", m_btmbflux(4, icol)
       IF (diag_level>0) _DIAG_VAR_(data%id_sed_load) = m_btmbflux(4, icol) * secs_per_day * sumAz * 1000
       !print*, "sed_load", _DIAG_VAR_(data%id_sed_load)
-      do rIndx = 1, NRLAYER+1, 1                                                                
+      do rIndx = 1, NRLAYER+1, 1
          rr = data%m_Rb0(rIndx)
          wb = CalcBuoyantVelocity(rr, vsc/dens)
          Vab(rIndx,icol) = wb
-         tmp1 = tmp1 + (pressure*rr + 2.0*gama) * wb                                            !KK [N/m]*[m/s]
+         tmp1 = tmp1 + (pressure*rr + 2.0*gama) * wb                 !KK [N/m]*[m/s]
          do g = 1, NGAS, 1
-            Vbg0(g, rIndx, icol) = m_btmbflux(g, icol) * (pressure*rr + 2.0*gama)                  !KK [mol/m2/s]*[N/m]
+            Vbg0(g, rIndx, icol) = m_btmbflux(g, icol) * (pressure*rr + 2.0*gama)  !KK [mol/m2/s]*[N/m]
          end do
          !print*, "Vbg0_init", Vbg0(4, rIndx, locIndx)
       end do
@@ -482,8 +488,8 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
 
    do icol = 1, nscol, 1
       layer_idx = icol
-      temp = _STATE_VAR_(data%id_temp) + 273.15                                        
-      vsc = CalcDynamicViscosity(temp)                                                          
+      temp = _STATE_VAR_(data%id_temp) + 273.15
+      vsc = CalcDynamicViscosity(temp)
       gama = CalcSurfaceTension(temp)
       dens = _STATE_VAR_(data%id_dens)
       depth = _STATE_VAR_(data%id_depth)
@@ -491,12 +497,12 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
          rr = data%m_Rb0(rIndx)
          pressure = airpres + dens*Gconst*depth + 2.0*gama/rr
          do g = 1, NGAS, 1
-            bNumb(rIndx,icol) = 0.75*R*temp/(Pi*pressure*rr**3.0)* &                     ! KK why is this not just 0.75, 0.75d-3
-               sum(Vbg0(:,rIndx,icol))                                                      !KK this sums the gases for rIndx and icol
+            bNumb(rIndx,icol) = 0.75*R*temp/(Pi*pressure*rr**3.0)* &    ! KK why is this not just 0.75, 0.75d-3
+               sum(Vbg0(:,rIndx,icol))                                  ! KK this sums the gases for rIndx and icol
          end do
-      end do  
+      end do
    end do
-   
+
    IF (diag_level>0) THEN
    do locIndx = bot, top, 1
       layer_idx = locIndx
@@ -512,11 +518,11 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
    da_sum = 0.0
    topAz = 0.0
    !print*, "Here"
-   do locIndx = bot, top, 1                                                                                                                                  
+   do locIndx = bot, top, 1
       layer_idx = locIndx
-      temp = MAX(_STATE_VAR_(data%id_temp) + 273.15, T0) 
+      temp = MAX(_STATE_VAR_(data%id_temp) + 273.15, T0)
       pH = _STATE_VAR_(data%id_ph)
-      sumAz = _STATE_VAR_(data%id_area) 
+      sumAz = _STATE_VAR_(data%id_area)
       da_sum = da_sum + sumAz
       m_Az(locIndx) = da_sum
       do g = 1, NGAS, 1
@@ -525,48 +531,48 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
          _DIAG_VAR_(data%id_schmidt(g)) = CalcSchmidtNumber(g,temp)
       end do
    end do
-   
+
    topAz = da_sum
-   
+
    !print*, "topAz", topAz
 
-!print*, "This replicates bubble dynamics"   
-   
-   
-   m_gasExchange(:, :) = 0.0                                                                
+!print*, "This replicates bubble dynamics"
+
+
+   m_gasExchange(:, :) = 0.0
    m_topbflux = 0.0
    da_sum = 0.0
    sumAz = 0.0
    !print*, "here2"
-   do icol = 1, nscol, 1  
-      layer_idx = icol  
+   do icol = 1, nscol, 1
+      layer_idx = icol
       !print*, "layer_idx", layer_idx
-      sumAz = _STATE_VAR_(data%id_area)   
-      m_dZw = _STATE_VAR_(data%id_dz)                                                      
-      if (m_btmbflux(4, icol) < 1.d-12) then 
+      sumAz = _STATE_VAR_(data%id_area)
+      m_dZw = _STATE_VAR_(data%id_dz)
+      if (m_btmbflux(4, icol) < 1.d-12) then
           m_gasExchange(4,icol) = m_gasExchange(4,icol) + m_btmbflux(4, icol)*sumAz/m_Az(icol)/m_dZw
           cycle
-      end if                         
-      m_topbflux = m_topbflux + m_btmbflux(4, icol)*sumAz/topAz                       
-      Cbg(:,:,:) = 0.0 
-      if (icol > 1) then                                            
-         Cbg(:,:,icol-1) = Vbg0(:,:,icol)  
-      end if  
-                                                      
-                                                          
-      do rIndx = 1, NRLAYER+1, 1  
-         !print*, "rIndx", rIndx                 
-         locIndx = icol   
-         layer_idx = locIndx 
-         !print*, "layer_idx1", layer_idx  
-         depth     = - _STATE_VAR_(data%id_depth) 
-         m_dZw = _STATE_VAR_(data%id_dz)                                                           ! KK start from the bottom                                                                                          
-         pos = depth - m_dZw 
+      end if
+      m_topbflux = m_topbflux + m_btmbflux(4, icol)*sumAz/topAz
+      Cbg(:,:,:) = 0.0
+      if (icol > 1) then
+         Cbg(:,:,icol-1) = Vbg0(:,:,icol)
+      end if
+
+
+      do rIndx = 1, NRLAYER+1, 1
+         !print*, "rIndx", rIndx
+         locIndx = icol
+         layer_idx = locIndx
+         !print*, "layer_idx1", layer_idx
+         depth     = - _STATE_VAR_(data%id_depth)
+         m_dZw = _STATE_VAR_(data%id_dz)                            ! KK start from the bottom
+         pos = depth - m_dZw
          !print*, "pos", pos
          rr =  data%m_Rb0(rIndx)
          Vbg = Vbg0(:,rIndx,icol)
          !print*, "Vbg", Vbg
-         do while (pos<ice_water_interface .and. rr>e8) 
+         do while (pos<ice_water_interface .and. rr>e8)
             if ( pos > depth) then
                !print*, "in the loop"
                !print*, "depth", depth
@@ -584,54 +590,55 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
             vsc = CalcDynamicViscosity(temp)
             wb = CalcBuoyantVelocity(rr, vsc/dens)
             !print*, "wb", wb
-            gama = CalcSurfaceTension(temp)                                            
-            pressure = airpres - dens*Gconst*pos + 2.0*gama/rr                                     !KK with the pressure their position is references from the top so it's reveresed
-            ! gas exchange rate  
+            gama = CalcSurfaceTension(temp)
+            pressure = airpres - dens*Gconst*pos + 2.0*gama/rr   !KK with the pressure their position is references
+                                                                 !   from the top so it's reveresed
+            ! gas exchange rate
             do g=1, NGAS, 1
-               peclet(g) = rr * wb / _DIAG_VAR_(data%id_bDiff(g))  
+               peclet(g) = rr * wb / _DIAG_VAR_(data%id_bDiff(g))
                reynold(g) = peclet(g) / _DIAG_VAR_(data%id_schmidt(g))
                if (reynold(g)<=1.0) then
                   nusselt(g) = sqrt(2.0*Pi*peclet(g)/3.0)
                else
-                  nusselt(g) = 2.0*sqrt(peclet(g)/Pi)                                                       !0.45*(reynold(g)**(1.0/6.0))*(peclet(g)**(1.0/3.0))
+                  nusselt(g) = 2.0*sqrt(peclet(g)/Pi)            !0.45*(reynold(g)**(1.0/6.0))*(peclet(g)**(1.0/3.0))
                endif
-               k_ndm(g) = -4.0 * Pi * rr * _DIAG_VAR_(data%id_bDiff(g)) * nusselt(g)       
-               call CalcGasRatioInSingleBubble(Vbg(:), ratio(:))   
+               k_ndm(g) = -4.0 * Pi * rr * _DIAG_VAR_(data%id_bDiff(g)) * nusselt(g)
+               call CalcGasRatioInSingleBubble(Vbg(:), ratio(:))
                gas = TRIM(data%gasname(g))
                SELECT CASE (gas)
                   CASE ('Wch4')
-                     gas_state_var = _STATE_VAR_(data%id_ch4)/1000.0                                  !unit conversion mmol/m3 to mol/m3                              
+                     gas_state_var = _STATE_VAR_(data%id_ch4)/1000.0                !unit conversion mmol/m3 to mol/m3
                      !print*, "ch4", gas_state_var
                   CASE ('Wo2')
                      gas_state_var = _STATE_VAR_(data%id_oxy)/1000.0
                      !print*, "oxy", gas_state_var
                   CASE ('Wco2')
-                     gas_state_var = (_STATE_VAR_(data%id_pco2)*101325.0)/(R*temp)                    !converting pCO2 (atm) to mol/m3
+                     gas_state_var = (_STATE_VAR_(data%id_pco2)*101325.0)/(R*temp)  !converting pCO2 (atm) to mol/m3
                      !print*, "co2", gas_state_var
                   CASE ('Wn2')
-                     Hn2 = 6.4e-6 * exp(1300.0*((1/temp)-(1/298.0)))                                  !mole/m3/Pa
+                     Hn2 = 6.4e-6 * exp(1300.0*((1/temp)-(1/298.0)))    !mole/m3/Pa
                      !print*, "Hn2", Hn2
                      gas_state_var = Hn2 * 0.78 * P0
-                     !gas_state_var = Hn2 * 40530.0                                                    !partial pressure of N2 is 40% of atmospheric pressure (Peltola et al. 2017)
+                     !gas_state_var = Hn2 * 40530.0  !partial pressure of N2 is 40% of atmospheric pressure (Peltola et al. 2017)
                      !print*, "n2_conc", gas_state_var
-               END SELECT 
+               END SELECT
                ndm(g) = k_ndm(g) * (_DIAG_VAR_(data%id_bsolu(g))*pressure*ratio(g) - &
-                  gas_state_var)  
-               Vbg(g) = Vbg(g) + bNumb(rIndx, icol) * ndm(g) * tdelta  
-            end do     
-            where (Vbg<0._r8) Vbg = 0._r8   
-            pr_tmp = 3.0 * airpres - 3.0 * dens*Gconst*pos + 4.0*gama/rr   
-            dr_tmp1 = 0.75*R*temp/(Pi*rr**2.0)/pr_tmp                                              !KK why is this not just 0.75   , 0.75d-3
-            dr_tmp2 = rr*dens*Gconst*wb/pr_tmp     
+                  gas_state_var)
+               Vbg(g) = Vbg(g) + bNumb(rIndx, icol) * ndm(g) * tdelta
+            end do
+            where (Vbg<0._r8) Vbg = 0._r8
+            pr_tmp = 3.0 * airpres - 3.0 * dens*Gconst*pos + 4.0*gama/rr
+            dr_tmp1 = 0.75*R*temp/(Pi*rr**2.0)/pr_tmp   !KK why is this not just 0.75   , 0.75d-3
+            dr_tmp2 = rr*dens*Gconst*wb/pr_tmp
             rr = rr + (dr_tmp1*sum(ndm)+dr_tmp2)*tdelta
             ! new position
             pos = pos + wb*tdelta
             !print*, "pos1", pos
          end do
-         if (rr>e8 .and. locIndx==top) then                                                           ! KK handling the top layer: I am assigning last Vbg to Cbg in the top layer
+         if (rr>e8 .and. locIndx==top) then   !KK handling the top layer: I am assigning last Vbg to Cbg in the top layer
             layer_idx = locIndx
             Cbg(:, rIndx, locIndx) = Vbg
-            !print*, "Cbgtop", Cbg(:, rIndx, locIndx) 
+            !print*, "Cbgtop", Cbg(:, rIndx, locIndx)
          endif
       end do
 
@@ -706,29 +713,29 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
 
    IF (diag_level>0) _DIAG_VAR_S_(data%id_bubble_fluxes(4)) = m_topbflux * 1000 * secs_per_day
    !print*, "top_ch4", _DIAG_VAR_S_(data%id_bubble_fluxes(4))
-   
-   CONTAINS      
+
+   CONTAINS
       real function CalcDynamicViscosity(temp)  !KK Does this need be calced for each water layer in initialize?
       implicit none
       AED_REAL, intent(in) :: temp    ! units: K
       AED_REAL :: dVsc  ! units: kg/s/m
-  
+
       !if (temp<T0-e8) THEN
-      !  CalcDynamicViscosity = inf 
+      !  CalcDynamicViscosity = inf
       !else
         CalcDynamicViscosity = 2.414d-5 * (10.0**(247.8/(temp-140.0)))
       !endif
       end function
 
-      
-
-
-     
 
 
 
 
-   
+
+
+
+
+
  END SUBROUTINE aed_calculate_column_bubbles
  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -773,7 +780,7 @@ END SUBROUTINE aed_calculate_benthic_bubbles
       AED_REAL :: CalcSurfaceTension               ! units: N/m
       AED_REAL, parameter :: r0 = 75.64d-3, r25 = 71.97d-3, r50 = 67.91d-3
       AED_REAL :: par
-   
+
       if (temp<T0) then
          !CalcSurfaceTension = 0.0_r8
          CalcSurfaceTension = r0
@@ -801,12 +808,12 @@ END SUBROUTINE aed_calculate_benthic_bubbles
       implicit none
       AED_REAL, intent(in) :: radius      ! units: m
       AED_REAL, intent(in) :: vsc         ! kinematic viscosity (m2/s)
-      AED_REAL :: CalcBuoyantVelocity     ! units: m/s               
+      AED_REAL :: CalcBuoyantVelocity     ! units: m/s
       AED_REAL :: rr, xx, yy
 
       if (vsc>1.0d10) then
          CalcBuoyantVelocity = 1.e-30_r8
-      else 
+      else
          xx = Gconst * (radius**3.0_r8) / (vsc**2.0_r8)
          yy = 10.82_r8 / xx
          CalcBuoyantVelocity = (2.0_r8*(radius**2.0_r8)*Gconst/9.0_r8/vsc) * &
@@ -844,7 +851,7 @@ END SUBROUTINE aed_calculate_benthic_bubbles
             indx = min(indx, 10)
             par = (temp - T0 - 5*indx + 5) / 5.0
             CalcHenrySolubility = (SOLO2(indx+1)*par + SOLO2(indx)*(1-par)) &
-                                    / MasO2 / P0 / Xo2 
+                                    / MasO2 / P0 / Xo2
          else
             CalcHenrySolubility = 1.3d-5*exp(1500*(1/temp-1/298.0))
          end if
@@ -963,7 +970,7 @@ END SUBROUTINE aed_calculate_benthic_bubbles
       CalcReynoldNumber = Pe/Schmidt
       return
    end function
-   
+
 
    function CalcNusseltNumber(gas, radius, temp, vsc)
       implicit none
@@ -1008,7 +1015,7 @@ END SUBROUTINE aed_calculate_benthic_bubbles
       AED_REAL :: GetBubbleAmount   ! unit: bubble/(m3*mm)
       AED_REAL :: gases
 
-      gases = sum(bubbleGasCon) 
+      gases = sum(bubbleGasCon)
       GetBubbleAmount = 1.0e-6_r8*gases*0.75*R*temp/ &
                   (Pi*pressure*(radius**3))
       return
@@ -1019,14 +1026,14 @@ END SUBROUTINE aed_calculate_benthic_bubbles
       !AED_REAL, intent(in) :: temp    ! units: K
       !AED_REAL :: CalcDynamicViscosity  ! units: kg/s/m
       !AED_REAL :: e8, T0, inf
-      
-      
+
+
       !e8 = 1.d-8
       !T0 = 273.15
       !inf = 1.d+30
- 
+
       !if (temp<T0-e8) THEN
-        !CalcDynamicViscosity = inf 
+        !CalcDynamicViscosity = inf
       !else
         !CalcDynamicViscosity = 2.414d-5 * (10.0**(247.8/(temp-140.0)))
       !endif

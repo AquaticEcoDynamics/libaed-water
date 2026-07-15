@@ -559,7 +559,8 @@ SUBROUTINE aed_mobility_phosphorus(data,column,layer_idx,mobility)
    ENDIF
    mobility(data%id_frpads) = vvel
 
-   IF (data%id_frpads_set>0) _DIAG_VAR_(data%id_frpads_set) = (vvel/dz)*_STATE_VAR_(data%id_frpads)*secs_per_day
+   IF (data%id_frpads_set>0) &
+      _DIAG_VAR_(data%id_frpads_set) = (vvel/dz)*_STATE_VAR_(data%id_frpads)*secs_per_day
 
 END SUBROUTINE aed_mobility_phosphorus
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
