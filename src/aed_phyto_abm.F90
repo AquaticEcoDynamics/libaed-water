@@ -815,7 +815,8 @@ IF (data%phytos(1)%simSplit > 0) THEN
                print *, 'aed_split_particle(): WARNING no more available particles; skipping particle split'
                RETURN
             ELSE
-               IF (p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN ! SCB - inactive, and exited via outflows?
+               IF (p(j)%ptm_istat(STAT) == 0) THEN ! SCB change 7/13 - check for inactivity only
+               ! IF (p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN ! SCB - inactive, and exited via outflows?
                   !first duplicate all attributes except PTID
                   p(j)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
                   p(j)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
