@@ -1267,6 +1267,9 @@ SUBROUTINE SoilTempFV(n, d, vwc, surfTemp, deepTemp, dt, props, temp, heatflux)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
+   zc(1) = zero_ ; lam(1) = zero_
+   b(1) = zero_ ; c(1) = zero_ ; rhs(1) = zero_
+
    DO i = 1, n
       dz(i)  = d(i+1) - d(i)
       zc(i)  = 0.5*(d(i) + d(i+1))
@@ -1281,7 +1284,6 @@ SUBROUTINE SoilTempFV(n, d, vwc, surfTemp, deepTemp, dt, props, temp, heatflux)
    ENDDO
    dzc(n) = d(n+1) - zc(n)   ;  ki(n) = lam(n)
    !# assemble tridiagonal system (Dirichlet top & bottom)
-   a = zero_ ; b = zero_ ; c = zero_ ; rhs = zero_ ; cp = zero_
    DO i = 1, n
       capv = cap(i)*dz(i)/dt
       fb   = ki(i)/dzc(i)         !# conductance to cell below / deep boundary
