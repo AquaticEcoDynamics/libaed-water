@@ -388,6 +388,7 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    ! Temporary variables
    AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,c,windsp,vel_l
    INTEGER  :: schmidt_model_l,piston_model_l
+   LOGICAL  :: have_la
    ! Parameters
    AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
 !
@@ -411,7 +412,10 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
 
    !-----------------------------------------------
    ! Compute k_wind
-   IF (PRESENT(LA) .AND. LA > 0.0) THEN
+ ! IF (PRESENT(LA) .AND. LA > 0.0) THEN
+   have_la = .false.
+   IF (PRESENT(LA)) have_la= (LA > 0.0)
+   IF (have_la) THEN
 
       ! New option for the calculation of k_wind. Note that this has a
       ! "lake area" (LA) variable included in it.
