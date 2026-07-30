@@ -362,7 +362,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    IF( simExposed ) THEN
       !data%id_wettime = aed_define_sheet_diag_variable('wettime','d','time cell has been innundated')
-      data%id_drytime = aed_define_sheet_diag_variable('drytime','d','time cell has been exposed')
+      data%id_drytime = aed_define_sheet_diag_variable('drytime','d','time cell has been exposed', rezero=.FALSE.)
    ENDIF
 
    !# Register diagnostic variables

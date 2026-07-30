@@ -762,8 +762,8 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
      IF ( do_mpb == 2 .OR. diag_level >= 2 ) THEN
             data%id_d_MPB = aed_define_sheet_diag_variable('mpb_ben','mmol C/m2'  ,'microphytobenthos density')
        ENDIF
-     data%id_xnc_avg = aed_define_sheet_diag_variable('mpb_xnc','mmol N/mmol C', 'average N:C ratio of deposited phytoplankton')
-     data%id_xpc_avg = aed_define_sheet_diag_variable('mpb_xpc','mmol P/mmol C', 'average P:C ratio of deposited phytoplankton')
+     data%id_xnc_avg = aed_define_sheet_diag_variable('mpb_xnc','mmol N/mmol C', 'average N:C ratio of deposited phytoplankton', rezero=.FALSE.)
+     data%id_xpc_avg = aed_define_sheet_diag_variable('mpb_xpc','mmol P/mmol C', 'average P:C ratio of deposited phytoplankton', rezero=.FALSE.)
      IF ( diag_level >= 2 ) THEN
         data%id_d_BPP = aed_define_sheet_diag_variable('mpb_gpp','mmol C/m2/d','benthic gross productivity')
         data%id_d_BCP = aed_define_sheet_diag_variable('mpb_rsp','mmol C/m2/d','benthic phyto respiration')

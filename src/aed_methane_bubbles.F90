@@ -207,11 +207,13 @@ SUBROUTINE aed_define_bubbles(data, namlst)
    INTEGER           :: status
 
    INTEGER           :: nradius        = 1
+   AED_REAL          :: minR           = 1.0_r8   ! mm, smallest bubble radius
+   AED_REAL          :: maxR           = 5.0_r8   ! mm, largest bubble radius
 
    CHARACTER(len=64)  :: ch4_diss_target_variable=''
    CHARACTER(len=64)  :: ch4_btmb_target_variable=''
 
-   NAMELIST /aed_methane_bubbles/nradius,ch4_diss_target_variable,ch4_btmb_target_variable,diag_level
+   NAMELIST /aed_methane_bubbles/nradius,minR,maxR,ch4_diss_target_variable,ch4_btmb_target_variable,diag_level
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -318,16 +320,12 @@ CONTAINS
 
    subroutine InitializeBubbleStateVariables()
       implicit none
-      AED_REAL :: minR, maxR, rratio, dr
+      AED_REAL :: rratio, dr
       integer :: rr
 
-
-      minR = 1.0_r8 !2.5_r8     ! mm  !MH > goto nml            !KK bubbles measured at the surface of the
-                                                                !   studied lakes had diameters within 5-20 mm
-      maxR = 5.0_r8 !10.0_r8    ! mm  !MH > goto nml
-      dr = (maxR - minR) / dble(NRLAYER)                        !increment in radius between consecutive layers of bubbles.
-      data%m_Rb0(:) = (/(minR+dr*(rr-1), rr = 1, NRLAYER+1)/)
-      data%m_Rb0(:) = 1.0e-3_r8 * data%m_Rb0(:)  ! mm => m      !Convert mm to meters (1e-3 mm/mm)
+      dr = (maxR - minR) / dble(NRLAYER)                                !increment in radius between consecutive layers of bubbles.
+      data%m_Rb0(:) = (/(minR+dr*(rr-1), rr = 1, NRLAYER+1)/)           
+      data%m_Rb0(:) = 1.0e-3_r8 * data%m_Rb0(:)  ! mm => m              !Convert mm to meters (1e-3 mm/mm)
       rratio = minR / 0.1_r8
       tdelta = 2.0_r8 / (0.1418*rratio**2 + 0.05579*rratio + 0.7794)
       !m_iceBubblePool = 0.0_r8
@@ -422,7 +420,7 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
       !new arrays
       AED_REAL :: Cbg(NGAS, NRLAYER+1, size(layer_map)), m_gasExchange(NGAS, size(layer_map)), m_Az(size(layer_map))
       AED_REAL :: m_btmbflux(NGAS, size(layer_map)), Vab(NRLAYER+1,size(layer_map))
-      AED_REAL :: tmp1, da_sum, topAz, m_dZw, sumAz, m_topbflux
+      AED_REAL :: tmp1, da_sum, topAz, m_dZw, sumAz, m_topbflux, az_ii
       AED_REAL :: vec, gas_exchange
       AED_REAL :: dr_tmp1, dr_tmp2, pr_tmp
       AED_REAL :: reynold(NGAS), k_ndm(NGAS), peclet(NGAS), nusselt(NGAS)
@@ -432,7 +430,7 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
 
    !External variables
       airpres = _STATE_VAR_S_(data%id_airpres) * 100.0 !KK convert from hPa to Pa
-
+ 
    !Layer map
       bot = layer_map(SIZE(layer_map))
       top = layer_map(1)
@@ -600,10 +598,10 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
                if (reynold(g)<=1.0) then
                   nusselt(g) = sqrt(2.0*Pi*peclet(g)/3.0)
                else
-                  nusselt(g) = 2.0*sqrt(peclet(g)/Pi)            !0.45*(reynold(g)**(1.0/6.0))*(peclet(g)**(1.0/3.0))
+                  nusselt(g) = 0.45*(reynold(g)**(1.0/6.0))*(peclet(g)**(1.0/3.0))   
                endif
                k_ndm(g) = -4.0 * Pi * rr * _DIAG_VAR_(data%id_bDiff(g)) * nusselt(g)
-               call CalcGasRatioInSingleBubble(Vbg(:), ratio(:))
+               call CalcGasRatioInSingleBubble(Vbg(:), ratio(:))   
                gas = TRIM(data%gasname(g))
                SELECT CASE (gas)
                   CASE ('Wch4')
@@ -627,9 +625,9 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
                Vbg(g) = Vbg(g) + bNumb(rIndx, icol) * ndm(g) * tdelta
             end do
             where (Vbg<0._r8) Vbg = 0._r8
-            pr_tmp = 3.0 * airpres - 3.0 * dens*Gconst*pos + 4.0*gama/rr
-            dr_tmp1 = 0.75*R*temp/(Pi*rr**2.0)/pr_tmp   !KK why is this not just 0.75   , 0.75d-3
-            dr_tmp2 = rr*dens*Gconst*wb/pr_tmp
+            pr_tmp = 3.0 * airpres - 3.0 * dens*Gconst*pos + 4.0*gama/rr   
+            dr_tmp1 = 0.75*R*temp/(Pi*rr**2.0)/pr_tmp                                              !KK why is this not just 0.75   , 0.75d-3
+            dr_tmp2 = rr*dens*Gconst*wb/pr_tmp     
             rr = rr + (dr_tmp1*sum(ndm)+dr_tmp2)*tdelta
             ! new position
             pos = pos + wb*tdelta
@@ -685,20 +683,12 @@ SUBROUTINE aed_calculate_column_bubbles(data,column,layer_map)
    end do
 
    ! update bubble flux
-   !print*, "mtopbfluxpre", m_topbflux
-   !print*, "releasenogasex", m_topbflux * 1000 * secs_per_day * topAz
    do locIndx = bot, top, 1
       layer_idx = locIndx
-      !print*, "layer_idx", layer_idx
       m_dZw = _STATE_VAR_(data%id_dz)
-      !print*, "m_dZw", m_dZw
       m_topbflux = m_topbflux - m_gasExchange(4,locIndx)*m_dZw* &
          m_Az(locIndx)/topAz
-      !print*, "m_topbflux", m_topbflux
-      !print*, "topAz", topAz
       _DIAG_VAR_(data%id_gas_ex(4)) = m_gasExchange(4,locIndx) * 1000 * secs_per_day
-   !print*, "gas_ex_final", m_gasExchange(4,locIndx)
-   !print*, "gas_ex_diag", _DIAG_VAR_(data%id_gas_ex(4))
    end do
 
    if (_STATE_VAR_S_(data%id_ice_b) + _STATE_VAR_S_(data%id_ice_w) > 1.0e-4) then
