@@ -85,13 +85,13 @@ else ifeq ($(F90),ifx)
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
   ifeq ($(OSTYPE),Msys)
-    FFLAGS=-fpp -warn=all -module=${moddir} -static-intel -mp1 -stand=f23 -warn=nounused
+    FFLAGS=-fpp -warn=all -module=${moddir} -static-intel -stand=f23 -warn=nounused
     ifeq ($(WITH_CHECKS),true)
       FFLAGS+=-check=all -check=noarg_temp_created
     endif
     FFLAGS+=-real-size=64
   else
-    FFLAGS=-fpp -warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
+    FFLAGS=-fpp -warn all -module ${moddir} -static-intel -stand f23 -warn nounused
     ifeq ($(WITH_CHECKS),true)
       FFLAGS+=-check all -check noarg_temp_created
     endif
