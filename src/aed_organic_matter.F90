@@ -629,8 +629,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_docr_miner = 0 ; data%id_donr_miner = 0 ; data%id_dopr_miner = 0
    data%id_cpom_bdown = 0 ; data%id_cdom       = 0 ; data%id_floc       = 0
    data%id_sed_toc    = 0 ; data%id_sed_ton    = 0 ; data%id_sed_top    = 0
-   data%id_sedomfr    = 0 ; data%id_pom_vvel   = 0 ; data%id_cpom_vvel  = 0
-   data%id_anaerobic  = 0
+   data%id_pom_vvel   = 0 ; data%id_cpom_vvel  = 0 ; data%id_anaerobic  = 0
 
     IF ( diag_level>0 ) THEN
       data%id_cdom    = aed_define_diag_variable(      'cdom'     ,'/m'         ,'Chromophoric DOM')
