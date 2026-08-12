@@ -1342,6 +1342,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + oxy_flux  ! mmol/m3/s CHECK would need to add equivalent zoop variables here if added zoops in
   _DIAG_VAR_(data%id_d_oxy) = oxy_flux * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
 
+!print *, 'id_frp', layer_idx, data%id_frp, _FLUX_VAR_(data%id_frp), pp_PD, RES_P, uptake_P ! RQT
+
 ! END OF CODE FROM PIBM BIOLOGY SUBROUTINE
 !------------------------------------------------------
 
