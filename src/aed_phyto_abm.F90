@@ -1315,7 +1315,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
             p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) * data%phytos(1)%mort_prob
 
-            ! SCB - Additional check to make sure the number of cells in particle is not less than 0. Can raise this threshold here later per RQT's idea            IF (p(i)%ptm_state(data%ip_num) <= 0d0) THEN
+            ! SCB - Additional check to make sure the number of cells in particle is not less than 0.
+            ! Can raise this threshold here later per RQT's idea.
+            IF (p(i)%ptm_state(data%ip_num) <= 0d0) THEN
                _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
                p(i)%ptm_state(data%ip_c)   = 0d0
                p(i)%ptm_state(data%ip_n)   = 0d0
