@@ -1273,7 +1273,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          !# PHYTOPLANKTON MORTALITY
          ! If cellular carbon is lower than the subsistence threshold (Cmin), it dies:
-         Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM
+         Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM ! SCB answer to ML: it corresponds to 1/2 the initial c value. PIBM paper has refs justifying choice.
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
             _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1
@@ -1291,21 +1291,39 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          endif
 
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
-         call random_number(rnm)
+         ! call random_number(rnm)
+         !
+         ! IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
+         !    _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
+         !    Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+         !    Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+         !    Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+         !
+         !    p(i)%ptm_state(data%ip_c)   = 0d0
+         !    p(i)%ptm_state(data%ip_n)   = 0d0
+         !    p(i)%ptm_state(data%ip_p)   = 0d0
+         !    p(i)%ptm_state(data%ip_chl) = 0d0
+         !    p(i)%ptm_state(data%ip_num) = 0d0
+         !    _PTM_STAT_(i,STAT) = 0
+         !    _PTM_STAT_(i,FLAG) = 3
+         ! ENDIF
 
-         IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
-            _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
-            Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+         IF (data%phytos(1)%mort_prob < 1d0) THEN
+            Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
+            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
+            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
 
-            p(i)%ptm_state(data%ip_c)   = 0d0
-            p(i)%ptm_state(data%ip_n)   = 0d0
-            p(i)%ptm_state(data%ip_p)   = 0d0
-            p(i)%ptm_state(data%ip_chl) = 0d0
-            p(i)%ptm_state(data%ip_num) = 0d0
-            _PTM_STAT_(i,STAT) = 0
-            _PTM_STAT_(i,FLAG) = 3
+            p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) * data%phytos(1)%mort_prob
+
+            ! SCB - Additional check to make sure the number of cells in particle is not less than 0. Can raise this threshold here later per RQT's idea            IF (p(i)%ptm_state(data%ip_num) <= 0d0) THEN
+               _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
+               p(i)%ptm_state(data%ip_c)   = 0d0
+               p(i)%ptm_state(data%ip_n)   = 0d0
+               p(i)%ptm_state(data%ip_p)   = 0d0
+               p(i)%ptm_state(data%ip_chl) = 0d0
+               _PTM_STAT_(i,STAT) = 0
+               _PTM_STAT_(i,FLAG) = 3
+            ENDIF
          ENDIF
       enddo !End of looping through particles
   endif !End if of N_ > 0
