@@ -76,6 +76,7 @@ MODULE aed_phyto_abm
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_amm, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
+      INTEGER :: id_timestep
 
       ! Phytoplankton parameters
       INTEGER  :: num_phytos
@@ -242,6 +243,10 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('zeta_P')        ; pd(dcol)%zeta_P        = extract_double(values(ccol))
             CASE ('a1')            ; pd(dcol)%a1            = extract_double(values(ccol))
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
+                                     !# mort_prob is a per-day random-mortality rate (d-1), converted
+                                     !# to a per-call death probability at the point of use via the
+                                     !# host's actual timestep (see mort_prob_step in
+                                     !# aed_particle_bgc_phyto_abm) - NOT a raw per-call probability.
             CASE ('nx')            ; pd(dcol)%nx            = extract_double(values(ccol))
             CASE ('thetaNmax')     ; pd(dcol)%thetaNmax     = extract_double(values(ccol))
             CASE ('thetaPmax')     ; pd(dcol)%thetaPmax     = extract_double(values(ccol))
@@ -712,6 +717,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
    data%id_yday  = aed_locate_sheet_global('yearday')
+   data%id_timestep = aed_locate_sheet_global('timestep')
 
 END SUBROUTINE aed_define_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -930,6 +936,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real      ::  nu_ = 0d0   !Basic Mutation rate
    real      :: cff = 0.d0   !Random number [0,1] for mutation
    real      :: rnm = 0.d0   !Random number [0,1] for mortality
+   real      :: mort_prob_step = 0.d0   !mort_prob (d-1) converted to a per-call death probability via dtdays
    real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
    real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
    real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -1001,7 +1008,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    INTEGER              :: Allocatestatus = 0
    real :: PHY_t = 0d0  !Total phytoplankton N
    ! additional declarations from PIBM time_settings.F90
-   real     :: dtdays       = 1.0d0/24 !ML initializing this to 1 hour
+   real     :: dtdays !# fraction of a day covered by one call, derived from the
+                       !# host's actual timestep (data%id_timestep, seconds) below -
+                       !# NOT assumed to be 1 hour
    real  :: hour_of_day   != 0
    integer  :: integer_day   != 0
    real  :: real_day
@@ -1021,6 +1030,12 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
 !------------------------------------------------------
 ! INITIAL CODE FROM AED
+
+   !# Fraction of a day covered by this call, derived from the host's actual
+   !# timestep (seconds) rather than assuming a fixed 1-hour cadence - keeps
+   !# the C/N/P/Chl integration and mortality probability (see below)
+   !# consistent if the host timestep ever differs from 1 hour.
+   dtdays = _STATE_VAR_S_(data%id_timestep) / secs_per_day
 
    i=1 !ML need to remove this later when can handle more than one phyto group in ABM
 
@@ -1334,9 +1349,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          endif
 
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
+         ! mort_prob is a per-day rate (d-1), consistent with every other rate parameter in this
+         ! module (R_resp, RC, RN, RP, RChl, etc.); convert it to the probability of death over
+         ! THIS call (which covers dtdays of simulated time) via the usual exponential-decay
+         ! discretization, so the results are independent of the host's chosen timestep.
          call random_number(rnm)
+         mort_prob_step = 1.d0 - exp(-data%phytos(1)%mort_prob * dtdays)
 
-         IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
+         IF (rnm < mort_prob_step) THEN !it dies
             _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
             Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
