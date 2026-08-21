@@ -72,6 +72,12 @@ MODULE aed_phyto_abm
                  id_cov_ta, id_cov_tl, id_cov_al, id_N_birth,  &
                  id_N_mutate, id_IPAR, id_NPPc, id_cells,      &
                  id_N_death
+      ! DIAGNOSTIC: cumulative (never rezero'd) biological loss/gain counters, since sim
+      ! start, so total births/deaths can be attributed by cause without the ~24x
+      ! undercount that comes from summing the hourly-reset id_N_birth/id_N_death
+      ! diagnostics at daily (or coarser) output frequency.
+      INTEGER :: id_cum_birth, id_cum_death_thresh, id_cum_death_prob
+      INTEGER :: id_cum_cells_decayed
       INTEGER :: ip_c, ip_n, ip_p, ip_par, ip_tem, ip_no3, ip_nh4, ip_frp, ip_chl, ip_num, ip_cdiv, ip_Topt, ip_LnalphaChl
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp, id_d_nit, id_d_amm, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
@@ -80,6 +86,32 @@ MODULE aed_phyto_abm
       ! Phytoplankton parameters
       INTEGER  :: num_phytos
       TYPE(phyto_data_t),DIMENSION(:),ALLOCATABLE :: phytos
+
+      ! FEATURE: minimum active-particle population maintenance. When > 0, and the
+      ! domain-wide active particle count falls below this value, the largest active
+      ! particle is split (see aed_split_particle_phyto_abm) to replace losses.
+      ! Set via 'target_particle_num' in the &aed_phyto_abm namelist (api.nml).
+      INTEGER :: target_particle_num = 0
+
+      ! FEATURE: general biological recruitment. When recruit_rate > 0, new active
+      ! particles are introduced at a steady rate (particles/day), independent of both
+      ! initial seeding (glm_ptm.c ptm_init_glm) and inflow-sourced particles
+      ! (inflow_conc in &particles). Represents an unmodeled external source (e.g.
+      ! resuspension/immigration). Each recruit is placed at an independently-random
+      ! height in [recruit_height_min, recruit_height_max] (absolute height above the
+      ! lake-bottom datum, matching ptm_env(HGHT)'s convention - NOT depth-below-
+      ! surface like init_depth_min/max) and is assigned trait values drawn the same
+      ! way initial-population diversity is generated in aed_particle_initialize_
+      ! phyto_abm - a Gaussian perturbation (srand_mtGaus, sigma_init from module
+      ! params) around the aed_phyto_pars.csv base defaults, rather than around a
+      ! stale ptm_state left over from a previous particle life.
+      ! Set via 'recruit_rate' (particles/day; 0 = disabled), 'recruit_height_min',
+      ! 'recruit_height_max' (m), and 'recruit_max_per_call' in the &aed_phyto_abm
+      ! namelist (api.nml). See aed_split_particle_phyto_abm, block (3).
+      AED_REAL :: recruit_rate         = 0.0d0
+      AED_REAL :: recruit_height_min   = 0.0d0
+      AED_REAL :: recruit_height_max   = 0.0d0
+      INTEGER  :: recruit_max_per_call = 1000
 
       CONTAINS
          PROCEDURE :: define              => aed_define_phyto_abm
@@ -122,6 +154,27 @@ MODULE aed_phyto_abm
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
+
+   ! DIAGNOSTIC: cumulative count of successful particle splits (the only mechanism in this
+   ! module that creates a new active particle / increases the particle count - "births" via
+   ! cell division elsewhere in this file only double cell count within an existing particle,
+   ! they do not create a new one). aed_split_particle_phyto_abm has no column/layer_idx
+   ! context, so this is tracked as a plain module-level counter and logged directly to file
+   ! rather than through the usual per-layer _DIAG_VAR_ mechanism.
+   INTEGER, SAVE :: ptm_cum_split_count = 0
+
+   ! DIAGNOSTIC: cumulative count of splits performed to maintain the minimum active
+   ! particle population (target_particle_num), as distinct from n_split-triggered splits
+   ! above. Logged to its own file for the same reason as ptm_cum_split_count.
+   INTEGER, SAVE :: ptm_cum_popmaintain_split_count = 0
+
+   ! DIAGNOSTIC: cumulative count of recruitment events (the third, independent
+   ! pathway that creates a new active particle - see also (1) and (2) above).
+   INTEGER, SAVE  :: ptm_cum_recruit_count = 0
+   ! Fractional-particle accumulator for recruit_rate (particles/day). See block (3)
+   ! in aed_split_particle_phyto_abm for why a fractional accumulator is used instead
+   ! of a fixed integer-per-call count.
+   AED_REAL, SAVE :: recruit_accumulator   = 0.0d0
 
 
 !===============================================================================
@@ -278,6 +331,7 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('v_')            ; pd(dcol)%v_            = extract_double(values(ccol))
             CASE ('simSplit')      ; pd(dcol)%simSplit      = extract_integer(values(ccol))
             CASE ('n_split')       ; pd(dcol)%n_split       = extract_double(values(ccol))
+            CASE ('simMortNumDecay'); pd(dcol)%simMortNumDecay = extract_integer(values(ccol))
 
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
@@ -455,6 +509,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%v_            = pd(list(i))%v_
        data%phytos(i)%simSplit      = pd(list(i))%simSplit
        data%phytos(i)%n_split       = pd(list(i))%n_split
+       data%phytos(i)%simMortNumDecay = pd(list(i))%simMortNumDecay
 
     ENDDO
     DEALLOCATE(pd)
@@ -514,6 +569,11 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    INTEGER            :: do_mpb = 0
    INTEGER            :: n_zones = 0
    AED_REAL           :: active_zones(1000) = 0
+   INTEGER            :: target_particle_num = 0   ! 0 = disabled; see FEATURE note on the type definition
+   AED_REAL           :: recruit_rate         = 0.0d0   ! particles/day; 0 = disabled
+   AED_REAL           :: recruit_height_min   = 0.0d0   ! m, absolute height above lake-bottom datum
+   AED_REAL           :: recruit_height_max   = 0.0d0   ! m, absolute height above lake-bottom datum
+   INTEGER            :: recruit_max_per_call = 1000    ! safety cap, mirrors MAX_POPMAINTAIN_SPLITS_PER_CALL
 
 !  From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
@@ -539,7 +599,9 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
                     resus_link, n_zones, active_zones, diag_level,             &
                     theta_mpb_growth,theta_mpb_resp,                           &
-                    phyto_particle_link, R_mpbb                               
+                    phyto_particle_link, R_mpbb, target_particle_num,          &
+                    recruit_rate, recruit_height_min, recruit_height_max,      &
+                    recruit_max_per_call
 !-------------------------------------------------------------------------------
 !BEGIN
 
@@ -548,6 +610,12 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! Read the namelist
    read(namlst,nml=aed_phyto_abm,iostat=status)
    IF (status /= 0) STOP 'Error reading namelist aed_phyto_abm'
+
+   data%target_particle_num = target_particle_num
+   data%recruit_rate         = recruit_rate
+   data%recruit_height_min   = recruit_height_min
+   data%recruit_height_max   = recruit_height_max
+   data%recruit_max_per_call = recruit_max_per_call
 
    print *,"        aed_phyto_abm initialization"
 
@@ -653,6 +721,22 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
    !integer :: N_death(nlev) = 0  !Number of death events during one hour
    data%id_N_death = aed_define_diag_variable('N_death', 'number', 'number of deaths in a layer')
+
+   ! DIAGNOSTIC: cumulative (rezero=.false.) counters, since simulation start, for full
+   ! attribution of particle-count change over time. Unlike N_birth/N_death/N_mutate above
+   ! (which are hourly-reset rate diagnostics), these accumulate monotonically and so give
+   ! an accurate running total regardless of output-save frequency.
+   data%id_cum_birth = aed_define_diag_variable('cum_birth', 'number', &
+                              'cumulative number of births in a layer since sim start', rezero = .false.)
+   data%id_cum_death_thresh = aed_define_diag_variable('cum_death_thresh', 'number', &
+                              'cumulative number of Cmin/N/P subsistence-threshold deaths in a layer since sim start', rezero = .false.)
+   data%id_cum_death_prob = aed_define_diag_variable('cum_death_prob', 'number', &
+                              'cumulative number of background probabilistic (mort_prob) deaths in a layer since sim start', rezero = .false.)
+   ! DIAGNOSTIC: cumulative CELLS (not particle-death events) lost via mort_prob when
+   ! simMortNumDecay=1 - see aed_particle_bgc_phyto_abm. Distinct units from
+   ! cum_death_prob (event counts), so kept as its own diagnostic.
+   data%id_cum_cells_decayed = aed_define_diag_variable('cum_cells_decayed', 'number', &
+                              'cumulative number of cells lost to mort_prob num-decay in a layer since sim start', rezero = .false.)
 
    ! Additional diagnostics from PIBM Geider_Lag.F90
    ! Includes diagnostic outputs for fluxes to and from layers
@@ -798,73 +882,333 @@ SUBROUTINE aed_split_particle_phyto_abm( data,ppid,p )
 !
 
 !LOCALS
-INTEGER   :: i, j, pid
-AED_REAL  :: div
-LOGICAL   :: pass
+INTEGER   :: i, j
+INTEGER   :: n_active, largest_i, n_split_this_call
+AED_REAL  :: largest_num
+LOGICAL   :: found_slot
+! Safety cap on population-maintenance splits performed in a single call: each split
+! requires an O(ppid) scan for the current largest particle plus an O(ppid) scan for a
+! free slot, so an uncapped loop could in the worst case cost O(ppid^2) in one call.
+! This still allows fast recovery (this routine runs once per host timestep) without
+! that pathological cost.
+INTEGER, PARAMETER :: MAX_POPMAINTAIN_SPLITS_PER_CALL = 1000
+
+INTEGER   :: n_recruit_this_call
+AED_REAL  :: rand01, recruit_height
+! Same fragile-but-precedented dt assumption as elsewhere in this file (see dtdays
+! in aed_particle_bgc_phyto_abm) - this routine has no column/layer context and so
+! cannot read the model's actual timestep.
+AED_REAL, PARAMETER :: dtdays_assumed = 1.0d0/24  ! assumes hourly host calls
 
 !
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+! (1) Per-particle size-triggered splitting: a particle that has grown past n_split
+!     divides in two, same as cell division elsewhere, except it also allocates a new
+!     active particle rather than doubling cell count in place. Gated by simSplit.
 IF (data%phytos(1)%simSplit > 0) THEN
    DO i = 1, ppid
       IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > data%phytos(1)%n_split) THEN
          j = 1
+         found_slot = .FALSE.
          DO
             IF (j > ppid) THEN
                print *, 'aed_split_particle(): WARNING no more available particles; skipping particle split'
-               RETURN
-            ELSE
-               IF (p(j)%ptm_istat(STAT) == 0) THEN ! SCB change 7/13 - check for inactivity only
-               ! IF (p(j)%ptm_istat(STAT) == 0 .AND. p(j)%ptm_istat(FLAG) == 3) THEN ! SCB - inactive, and exited via outflows?
-                  !first duplicate all attributes except PTID
-                  p(j)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
-                  p(j)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
-                  p(j)%ptm_istat(IDX3) = p(i)%ptm_istat(IDX3)
-                  p(j)%ptm_istat(LAYR) = p(i)%ptm_istat(LAYR)
-                  p(j)%ptm_istat(FLAG) = p(i)%ptm_istat(FLAG)
-                  p(j)%ptm_env(MASS) = p(i)%ptm_env(MASS)
-                  p(j)%ptm_env(DIAM) = p(i)%ptm_env(DIAM)
-                  p(j)%ptm_env(DENS) = p(i)%ptm_env(DENS)
-                  p(j)%ptm_env(VVEL) = p(i)%ptm_env(VVEL)
-                  p(j)%ptm_env(HGHT) = p(i)%ptm_env(HGHT)
-                  p(j)%ptm_state(data%ip_par) = p(i)%ptm_state(data%ip_par)
-                  p(j)%ptm_state(data%ip_tem) = p(i)%ptm_state(data%ip_tem)
-                  p(j)%ptm_state(data%ip_no3) = p(i)%ptm_state(data%ip_no3)
-                  p(j)%ptm_state(data%ip_nh4) = p(i)%ptm_state(data%ip_nh4)
-                  p(j)%ptm_state(data%ip_frp) = p(i)%ptm_state(data%ip_frp)
-                  p(j)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c)
-                  p(j)%ptm_state(data%ip_n) = p(i)%ptm_state(data%ip_n)
-                  p(j)%ptm_state(data%ip_p) = p(i)%ptm_state(data%ip_p)
-                  p(j)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl)
-                  p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num)
-                  p(j)%ptm_state(data%ip_Cdiv) = p(i)%ptm_state(data%ip_Cdiv)
-                  p(j)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
-                  p(j)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
-
-                  !then split the number of cells for both old and new particles
-                  p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
-                  p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
-
-                  !then get a new PTID for new particle
-                  IF(p(j)%ptm_istat(PTID) < 0) THEN
-                     p(j)%ptm_istat(PTID) = j;
-                  ELSE
-                     div = REAL(p(j)%ptm_istat(PTID) / ppid)
-                     pid = FLOOR(div)
-                     p(j)%ptm_istat(PTID) = ppid + pid*ppid + j
-                  END IF
-                  ! then exit the search for available particles loop and go back to i loop to check if next particle needs to split
-                  EXIT
-               END IF ! end assign new particle if statement
-            END IF ! end check max particle num statement
+               EXIT
+            ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN ! SCB change 7/13 - check for inactivity only
+               CALL duplicate_and_halve_particle(i, j)
+               found_slot = .TRUE.
+               EXIT
+            END IF
             j = j + 1
          END DO ! end search for available particles loop
+
+         IF (found_slot) THEN
+            ! DIAGNOSTIC: record the split event (one of the two pathways that create a
+            ! new active particle / increase the particle count - see also (2) below).
+            ptm_cum_split_count = ptm_cum_split_count + 1
+            BLOCK
+               INTEGER :: split_log_unit
+               OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
+                    POSITION='append', STATUS='unknown', ACTION='write')
+               IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
+               WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
+               CLOSE(split_log_unit)
+            END BLOCK
+         ELSE
+            RETURN ! no free slots anywhere; further scanning this call is pointless
+         END IF
       END IF ! end does particle need to split if statement
-   END DO ! end particle loop 
-ELSE
-   RETURN
-END IF !end simSplit query loop
+   END DO ! end particle loop
+END IF
+
+! (2) Population maintenance: if the domain-wide active particle count has fallen below
+!     target_particle_num (namelist parameter, disabled when 0), repeatedly split the
+!     largest currently-active particle - by cells per particle, ip_num - into a free
+!     slot to replace losses, until the target is met, no free slots remain, or the
+!     per-call cap above is reached. Independent of simSplit: this is a population-size
+!     trigger, not a per-particle-size trigger.
+IF (data%target_particle_num > 0) THEN
+   n_active = 0
+   DO i = 1, ppid
+      IF (p(i)%ptm_istat(STAT) > 0) n_active = n_active + 1
+   END DO
+
+   n_split_this_call = 0
+   DO WHILE (n_active < data%target_particle_num .AND. n_split_this_call < MAX_POPMAINTAIN_SPLITS_PER_CALL)
+      ! find the largest active particle
+      largest_i = -1
+      largest_num = -1.0d0
+      DO i = 1, ppid
+         IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > largest_num) THEN
+            largest_num = p(i)%ptm_state(data%ip_num)
+            largest_i = i
+         END IF
+      END DO
+      IF (largest_i < 0 .OR. largest_num < 2.0d0) EXIT ! nothing left worth splitting
+
+      ! find a free slot to hold the new particle
+      j = 1
+      found_slot = .FALSE.
+      DO
+         IF (j > ppid) THEN
+            print *, 'aed_split_particle(): WARNING population below target_particle_num but no free particle slots available'
+            EXIT
+         ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN
+            found_slot = .TRUE.
+            EXIT
+         END IF
+         j = j + 1
+      END DO
+      IF (.NOT. found_slot) EXIT ! no free slots anywhere; give up until next call
+
+      CALL duplicate_and_halve_particle(largest_i, j)
+      n_active = n_active + 1
+      n_split_this_call = n_split_this_call + 1
+
+      ! DIAGNOSTIC: record the split event, distinct from the n_split-triggered log above.
+      ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
+      BLOCK
+         INTEGER :: pm_log_unit
+         OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
+              POSITION='append', STATUS='unknown', ACTION='write')
+         IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
+            'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
+         WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
+            ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
+            largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
+         CLOSE(pm_log_unit)
+      END BLOCK
+   END DO
+END IF
+
+! (3) General recruitment: an ongoing, rate-controlled source of brand-new active
+!     particles, independent of simSplit and target_particle_num above, and
+!     independent of initial seeding / inflow-sourced particles (host-side C).
+!     Represents an unmodeled external biological source (e.g. resuspension,
+!     immigration). Gated by recruit_rate (particles/day, disabled when 0).
+IF (data%recruit_rate > 0) THEN
+   ! NOTE: same fragile-but-precedented dt assumption as elsewhere in this file
+   ! (see dtdays in aed_particle_bgc_phyto_abm) - this routine has no column/
+   ! layer context and so cannot read the model's actual timestep.
+   recruit_accumulator = recruit_accumulator + data%recruit_rate * dtdays_assumed
+
+   n_recruit_this_call = 0
+   DO WHILE (recruit_accumulator >= 1.0d0 .AND. n_recruit_this_call < data%recruit_max_per_call)
+
+      ! find a free slot
+      j = 1
+      found_slot = .FALSE.
+      DO
+         IF (j > ppid) THEN
+            print *, 'aed_split_particle(): WARNING recruit_rate > 0 but no free particle slots available'
+            EXIT
+         ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN
+            found_slot = .TRUE.
+            EXIT
+         END IF
+         j = j + 1
+      END DO
+      IF (.NOT. found_slot) EXIT ! no free slots anywhere; keep the fractional
+                                  ! accumulator so nothing is lost - try again next call
+
+      ! ---- draw an independently-random height within the recruitment band,
+      !      matching the ptm_addparticles() random-within-band precedent used
+      !      for initial seeding (GLM/src/glm_ptm.c) ----
+      CALL RANDOM_NUMBER(rand01)
+      recruit_height = data%recruit_height_min + &
+                        rand01 * (data%recruit_height_max - data%recruit_height_min)
+
+      CALL recruit_particle(j, recruit_height)
+
+      ! DIAGNOSTIC: record the recruitment event, distinct from the split-triggered
+      ! logs above (this is the third, independent pathway that creates a new
+      ! active particle).
+      ptm_cum_recruit_count = ptm_cum_recruit_count + 1
+      n_recruit_this_call = n_recruit_this_call + 1
+      recruit_accumulator = recruit_accumulator - 1.0d0
+      BLOCK
+         INTEGER :: recruit_log_unit
+         OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
+              POSITION='append', STATUS='unknown', ACTION='write')
+         IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
+            'event_num,new_particle,height,cells_per_particle'
+         WRITE(recruit_log_unit,'(I0,A,I0,A,ES14.6,A,ES14.6)') &
+            ptm_cum_recruit_count, ',', j, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+         CLOSE(recruit_log_unit)
+      END BLOCK
+   END DO
+END IF
+
+CONTAINS
+
+   !###########################################################################
+   ! Duplicate particle i's attributes into slot j, halve ip_num on both so the
+   ! total cell count represented is conserved, and assign j a new PTID. Shared
+   ! by both split pathways above; does not touch the diagnostic counters/logs,
+   ! since each pathway logs differently.
+   SUBROUTINE duplicate_and_halve_particle(i, j)
+      INTEGER, INTENT(in) :: i, j
+      AED_REAL :: div
+      INTEGER  :: pid
+
+      !first duplicate all attributes except PTID
+      p(j)%ptm_istat(STAT) = p(i)%ptm_istat(STAT)
+      p(j)%ptm_istat(IDX2) = p(i)%ptm_istat(IDX2)
+      p(j)%ptm_istat(IDX3) = p(i)%ptm_istat(IDX3)
+      p(j)%ptm_istat(LAYR) = p(i)%ptm_istat(LAYR)
+      p(j)%ptm_istat(FLAG) = p(i)%ptm_istat(FLAG)
+      p(j)%ptm_env(MASS) = p(i)%ptm_env(MASS)
+      p(j)%ptm_env(DIAM) = p(i)%ptm_env(DIAM)
+      p(j)%ptm_env(DENS) = p(i)%ptm_env(DENS)
+      p(j)%ptm_env(VVEL) = p(i)%ptm_env(VVEL)
+      p(j)%ptm_env(HGHT) = p(i)%ptm_env(HGHT)
+      p(j)%ptm_state(data%ip_par) = p(i)%ptm_state(data%ip_par)
+      p(j)%ptm_state(data%ip_tem) = p(i)%ptm_state(data%ip_tem)
+      p(j)%ptm_state(data%ip_no3) = p(i)%ptm_state(data%ip_no3)
+      p(j)%ptm_state(data%ip_nh4) = p(i)%ptm_state(data%ip_nh4)
+      p(j)%ptm_state(data%ip_frp) = p(i)%ptm_state(data%ip_frp)
+      p(j)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c)
+      p(j)%ptm_state(data%ip_n) = p(i)%ptm_state(data%ip_n)
+      p(j)%ptm_state(data%ip_p) = p(i)%ptm_state(data%ip_p)
+      p(j)%ptm_state(data%ip_chl) = p(i)%ptm_state(data%ip_chl)
+      p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num)
+      p(j)%ptm_state(data%ip_Cdiv) = p(i)%ptm_state(data%ip_Cdiv)
+      p(j)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
+      p(j)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
+
+      !then split the number of cells for both old and new particles
+      p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
+      p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
+
+      !then get a new PTID for new particle
+      IF(p(j)%ptm_istat(PTID) < 0) THEN
+         p(j)%ptm_istat(PTID) = j;
+      ELSE
+         div = REAL(p(j)%ptm_istat(PTID) / ppid)
+         pid = FLOOR(div)
+         p(j)%ptm_istat(PTID) = ppid + pid*ppid + j
+      END IF
+   END SUBROUTINE duplicate_and_halve_particle
+
+   !###########################################################################
+   ! Activate free slot j as a brand-new recruited particle at target_height.
+   ! Unlike duplicate_and_halve_particle, there is no parent - PTM host state and
+   ! AED biology state are both populated fresh: host-state (LAYR/DIAM/DENS/VVEL)
+   ! is copied from whichever other active particle's HGHT is closest to
+   ! target_height (best-effort placeholder for LAYR - GLM's ptm_update_layerid(),
+   ! called unconditionally every host step, corrects it before it's ever read by
+   ! per-layer bgc; falls back to LAYR=1, DIAM/DENS/VVEL=0 if the domain is
+   ! entirely empty of other active particles). Biology state (traits + cell C/N/P/
+   ! Chl) is drawn the same way aed_particle_initialize_phyto_abm gives the
+   ! founding population its diversity - a Gaussian perturbation (srand_mtGaus,
+   ! sigma_init from module params) - except centered on the base
+   ! aed_phyto_pars.csv defaults (data%phytos(1)%...) rather than on a stale
+   ! ptm_state left behind by whatever previously occupied this slot.
+   SUBROUTINE recruit_particle(j, target_height)
+      use params,  only : NInit, sigma_init
+      use mGf90,   only : srand_mtGaus
+      INTEGER, INTENT(in)  :: j
+      AED_REAL, INTENT(in) :: target_height
+      INTEGER  :: k, best_k, v
+      AED_REAL :: best_dist, d
+      real     :: oldtt(1), newtt(1), vartt(1,1)
+      integer, parameter :: iTopt=1, iSize=2, ialphaChl=3, iC=4, iNO3=5, iP=6, iChl=7, iNum=8
+
+      ! ---- generic PTM host-state fields ----
+      p(j)%ptm_istat(STAT) = 1
+      p(j)%ptm_istat(IDX2) = 0
+      p(j)%ptm_istat(IDX3) = 0
+      p(j)%ptm_istat(FLAG) = 0
+      p(j)%ptm_env(HGHT)   = target_height
+      p(j)%ptm_env(MASS)   = 1.0d0   ! matches ptm_addparticles' hardcoded MASS
+
+      best_k = -1
+      best_dist = HUGE(best_dist)
+      DO k = 1, ppid
+         IF (k == j) CYCLE
+         IF (p(k)%ptm_istat(STAT) > 0) THEN
+            d = ABS(p(k)%ptm_env(HGHT) - target_height)
+            IF (d < best_dist) THEN
+               best_dist = d
+               best_k = k
+            END IF
+         END IF
+      END DO
+      IF (best_k > 0) THEN
+         p(j)%ptm_istat(LAYR) = p(best_k)%ptm_istat(LAYR)
+         p(j)%ptm_env(DIAM)   = p(best_k)%ptm_env(DIAM)
+         p(j)%ptm_env(DENS)   = p(best_k)%ptm_env(DENS)
+         p(j)%ptm_env(VVEL)   = p(best_k)%ptm_env(VVEL)
+      ELSE
+         p(j)%ptm_istat(LAYR) = 1
+         p(j)%ptm_env(DIAM)   = 0.0d0
+         p(j)%ptm_env(DENS)   = 0.0d0
+         p(j)%ptm_env(VVEL)   = 0.0d0
+      END IF
+
+      ! ---- PTID: same generation-aware scheme as duplicate_and_halve_particle ----
+      IF (p(j)%ptm_istat(PTID) < 0) THEN
+         p(j)%ptm_istat(PTID) = j
+      ELSE
+         p(j)%ptm_istat(PTID) = ppid + FLOOR(REAL(p(j)%ptm_istat(PTID)) / ppid)*ppid + j
+      END IF
+
+      ! ---- non-trait environment/state: neutral start, filled in by the next bgc call ----
+      p(j)%ptm_state(data%ip_par) = 0.0d0
+      p(j)%ptm_state(data%ip_tem) = 0.0d0
+      p(j)%ptm_state(data%ip_no3) = 0.0d0
+      p(j)%ptm_state(data%ip_nh4) = 0.0d0
+      p(j)%ptm_state(data%ip_frp) = 0.0d0
+
+      ! ---- traits + cell C/N/P/Chl/num: base CSV defaults, Gaussian-perturbed ----
+      DO v = 1, NInit
+         SELECT CASE (v)
+         CASE (iTopt);     oldtt(1) = data%phytos(1)%T_opt
+         CASE (iSize);     oldtt(1) = log(data%phytos(1)%Cdiv)
+         CASE (ialphaChl); oldtt(1) = data%phytos(1)%Lnalphachl
+         CASE (iC);        oldtt(1) = log(data%phytos(1)%X_cinit)
+         CASE (iNO3);      oldtt(1) = log(data%phytos(1)%X_ninit)
+         CASE (iP);        oldtt(1) = log(data%phytos(1)%X_pinit)
+         CASE (iChl);      oldtt(1) = log(data%phytos(1)%X_chlinit)
+         CASE (iNum);      oldtt(1) = log(data%phytos(1)%n0)
+         END SELECT
+         vartt(1,1) = sigma_init(v)**2
+         newtt = srand_mtGaus(1, oldtt, vartt)
+         SELECT CASE (v)
+         CASE (iTopt);     p(j)%ptm_state(data%ip_Topt)       = newtt(1)
+         CASE (iSize);     p(j)%ptm_state(data%ip_Cdiv)       = exp(newtt(1))
+         CASE (ialphaChl); p(j)%ptm_state(data%ip_LnalphaChl) = newtt(1)
+         CASE (iC);        p(j)%ptm_state(data%ip_c)          = exp(newtt(1))
+         CASE (iNO3);      p(j)%ptm_state(data%ip_n)          = exp(newtt(1))
+         CASE (iP);        p(j)%ptm_state(data%ip_p)          = exp(newtt(1))
+         CASE (iChl);      p(j)%ptm_state(data%ip_chl)        = exp(newtt(1))
+         CASE (iNum);      p(j)%ptm_state(data%ip_num)        = exp(newtt(1))
+         END SELECT
+      END DO
+   END SUBROUTINE recruit_particle
 
 END SUBROUTINE aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -908,6 +1252,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real      ::  nu_ = 0d0   !Basic Mutation rate
    real      :: cff = 0.d0   !Random number [0,1] for mutation
    real      :: rnm = 0.d0   !Random number [0,1] for mortality
+   real      :: mort_prob_step = 0.d0   !mort_prob (d-1) converted to a per-call death probability via dtdays
+   real      :: num_lost = 0.d0         !cells lost this call under simMortNumDecay=1 (see PHYTOPLANKTON MORTALITY)
    real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
    real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
    real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -1277,6 +1623,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
             _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1
+            _DIAG_VAR_(data%id_cum_death_thresh) = _DIAG_VAR_(data%id_cum_death_thresh) + 1
             Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
             Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
@@ -1291,22 +1638,52 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          endif
 
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
-         call random_number(rnm)
+         ! mort_prob is a per-day rate (d-1), consistent with every other rate parameter in this
+         ! module (R_resp, RC, RN, RP, RChl, etc.); convert it to the probability of death over
+         ! THIS call (which covers dtdays of simulated time) via the usual exponential-decay
+         ! rate-to-probability conversion, rather than comparing the raw daily rate directly.
+         mort_prob_step = 1.d0 - exp(-data%phytos(1)%mort_prob * dtdays)
 
-         IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
-            _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
-            Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+         IF (data%phytos(1)%simMortNumDecay > 0) THEN
+            ! ---- num-decay mode: mort_prob shrinks the number of cells the particle
+            ! represents (ip_num) by the same exponential fraction each call, instead of
+            ! probabilistically killing the whole particle. Per-cell state (ip_c/n/p/chl)
+            ! is unchanged - those describe the surviving cells, not the ones lost. The
+            ! particle itself only fully dies via the Cmin/Nt_min/P_min subsistence check
+            ! above, once its shrinking total N/P/C eventually crosses that threshold.
+            IF (_PTM_STAT_(i,STAT) == 1) THEN
+               num_lost = p(i)%ptm_state(data%ip_num) * mort_prob_step
+               _DIAG_VAR_(data%id_cum_cells_decayed) = _DIAG_VAR_(data%id_cum_cells_decayed) + num_lost
+               Pmort   = Pmort   + p(i)%ptm_state(data%ip_n) * num_lost !Natural mortality of phytoplankton ==> DET
+               Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * num_lost !Natural mortality of phytoplankton ==> DET
+               Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * num_lost !Natural mortality of phytoplankton ==> DET
 
-            p(i)%ptm_state(data%ip_c)   = 0d0
-            p(i)%ptm_state(data%ip_n)   = 0d0
-            p(i)%ptm_state(data%ip_p)   = 0d0
-            p(i)%ptm_state(data%ip_chl) = 0d0
-            p(i)%ptm_state(data%ip_num) = 0d0
-            _PTM_STAT_(i,STAT) = 0
-            _PTM_STAT_(i,FLAG) = 3
-         ENDIF
+               p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) - num_lost
+            END IF
+         ELSE
+            ! ---- default mode: a per-call Bernoulli draw kills the whole particle.
+            call random_number(rnm)
+
+            ! Guard against double-counting a particle that already died from the subsistence
+            ! threshold check above (STAT was set to 0 there); without this guard, a particle
+            ! could be recorded as dying twice in the same call (harmless to mass balance, since
+            ! its state was already zeroed, but it inflates the death-cause diagnostics below).
+            IF (_PTM_STAT_(i,STAT) == 1 .AND. rnm < mort_prob_step) THEN !it dies
+               _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
+               _DIAG_VAR_(data%id_cum_death_prob) = _DIAG_VAR_(data%id_cum_death_prob) + 1.
+               Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+               Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+               Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+
+               p(i)%ptm_state(data%ip_c)   = 0d0
+               p(i)%ptm_state(data%ip_n)   = 0d0
+               p(i)%ptm_state(data%ip_p)   = 0d0
+               p(i)%ptm_state(data%ip_chl) = 0d0
+               p(i)%ptm_state(data%ip_num) = 0d0
+               _PTM_STAT_(i,STAT) = 0
+               _PTM_STAT_(i,FLAG) = 3
+            ENDIF
+         END IF
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
@@ -1373,6 +1750,7 @@ IF (N_ > 0) THEN
    IF (p(i)%ptm_state(data%ip_c) >= p(i)%ptm_state(data%ip_cdiv)) THEN  !Divide
       !print *, 'I divided!'
       _DIAG_VAR_(data%id_N_birth) = _DIAG_VAR_(data%id_N_birth) + 1.
+      _DIAG_VAR_(data%id_cum_birth) = _DIAG_VAR_(data%id_cum_birth) + 1.
       p(i)%ptm_state(data%ip_c)   = p(i)%ptm_state(data%ip_c)/2d0
       p(i)%ptm_state(data%ip_n)   = p(i)%ptm_state(data%ip_n)/2d0
       p(i)%ptm_state(data%ip_p)   = p(i)%ptm_state(data%ip_p)/2d0

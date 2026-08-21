@@ -92,6 +92,11 @@ MODULE aed_bio_utils
       AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
       AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
+      ! mort_prob interpretation: 0 (default) = mort_prob is compared to a per-call
+      ! random draw and the whole particle dies; 1 = mort_prob instead deterministically
+      ! decays ip_num (cells represented) each call, so the particle stays alive but
+      ! represents fewer individuals. See aed_particle_bgc_phyto_abm.
+      INTEGER  :: simMortNumDecay
    END TYPE phyto_data_t
 
 
@@ -127,6 +132,7 @@ MODULE aed_bio_utils
       AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
       AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
+      INTEGER  :: simMortNumDecay
    END TYPE phyto_param_t
    ! %% END NAMELIST   %% phyto_param_t
 
