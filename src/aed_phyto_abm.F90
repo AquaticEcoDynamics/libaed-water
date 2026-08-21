@@ -122,6 +122,7 @@ MODULE aed_phyto_abm
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
+   INTEGER  :: n_starved = 0
 
 
 !===============================================================================
@@ -798,6 +799,95 @@ SUBROUTINE aed_split_particle_phyto_abm( data,ppid,p )
 !
 
 !LOCALS
+INTEGER   :: i, j, pid, donor, split_count
+AED_REAL  :: div, total_carbon, max_carbon
+LOGICAL, ALLOCATABLE :: selected(:)
+
+!
+
+!-------------------------------------------------------------------------------
+!BEGIN
+IF (data%phytos(1)%simSplit > 0) THEN
+   ALLOCATE(selected(ppid))
+   selected = .FALSE.
+   split_count = 0
+
+   DO WHILE (split_count < n_starved)
+      donor = 0
+      max_carbon = -HUGE(max_carbon)
+      DO i = 1, ppid
+         IF (p(i)%ptm_istat(STAT) > 0 .AND. .NOT. selected(i)) THEN
+            total_carbon = p(i)%ptm_state(data%ip_num) * p(i)%ptm_state(data%ip_c)
+            IF (total_carbon > max_carbon) THEN
+               max_carbon = total_carbon
+               donor = i
+            END IF
+         END IF
+      END DO
+
+      j = 1
+      DO WHILE (j <= ppid .AND. p(j)%ptm_istat(STAT) /= 0)
+         j = j + 1
+      END DO
+      IF (donor == 0 .OR. j > ppid) EXIT
+
+      selected(donor) = .TRUE.
+      p(j)%ptm_istat(STAT) = p(donor)%ptm_istat(STAT)
+      p(j)%ptm_istat(IDX2) = p(donor)%ptm_istat(IDX2)
+      p(j)%ptm_istat(IDX3) = p(donor)%ptm_istat(IDX3)
+      p(j)%ptm_istat(LAYR) = p(donor)%ptm_istat(LAYR)
+      p(j)%ptm_istat(FLAG) = p(donor)%ptm_istat(FLAG)
+      p(j)%ptm_env(MASS) = p(donor)%ptm_env(MASS)
+      p(j)%ptm_env(DIAM) = p(donor)%ptm_env(DIAM)
+      p(j)%ptm_env(DENS) = p(donor)%ptm_env(DENS)
+      p(j)%ptm_env(VVEL) = p(donor)%ptm_env(VVEL)
+      p(j)%ptm_env(HGHT) = p(donor)%ptm_env(HGHT)
+      p(j)%ptm_state(data%ip_par) = p(donor)%ptm_state(data%ip_par)
+      p(j)%ptm_state(data%ip_tem) = p(donor)%ptm_state(data%ip_tem)
+      p(j)%ptm_state(data%ip_no3) = p(donor)%ptm_state(data%ip_no3)
+      p(j)%ptm_state(data%ip_nh4) = p(donor)%ptm_state(data%ip_nh4)
+      p(j)%ptm_state(data%ip_frp) = p(donor)%ptm_state(data%ip_frp)
+      p(j)%ptm_state(data%ip_c) = p(donor)%ptm_state(data%ip_c)
+      p(j)%ptm_state(data%ip_n) = p(donor)%ptm_state(data%ip_n)
+      p(j)%ptm_state(data%ip_p) = p(donor)%ptm_state(data%ip_p)
+      p(j)%ptm_state(data%ip_chl) = p(donor)%ptm_state(data%ip_chl)
+      p(j)%ptm_state(data%ip_num) = p(donor)%ptm_state(data%ip_num) / 2
+      p(donor)%ptm_state(data%ip_num) = p(donor)%ptm_state(data%ip_num) / 2
+      p(j)%ptm_state(data%ip_Cdiv) = p(donor)%ptm_state(data%ip_Cdiv)
+      p(j)%ptm_state(data%ip_Topt) = p(donor)%ptm_state(data%ip_Topt)
+      p(j)%ptm_state(data%ip_LnalphaChl) = p(donor)%ptm_state(data%ip_LnalphaChl)
+
+      IF (p(j)%ptm_istat(PTID) < 0) THEN
+         p(j)%ptm_istat(PTID) = j
+      ELSE
+         div = REAL(p(j)%ptm_istat(PTID) / ppid)
+         pid = FLOOR(div)
+         p(j)%ptm_istat(PTID) = ppid + pid*ppid + j
+      END IF
+      split_count = split_count + 1
+   END DO
+   DEALLOCATE(selected)
+   n_starved = 0
+ELSE
+   n_starved = 0
+   RETURN
+END IF !end simSplit query loop
+
+END SUBROUTINE aed_split_particle_phyto_abm
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE OLD_aed_split_particle_phyto_abm( data,ppid,p )
+
+!ARGUMENTS
+   CLASS (aed_phyto_abm_data_t),INTENT(in) :: data
+   TYPE(aed_ptm_t), DIMENSION(:), INTENT(inout) :: p
+   INTEGER,INTENT(inout) :: ppid
+
+!
+
+!LOCALS
 INTEGER   :: i, j, pid
 AED_REAL  :: div
 LOGICAL   :: pass
@@ -866,9 +956,8 @@ ELSE
    RETURN
 END IF !end simSplit query loop
 
-END SUBROUTINE aed_split_particle_phyto_abm
+END SUBROUTINE OLD_aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 !###############################################################################
 SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
@@ -1288,45 +1377,53 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_state(data%ip_num) = 0d0
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
+
+            n_starved = n_starved + 1
+
          endif
 
+         print *, "Starved particles this time step:",  n_starved
+
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
-         ! call random_number(rnm)
-         !
-         ! IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
-         !    _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
-         !    Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-         !    Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-         !    Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
-         !
-         !    p(i)%ptm_state(data%ip_c)   = 0d0
-         !    p(i)%ptm_state(data%ip_n)   = 0d0
-         !    p(i)%ptm_state(data%ip_p)   = 0d0
-         !    p(i)%ptm_state(data%ip_chl) = 0d0
-         !    p(i)%ptm_state(data%ip_num) = 0d0
-         !    _PTM_STAT_(i,STAT) = 0
-         !    _PTM_STAT_(i,FLAG) = 3
-         ! ENDIF
-
-         IF (data%phytos(1)%mort_prob < 1d0) THEN
-            Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
-            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
-            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
-
-            p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) * data%phytos(1)%mort_prob
-
-            ! SCB - Additional check to make sure the number of cells in particle is not less than 0.
-            ! Can raise this threshold here later per RQT's idea.
-            IF (p(i)%ptm_state(data%ip_num) <= 0d0) THEN
-               _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
-               p(i)%ptm_state(data%ip_c)   = 0d0
-               p(i)%ptm_state(data%ip_n)   = 0d0
-               p(i)%ptm_state(data%ip_p)   = 0d0
-               p(i)%ptm_state(data%ip_chl) = 0d0
-               _PTM_STAT_(i,STAT) = 0
-               _PTM_STAT_(i,FLAG) = 3
-            ENDIF
+         call random_number(rnm)
+         
+         IF (rnm < data%phytos(1)%mort_prob) THEN !it dies
+            _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
+            Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+            Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+            Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
+         
+            p(i)%ptm_state(data%ip_c)   = 0d0
+            p(i)%ptm_state(data%ip_n)   = 0d0
+            p(i)%ptm_state(data%ip_p)   = 0d0
+            p(i)%ptm_state(data%ip_chl) = 0d0
+            p(i)%ptm_state(data%ip_num) = 0d0
+            _PTM_STAT_(i,STAT) = 0
+            _PTM_STAT_(i,FLAG) = 3
          ENDIF
+
+         ! This code chunk was written by AI. Needs checking
+         ! Currently turned off for 
+         ! IF (data%phytos(1)%mort_prob < 1d0) THEN
+         !    Pmort = Pmort + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
+         !    Pmort_P = Pmort_P + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
+         !    Pmort_C = Pmort_C + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * (1d0 - data%phytos(1)%mort_prob)
+
+         !    p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) * data%phytos(1)%mort_prob
+
+         !    ! SCB - Additional check to make sure the number of cells in particle is not less than 0.
+         !    ! Can raise this threshold here later per RQT's idea.
+         !    ! SCB - commented this out to see if it's causing weird issues
+         !    ! IF (p(i)%ptm_state(data%ip_num) <= 0d0) THEN
+         !    !    _DIAG_VAR_(data%id_N_death) = _DIAG_VAR_(data%id_N_death) + 1.
+         !    !    p(i)%ptm_state(data%ip_c)   = 0d0
+         !    !    p(i)%ptm_state(data%ip_n)   = 0d0
+         !    !    p(i)%ptm_state(data%ip_p)   = 0d0
+         !    !    p(i)%ptm_state(data%ip_chl) = 0d0
+         !    !    _PTM_STAT_(i,STAT) = 0
+         !    !    _PTM_STAT_(i,FLAG) = 3
+         !    ! ENDIF
+         ! ENDIF
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
