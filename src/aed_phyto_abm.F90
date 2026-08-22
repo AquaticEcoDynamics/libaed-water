@@ -1003,7 +1003,13 @@ SUBROUTINE aed_split_particle_phyto_abm( data,ppid,p )
 !
 
 !LOCALS
-INTEGER   :: i, j, grp
+! NOTE: the loop index over phyto groups is deliberately NOT named 'grp'. Fortran
+! identifiers are case-insensitive, so a local named 'grp' silently shadows the
+! module PARAMETER GRP (= the ptm_istat slot holding a particle's phyto group),
+! turning every p(..)%ptm_istat(GRP) in this scope into an indexed read/write at
+! whatever the local happens to hold. The same applies to the contained
+! recruit_particle's dummy argument, hence 'rgrp' there.
+INTEGER   :: i, j, ng
 INTEGER   :: n_active, largest_i, n_split_this_call
 AED_REAL  :: largest_num
 LOGICAL   :: found_slot
@@ -1134,18 +1140,18 @@ END IF
 !     immigration). Gated by recruit_rate(g) (particles/day, disabled when 0).
 !     Per-group (unlike population maintenance in (2) above): each species recruits
 !     independently at its own rate, into its own height band.
-DO grp = 1, data%num_phytos
-   IF (data%recruit_rate(grp) > 0) THEN
+DO ng = 1, data%num_phytos
+   IF (data%recruit_rate(ng) > 0) THEN
       ! NOTE: same fragile-but-precedented dt assumption as elsewhere in this file
       ! (see dtdays in aed_particle_bgc_phyto_abm) - this routine has no column/
       ! layer context and so cannot read the model's actual timestep.
-      recruit_accumulator(grp) = recruit_accumulator(grp) + data%recruit_rate(grp) * dtdays_assumed
+      recruit_accumulator(ng) = recruit_accumulator(ng) + data%recruit_rate(ng) * dtdays_assumed
 
       n_recruit_this_call = 0
-      DO WHILE (recruit_accumulator(grp) >= 1.0d0 .AND. n_recruit_this_call < data%recruit_max_per_call(grp))
+      DO WHILE (recruit_accumulator(ng) >= 1.0d0 .AND. n_recruit_this_call < data%recruit_max_per_call(ng))
 
          ! find a free slot (any slot regardless of which group previously occupied it -
-         ! correctness comes from recruit_particle setting GRP=grp on the new occupant)
+         ! correctness comes from recruit_particle setting GRP=ng on the new occupant)
          j = 1
          found_slot = .FALSE.
          DO
@@ -1165,17 +1171,17 @@ DO grp = 1, data%num_phytos
          !      matching the ptm_addparticles() random-within-band precedent used
          !      for initial seeding (GLM/src/glm_ptm.c) ----
          CALL RANDOM_NUMBER(rand01)
-         recruit_height = data%recruit_height_min(grp) + &
-                           rand01 * (data%recruit_height_max(grp) - data%recruit_height_min(grp))
+         recruit_height = data%recruit_height_min(ng) + &
+                           rand01 * (data%recruit_height_max(ng) - data%recruit_height_min(ng))
 
-         CALL recruit_particle(j, grp, recruit_height)
+         CALL recruit_particle(j, ng, recruit_height)
 
          ! DIAGNOSTIC: record the recruitment event, distinct from the split-triggered
          ! logs above (this is the third, independent pathway that creates a new
          ! active particle).
          ptm_cum_recruit_count = ptm_cum_recruit_count + 1
          n_recruit_this_call = n_recruit_this_call + 1
-         recruit_accumulator(grp) = recruit_accumulator(grp) - 1.0d0
+         recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
          BLOCK
             INTEGER :: recruit_log_unit
             OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
@@ -1183,7 +1189,7 @@ DO grp = 1, data%num_phytos
             IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
                'event_num,new_particle,group,height,cells_per_particle'
             WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-               ptm_cum_recruit_count, ',', j, ',', grp, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+               ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
             CLOSE(recruit_log_unit)
          END BLOCK
       END DO
@@ -1255,13 +1261,13 @@ CONTAINS
    ! Chl) is drawn the same way aed_particle_initialize_phyto_abm gives the
    ! founding population its diversity - a Gaussian perturbation (srand_mtGaus,
    ! sigma_init from module params) - except centered on the target group's own
-   ! aed_phyto_pars.csv defaults (data%phytos(grp)%...) rather than on a stale
+   ! aed_phyto_pars.csv defaults (data%phytos(ng)%...) rather than on a stale
    ! ptm_state left behind by whatever previously occupied this slot.
-   SUBROUTINE recruit_particle(j, grp, target_height)
+   SUBROUTINE recruit_particle(j, rgrp, target_height)
       use params,  only : NInit, sigma_init
       use mGf90,   only : srand_mtGaus
       INTEGER, INTENT(in)  :: j
-      INTEGER, INTENT(in)  :: grp   ! which data%phytos(:) group this recruit belongs to
+      INTEGER, INTENT(in)  :: rgrp   ! which data%phytos(:) group this recruit belongs to
       AED_REAL, INTENT(in) :: target_height
       INTEGER  :: k, best_k, v
       AED_REAL :: best_dist, d
@@ -1273,7 +1279,7 @@ CONTAINS
       p(j)%ptm_istat(IDX2) = 0
       p(j)%ptm_istat(IDX3) = 0
       p(j)%ptm_istat(FLAG) = 0
-      p(j)%ptm_istat(GRP)  = grp
+      p(j)%ptm_istat(GRP)  = rgrp
       p(j)%ptm_env(HGHT)   = target_height
       p(j)%ptm_env(MASS)   = 1.0d0   ! matches ptm_addparticles' hardcoded MASS
 
@@ -1319,14 +1325,14 @@ CONTAINS
       ! ---- traits + cell C/N/P/Chl/num: base CSV defaults, Gaussian-perturbed ----
       DO v = 1, NInit
          SELECT CASE (v)
-         CASE (iTopt);     oldtt(1) = data%phytos(grp)%T_opt
-         CASE (iSize);     oldtt(1) = log(data%phytos(grp)%Cdiv)
-         CASE (ialphaChl); oldtt(1) = data%phytos(grp)%Lnalphachl
-         CASE (iC);        oldtt(1) = log(data%phytos(grp)%X_cinit)
-         CASE (iNO3);      oldtt(1) = log(data%phytos(grp)%X_ninit)
-         CASE (iP);        oldtt(1) = log(data%phytos(grp)%X_pinit)
-         CASE (iChl);      oldtt(1) = log(data%phytos(grp)%X_chlinit)
-         CASE (iNum);      oldtt(1) = log(data%phytos(grp)%n0)
+         CASE (iTopt);     oldtt(1) = data%phytos(rgrp)%T_opt
+         CASE (iSize);     oldtt(1) = log(data%phytos(rgrp)%Cdiv)
+         CASE (ialphaChl); oldtt(1) = data%phytos(rgrp)%Lnalphachl
+         CASE (iC);        oldtt(1) = log(data%phytos(rgrp)%X_cinit)
+         CASE (iNO3);      oldtt(1) = log(data%phytos(rgrp)%X_ninit)
+         CASE (iP);        oldtt(1) = log(data%phytos(rgrp)%X_pinit)
+         CASE (iChl);      oldtt(1) = log(data%phytos(rgrp)%X_chlinit)
+         CASE (iNum);      oldtt(1) = log(data%phytos(rgrp)%n0)
          END SELECT
          vartt(1,1) = sigma_init(v)**2
          newtt = srand_mtGaus(1, oldtt, vartt)
@@ -1391,6 +1397,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real      :: rnm = 0.d0   !Random number [0,1] for mortality
    real      :: mort_prob_step = 0.d0   !mort_prob (d-1) converted to a per-call death probability via dtdays
    real      :: num_lost = 0.d0         !cells lost this call under simMortNumDecay=1 (see PHYTOPLANKTON MORTALITY)
+   real      :: num_before = 0.d0       !DEBUG: ip_num at top of this particle's per-call update, to detect single-call collapses
+   integer, save :: dbg_call_count = 0  !DEBUG: monotonic count of calls to this subroutine, for ordering debug output
    real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
    real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
    real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -1538,6 +1546,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       _DIAG_VAR_(data%id_d_oxy(ng)) = zero_
    ENDDO
 
+   dbg_call_count = dbg_call_count + 1   !DEBUG
+
    !Calculate the number of super-individuals (N_) in this vertical layer and obtain their indices (index_)
    N_PAR = ppid
    N_ = 0
@@ -1631,6 +1641,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       do j = 1, N_
          i = index_(j)
          g = p(i)%ptm_istat(GRP)   ! this particle's phyto group - selects which data%phytos(g) parameter set to use
+         num_before = p(i)%ptm_state(data%ip_num)   !DEBUG
 
          ! set particle par, temp, and no3 using environmental conditions from this layer
          p(i)%ptm_state(data%ip_par) = par
@@ -1783,7 +1794,11 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          ! If cellular carbon is lower than the subsistence threshold (Cmin), it dies:
          Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM
 
-         if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
+         if (p(i)%ptm_state(data%ip_c) < Cmin .or. &
+            (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. &
+            (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min .or. &
+            p(i)%ptm_state(data%ip_num) < 1.0d0) then  ! The superindividual Dies
+         !if (p(i)%ptm_state(data%ip_c) < Cmin .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_p)) < P_min) then  ! The superindividual Dies
             _DIAG_VAR_(data%id_N_death(g)) = _DIAG_VAR_(data%id_N_death(g)) + 1
             _DIAG_VAR_(data%id_cum_death_thresh(g)) = _DIAG_VAR_(data%id_cum_death_thresh(g)) + 1
             Pmort(g) = Pmort(g) + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) !Natural mortality of phytoplankton ==> DET
@@ -1845,6 +1860,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                _PTM_STAT_(i,STAT) = 0
                _PTM_STAT_(i,FLAG) = 3
             ENDIF
+         END IF
+
+         !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
+         IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+            print *, 'PTM_NUM_COLLAPSE call=', dbg_call_count, ' yday=', real_day, &
+                     ' ptid=', p(i)%ptm_istat(PTID), ' i=', i, ' layer=', layer_idx, &
+                     ' num_before=', num_before, ' num_after=', p(i)%ptm_state(data%ip_num), &
+                     ' num_lost=', num_lost, ' mort_prob_step=', mort_prob_step, &
+                     ' simMortNumDecay=', data%phytos(g)%simMortNumDecay, &
+                     ' mort_prob=', data%phytos(g)%mort_prob, ' dtdays=', dtdays, &
+                     ' ip_c=', p(i)%ptm_state(data%ip_c), ' ip_n=', p(i)%ptm_state(data%ip_n), &
+                     ' ip_p=', p(i)%ptm_state(data%ip_p), ' Cmin=', Cmin, &
+                     ' WaterTemp=', WaterTemperature, ' par=', par
          END IF
       enddo !End of looping through particles
   endif !End if of N_ > 0
