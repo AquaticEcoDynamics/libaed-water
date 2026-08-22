@@ -315,7 +315,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_, rhoChl_L)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -406,6 +406,11 @@ real, intent(in)   :: a_
 real, intent(in)   :: b_
 real, intent(in)   :: v_
 
+! Per-particle carryover of rhoChl from the end of the last daylight period, used during dark
+! hours below - see the long comment by the (removed) local rhoChl_L declaration for why this
+! must be owned by the caller (one value per particle) rather than by this subroutine.
+real, intent(inout) :: rhoChl_L        !Phyto C production devoted to Chl synthesis at last sunset [mg Chl mmol C-1]
+
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
 real, intent(out) :: dNO3             !Changes in the cellular nitrogen content from NO3 [pmol N cell-1 d-1]
 real, intent(out) :: dNH4             !Changes in the cellular nitrogen content from NH4 [pmol N cell-1 d-1]
@@ -431,7 +436,15 @@ real              :: SI     = 0.      !Light limitation index [fpar]
 real              :: PCmax  = 0.      !Maximal photosynthesis rate (regulated by QN and QP) [d-1]
 real              :: PC     = 0.      !Carbon specific rate of photosynthesis [d-1]
 real              :: rhoChl = 0.      !Phyto C production devoted to Chl synthesis [mg Chl mmol C-1]
-real              :: rhoChl_L = 0.    !Phyto C production devoted to Chl synthesis at last sunset [mg Chl mmol C-1]
+! rhoChl_L ("value at the last sunset") must persist from this call to the NEXT dark-hours
+! call - but it is per-PARTICLE state, not something this subroutine may own itself: a bare
+! local variable with an initializer like `= 0.` is implicitly SAVE'd by Fortran, which would
+! make it ONE value shared by every call (every particle, every species) rather than each
+! particle's own carryover. That was a real bug once multiple phyto groups shared a column:
+! whichever particle happened to be processed last before dark would silently overwrite every
+! other particle's (including other species') nighttime Chl dynamics. Now passed in/out by the
+! caller instead, backed by each particle's own ptm_state slot (data%ip_rhochl in
+! aed_phyto_abm.F90) - see the intent(inout) dummy argument declared with the other arguments.
 real              :: Ik     = 0.      !Saturation parameter for the PI curve [W m-2 s-1]
 real              :: A      = 0.      !Photoinhibition, following Nikolau et al. (2016)
 
