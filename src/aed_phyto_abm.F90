@@ -1869,25 +1869,24 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          END IF
 
          !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
-         ! AUTO: uncomment to explore more diagnostics
-         !IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
-         !   BLOCK
-         !      INTEGER :: collapse_log_unit
-         !      OPEN(NEWUNIT=collapse_log_unit, FILE='output/ptm_num_collapse.csv', &
-         !           POSITION='append', STATUS='unknown', ACTION='write')
-         !      IF (.NOT. ptm_num_collapse_header_written) THEN
-         !         WRITE(collapse_log_unit,'(A)') 'call,yday,ptid,i,layer,num_before,num_after,num_lost,mort_prob_step,simMortNumDecay,mort_prob,dtdays,ip_c,ip_n,ip_p,Cmin,WaterTemp,par'
-         !         ptm_num_collapse_header_written = .true.
-         !      ENDIF
-         !      WRITE(collapse_log_unit,'(I0,A,ES14.6,A,I0,A,I0,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6)') &
-         !      dbg_call_count, ',', real_day, ',', p(i)%ptm_istat(PTID), ',', i, ',', layer_idx, ',', &
-         !      num_before, ',', p(i)%ptm_state(data%ip_num), ',', num_lost, ',', mort_prob_step, ',', &
-         !      data%phytos(g)%simMortNumDecay, ',', data%phytos(g)%mort_prob, ',', dtdays, ',', &
-         !      p(i)%ptm_state(data%ip_c), ',', p(i)%ptm_state(data%ip_n), ',', p(i)%ptm_state(data%ip_p), ',', &
-         !      Cmin, ',', WaterTemperature, ',', par
-         !      CLOSE(collapse_log_unit)
-         !   END BLOCK
-         !END IF
+         IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+            BLOCK
+               INTEGER :: collapse_log_unit
+               OPEN(NEWUNIT=collapse_log_unit, FILE='output/ptm_num_collapse.csv', &
+                    POSITION='append', STATUS='unknown', ACTION='write')
+               IF (.NOT. ptm_num_collapse_header_written) THEN
+                  WRITE(collapse_log_unit,'(A)') 'call,yday,ptid,i,layer,num_before,num_after,num_lost,mort_prob_step,simMortNumDecay,mort_prob,dtdays,ip_c,ip_n,ip_p,Cmin,WaterTemp,par'
+                  ptm_num_collapse_header_written = .true.
+               ENDIF
+               WRITE(collapse_log_unit,'(I0,A,ES14.6,A,I0,A,I0,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6)') &
+               dbg_call_count, ',', real_day, ',', p(i)%ptm_istat(PTID), ',', i, ',', layer_idx, ',', &
+               num_before, ',', p(i)%ptm_state(data%ip_num), ',', num_lost, ',', mort_prob_step, ',', &
+               data%phytos(g)%simMortNumDecay, ',', data%phytos(g)%mort_prob, ',', dtdays, ',', &
+               p(i)%ptm_state(data%ip_c), ',', p(i)%ptm_state(data%ip_n), ',', p(i)%ptm_state(data%ip_p), ',', &
+               Cmin, ',', WaterTemperature, ',', par
+               CLOSE(collapse_log_unit)
+            END BLOCK
+         END IF
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
