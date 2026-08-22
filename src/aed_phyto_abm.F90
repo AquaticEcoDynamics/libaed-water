@@ -1060,15 +1060,16 @@ DO i = 1, ppid
          IF (found_slot) THEN
             ! DIAGNOSTIC: record the split event (one of the two pathways that create a
             ! new active particle / increase the particle count - see also (2) below).
-            ptm_cum_split_count = ptm_cum_split_count + 1
-            BLOCK
-               INTEGER :: split_log_unit
-               OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
-                    POSITION='append', STATUS='unknown', ACTION='write')
-               IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
-               WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
-               CLOSE(split_log_unit)
-            END BLOCK
+            ! AUTO: uncomment to explore more diagnostics
+            !ptm_cum_split_count = ptm_cum_split_count + 1
+            !BLOCK
+            !   INTEGER :: split_log_unit
+            !   OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
+            !        POSITION='append', STATUS='unknown', ACTION='write')
+            !   IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
+            !   WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
+            !   CLOSE(split_log_unit)
+            !END BLOCK
          ELSE
             RETURN ! no free slots anywhere; further scanning this call is pointless
          END IF
@@ -1121,18 +1122,19 @@ IF (data%target_particle_num > 0) THEN
       n_split_this_call = n_split_this_call + 1
 
       ! DIAGNOSTIC: record the split event, distinct from the n_split-triggered log above.
-      ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
-      BLOCK
-         INTEGER :: pm_log_unit
-         OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
-              POSITION='append', STATUS='unknown', ACTION='write')
-         IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
-            'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
-         WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
-            ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
-            largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
-         CLOSE(pm_log_unit)
-      END BLOCK
+      ! AUTO: uncomment to explore more diagnostics
+      !ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
+      !BLOCK
+      !   INTEGER :: pm_log_unit
+      !   OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
+      !        POSITION='append', STATUS='unknown', ACTION='write')
+      !   IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
+      !      'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
+      !   WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
+      !      ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
+      !      largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
+      !   CLOSE(pm_log_unit)
+      !END BLOCK
    END DO
 END IF
 
@@ -1182,19 +1184,20 @@ DO ng = 1, data%num_phytos
          ! DIAGNOSTIC: record the recruitment event, distinct from the split-triggered
          ! logs above (this is the third, independent pathway that creates a new
          ! active particle).
-         ptm_cum_recruit_count = ptm_cum_recruit_count + 1
-         n_recruit_this_call = n_recruit_this_call + 1
-         recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
-         BLOCK
-            INTEGER :: recruit_log_unit
-            OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
-                 POSITION='append', STATUS='unknown', ACTION='write')
-            IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
-               'event_num,new_particle,group,height,cells_per_particle'
-            WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-               ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
-            CLOSE(recruit_log_unit)
-         END BLOCK
+         ! AUTO: uncomment to explore more diagnostics
+         !ptm_cum_recruit_count = ptm_cum_recruit_count + 1
+         !n_recruit_this_call = n_recruit_this_call + 1
+         !recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
+         !BLOCK
+         !   INTEGER :: recruit_log_unit
+         !   OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
+         !        POSITION='append', STATUS='unknown', ACTION='write')
+         !   IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
+         !      'event_num,new_particle,group,height,cells_per_particle'
+         !   WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
+         !      ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+         !   CLOSE(recruit_log_unit)
+         !END BLOCK
       END DO
    END IF
 END DO
@@ -1866,24 +1869,25 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          END IF
 
          !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
-         IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
-            BLOCK
-               INTEGER :: collapse_log_unit
-               OPEN(NEWUNIT=collapse_log_unit, FILE='output/ptm_num_collapse.csv', &
-                    POSITION='append', STATUS='unknown', ACTION='write')
-               IF (.NOT. ptm_num_collapse_header_written) THEN
-                  WRITE(collapse_log_unit,'(A)') 'call,yday,ptid,i,layer,num_before,num_after,num_lost,mort_prob_step,simMortNumDecay,mort_prob,dtdays,ip_c,ip_n,ip_p,Cmin,WaterTemp,par'
-                  ptm_num_collapse_header_written = .true.
-               ENDIF
-               WRITE(collapse_log_unit,'(I0,A,ES14.6,A,I0,A,I0,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6)') &
-                  dbg_call_count, ',', real_day, ',', p(i)%ptm_istat(PTID), ',', i, ',', layer_idx, ',', &
-                  num_before, ',', p(i)%ptm_state(data%ip_num), ',', num_lost, ',', mort_prob_step, ',', &
-                  data%phytos(g)%simMortNumDecay, ',', data%phytos(g)%mort_prob, ',', dtdays, ',', &
-                  p(i)%ptm_state(data%ip_c), ',', p(i)%ptm_state(data%ip_n), ',', p(i)%ptm_state(data%ip_p), ',', &
-                  Cmin, ',', WaterTemperature, ',', par
-               CLOSE(collapse_log_unit)
-            END BLOCK
-         END IF
+         ! AUTO: uncomment to explore more diagnostics
+         !IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+         !   BLOCK
+         !      INTEGER :: collapse_log_unit
+         !      OPEN(NEWUNIT=collapse_log_unit, FILE='output/ptm_num_collapse.csv', &
+         !           POSITION='append', STATUS='unknown', ACTION='write')
+         !      IF (.NOT. ptm_num_collapse_header_written) THEN
+         !         WRITE(collapse_log_unit,'(A)') 'call,yday,ptid,i,layer,num_before,num_after,num_lost,mort_prob_step,simMortNumDecay,mort_prob,dtdays,ip_c,ip_n,ip_p,Cmin,WaterTemp,par'
+         !         ptm_num_collapse_header_written = .true.
+         !      ENDIF
+         !      WRITE(collapse_log_unit,'(I0,A,ES14.6,A,I0,A,I0,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6)') &
+         !      dbg_call_count, ',', real_day, ',', p(i)%ptm_istat(PTID), ',', i, ',', layer_idx, ',', &
+         !      num_before, ',', p(i)%ptm_state(data%ip_num), ',', num_lost, ',', mort_prob_step, ',', &
+         !      data%phytos(g)%simMortNumDecay, ',', data%phytos(g)%mort_prob, ',', dtdays, ',', &
+         !      p(i)%ptm_state(data%ip_c), ',', p(i)%ptm_state(data%ip_n), ',', p(i)%ptm_state(data%ip_p), ',', &
+         !      Cmin, ',', WaterTemperature, ',', par
+         !      CLOSE(collapse_log_unit)
+         !   END BLOCK
+         !END IF
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
