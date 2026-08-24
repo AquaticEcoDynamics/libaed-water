@@ -469,6 +469,13 @@ real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't 
 
 if (C .le. 0d0) then
    dN   = 0.d0
+   ! dNO3/dNH4 are INTENT(out) and written unconditionally below (dNH4 = dN*pN_,
+   ! dNO3 = dN*(1.-pN_)) on the normal path - this early return skipped both, leaving
+   ! them undefined. The caller then does uptake_NO3(g) = uptake_NO3(g) + dNO3_ * ...
+   ! unconditionally (aed_phyto_abm.F90), so an undefined dNO3/dNH4 here contaminated
+   ! the NO3/NH4 flux with whatever garbage happened to be in that memory.
+   dNO3 = 0.d0
+   dNH4 = 0.d0
    dP   = 0.d0
    dC   = 0.d0
    dChl = 0.d0
@@ -560,8 +567,13 @@ RChlT = temp_Topt(Temp, RChl, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
 RChlT = respiration(ESD_, RChlT, b_rho, V_s)
 
 !Nutrient limitation [nd]:
-Lno3 = (QN - QNmin) / dQN
-Lfrp = (QP - QPmin) / dQP
+! Capped at 1: this is a quota-space fraction that is exactly 1 by construction when
+! Q = Qmax, but Q is STATE and can transiently overshoot Qmax while C falls quickly
+! (respiration draining C faster than the quota adjusts). Left uncapped, L>1 inflates
+! PCmax above muT (superlinear growth) and inflates Ik below - and silently masks the
+! overshoot in diagnostics rather than reporting it. The <=0 test below is unaffected.
+Lno3 = min((QN - QNmin) / dQN, 1d0)
+Lfrp = min((QP - QPmin) / dQP, 1d0)
 
 if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then !if QN or QP is already at minimum, no photosynthesis occurs
    PC = 0d0
