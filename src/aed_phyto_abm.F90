@@ -2007,7 +2007,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             scl_N = (sv_dNO3(j) + sv_dNH4(j)) / sv_dN(j)
             sv_dN(j) = sv_dNO3(j) + sv_dNH4(j)
          endif
-         if (sv_dC(j)   > 0d0) sv_dC(j)   = sv_dC(j)   * min(scl_N, 1d0)
+         if (sv_dC(j)   > 0d0) sv_dC(j)   = sv_dC(j)   * min(min(scl_N, scl_FRP), 1d0)
          if (sv_dChl(j) > 0d0) sv_dChl(j) = sv_dChl(j) * min(scl_N, 1d0)
       enddo
    endif
