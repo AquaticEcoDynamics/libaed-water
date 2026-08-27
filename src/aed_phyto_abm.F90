@@ -93,6 +93,7 @@ MODULE aed_phyto_abm
       INTEGER :: id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
+      INTEGER :: id_lvol
 
       ! Phytoplankton parameters
       INTEGER  :: num_phytos
@@ -236,6 +237,7 @@ MODULE aed_phyto_abm
 
 
 !===============================================================================
+
 CONTAINS
 
 
@@ -933,6 +935,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_lht   = aed_locate_global('layer_ht')
    data%id_par   = aed_locate_global('par')
    data%id_larea = aed_locate_global('layer_area') ! ML currently state var s; use this for now but is only top layer
+   data%id_lvol  = aed_locate_global('layer_vol')
                                                    ! CAB no! top layer is col_area
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
@@ -1118,15 +1121,22 @@ INTEGER, PARAMETER :: MAX_POPMAINTAIN_SPLITS_PER_CALL = 1000
 
 INTEGER   :: n_recruit_this_call
 AED_REAL  :: rand01, recruit_height
-! Same fragile-but-precedented dt assumption as elsewhere in this file (see dtdays
-! in aed_particle_bgc_phyto_abm) - this routine has no column/layer context and so
-! cannot read the model's actual timestep.
-AED_REAL, PARAMETER :: dtdays_assumed = 1.0d0/24  ! assumes hourly host calls
+! Biological timestep in days, taken from the same host-published value that
+! aed_particle_bgc_phyto_abm uses for dtdays (aed_core%aed_ptm_dt_days). This
+! routine has no column/layer context of its own, but the value is a module
+! scalar set by aed_calculate_particles before the models run, so it is
+! available here too. Previously hardcoded to 1/24 d, which assumed the host
+! calls the particle model exactly once per hour.
+AED_REAL :: dtdays_assumed
 
 !
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+! Same host-published biological timestep the BGC routine uses (see dtdays there).
+dtdays_assumed = aed_ptm_dt_days
+
 
 ! Adaptive-splitting pre-pass: one O(ppid) sweep to get each group's live cell total
 ! and live particle count, needed below by any group using n_split < 0. Computed
@@ -1393,6 +1403,7 @@ DO ng = 1, data%num_phytos
    END IF
 END DO
 
+
 DEALLOCATE(grp_cells, grp_live)
 
 CONTAINS
@@ -1598,6 +1609,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real      :: num_lost = 0.d0         !cells lost this call under simMortNumDecay=1 (see PHYTOPLANKTON MORTALITY)
    real      :: num_before = 0.d0       !DEBUG: ip_num at top of this particle's per-call update, to detect single-call collapses
    integer, save :: dbg_call_count = 0  !DEBUG: monotonic count of calls to this subroutine, for ordering debug output
+
    real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
    real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
    real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -1634,6 +1646,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real    :: pp_DZP = 0.
    real    :: pp_ND = 0.
    real    :: pp_PD = 0.
+   !# Per-particle physiology increments from the GMK98 pass, held so that the
+   !# aggregate nutrient demand of every particle in this layer can be compared
+   !# against what the layer actually holds, and rationed down if it exceeds it,
+   !# BEFORE any of it is committed. See the rationing block below.
+   real, allocatable :: sv_dC(:), sv_dN(:), sv_dNO3(:), sv_dNH4(:)
+   real, allocatable :: sv_dP(:), sv_dChl(:), sv_ESD(:)
+   real    :: dem_NO3, dem_NH4, dem_FRP
+   real    :: scl_NO3, scl_NH4, scl_FRP, scl_N
    real, allocatable :: Pmort(:)
    real, allocatable :: Pmort_P(:)
    real, allocatable :: Pmort_C(:)
@@ -1666,7 +1686,11 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    INTEGER              :: Allocatestatus = 0
    real :: PHY_t = 0d0  !Total phytoplankton N
    ! additional declarations from PIBM time_settings.F90
-   real     :: dtdays       = 1.0d0/24 !ML initializing this to 1 hour
+   !# Biological timestep in days. Assigned from aed_ptm_dt_days at !BEGIN below
+   !# (published by aed_calculate_particles from the value the host passes in),
+   !# so this tracks the interval the host is actually advancing over rather
+   !# than assuming an hourly call. The initialiser is only a fallback.
+   real     :: dtdays       = 1.0d0/24
    real  :: hour_of_day   != 0
    integer  :: integer_day   != 0
    real  :: real_day
@@ -1689,6 +1713,13 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
    ! Allocate this call's per-group accumulators/diagnostics-staging arrays (freshly
    ! each call, mirroring the existing index_/BN/BC/BP allocate-per-call pattern below).
+
+   !# Take this call's biological timestep from the host (published via
+   !# aed_calculate_particles). Was hardcoded to 1/24 d, which silently assumed
+   !# the host calls us exactly once per hour - wrong the moment the particle
+   !# model is run once per split_factor sub-step rather than once per host step.
+   dtdays = aed_ptm_dt_days
+
    ALLOCATE(PHYC(data%num_phytos));  PHYC = 0d0
    ALLOCATE(PHYN(data%num_phytos));  PHYN = 0d0
    ALLOCATE(PHYP(data%num_phytos));  PHYP = 0d0
@@ -1779,7 +1810,10 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       endif
    enddo
    ! get volume of layer
-   Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea)
+   !# TRUE layer volume from the host's hypsograph. Was dz*area, which treats the
+   !# layer as a prism of constant area and so mis-scales every particle<->water
+   !# exchange; Hz appears in the denominator of every flux conversion below.
+   Hz = _STATE_VAR_(data%id_lvol)
 
    !Save number of super-individuals per layer, per group
    DO ng=1,data%num_phytos
@@ -1837,11 +1871,36 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    Pmort_C   = 0d0
    oxy_flux = 0d0
 
+   !###########################################################################
+   !# PASS 1 of 2: compute each particle's physiology increments WITHOUT
+   !# committing them, so the layer's aggregate nutrient demand is known before
+   !# any of it is taken. Pass 2 (the loop further below) applies the results,
+   !# scaled by the rationing factors computed in between.
+   !#
+   !# Every particle's uptake is a function of the SAME start-of-step no3/nh4/frp
+   !# - no particle can see what the others are taking. Michaelis-Menten throttles
+   !# each individual draw but places no bound on the sum, so with thousands of
+   !# particles in a layer the aggregate can exceed what is present. The pool then
+   !# goes negative and repair_state clamps it back to zero, fabricating mass.
+   !#
+   !# This mirrors aed_phytoplankton, which has had the same guard for its
+   !# Eulerian groups since long before this module existed (see the
+   !# "Check uptake values for availability to prevent -ve numbers" block, where
+   !# uptake is scaled by available*0.99/upTot when the total exceeds supply).
+   !# That module is naturally two-pass - it fills nuptake/puptake arrays, rations,
+   !# then applies - whereas this one computed and committed in a single sweep,
+   !# which is why the guard was never inherited. Same job, same treatment.
+   !###########################################################################
    if (N_ > 0) then
+      allocate(sv_dC(N_), sv_dN(N_), sv_dNO3(N_), sv_dNH4(N_), &
+               sv_dP(N_), sv_dChl(N_), sv_ESD(N_), stat=AllocateStatus)
+      IF (AllocateStatus /= 0) STOP "*** Problem allocating particle uptake scratch ***"
+
+      dem_NO3 = 0d0 ; dem_NH4 = 0d0 ; dem_FRP = 0d0
+
       do j = 1, N_
          i = index_(j)
-         g = p(i)%ptm_istat(GRP)   ! this particle's phyto group - selects which data%phytos(g) parameter set to use
-         num_before = p(i)%ptm_state(data%ip_num)   !DEBUG
+         g = p(i)%ptm_istat(GRP)
 
          ! set particle par, temp, and no3 using environmental conditions from this layer
          p(i)%ptm_state(data%ip_par) = par
@@ -1850,72 +1909,121 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          p(i)%ptm_state(data%ip_nh4) = nh4
          p(i)%ptm_state(data%ip_frp) = frp
 
-         ! call the PIBM function that is the primary engine for phytoplankton physiology
-         ! this is located in aed_pibm_utils.F90
-         call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem),              & ! Temp     (environmental temperature)
-                                      p(i)%ptm_state(data%ip_par),              & ! PAR      (environmental PAR)
-                                      p(i)%ptm_state(data%ip_no3) + p(i)%ptm_state(data%ip_nh4),              & ! NO3 + NH4    (environmental DIN)
-                                      p(i)%ptm_state(data%ip_no3),              & ! NO3      (environmental NO3)
-                                      p(i)%ptm_state(data%ip_nh4),              & ! NH4      (environmental NH4)
-                                      p(i)%ptm_state(data%ip_frp),              & ! FRP      (environmental FRP)
-                                      p(i)%ptm_state(data%ip_c),                & ! C        (C in particle)
-                                      p(i)%ptm_state(data%ip_n),                & ! N        (N in particle)
-                                      p(i)%ptm_state(data%ip_p),                & ! P        (P in particle)
-                                      p(i)%ptm_state(data%ip_chl),              & ! Chl      (Chl in particle)
-                                      p(i)%ptm_state(data%ip_Topt),             & ! Topt     (parameter + mutating trait; optimum temperature)
-                                      p(i)%ptm_state(data%ip_cdiv),             & ! Cdiv     (parameter + mutating trait; carbon threshold for cell division)
-                                      exp(p(i)%ptm_state(data%ip_LnalphaChl)),  & ! alphaChl (parameter + mutating trait; slope of the PI curve)
-                                      dC_,                                      & ! dC       (change in C; returned by function)
-                                      dN_,                                      & ! dN       (change in N; returned by function)
-                                      dNO3_,                                    & ! dNO3     (change in N from NO3; returned by function)
-                                      dNH4_,                                    & ! dNH4     (change in N from NH4; returned by function)
-                                      dP_,                                      & ! dP       (change in P; returned by function)
-                                      dChl_,                                    & ! dChl     (change in Chl; returned by function)
-                                      ESD_,                                     & ! ESD      (ESD of cells in particle; returned by function)
-                                      data%phytos(g)%RC,                        & ! RC       (user-specified parameter)
-                                      data%phytos(g)%RN,                        & ! RN       (user-specified parameter)
-                                      data%phytos(g)%RP,                        & ! RP       (user-specified parameter)
-                                      data%phytos(g)%RChl,                      & ! RChl     (user-specified parameter)
-                                      data%phytos(g)%zeta_N,                    & ! zeta_N   (user-specified parameter)
-                                      data%phytos(g)%zeta_P,                    & ! zeta_P   (user-specified parameter)
-                                      data%phytos(g)%a1,                        & ! a1       (user-specified parameter)
-                                      data%phytos(g)%R_growth,                  & ! mu0      (user-specified parameter)
-                                      data%phytos(g)%nx,                        & ! nx       (user-specified parameter)
-                                      data%phytos(g)%thetaNmax,                 & ! thetaNmax(user-specified parameter)
-                                      data%phytos(g)%thetaPmax,                 & ! thetaPmax(user-specified parameter)
-                                      data%phytos(g)%QNmin_a,                   & ! QNmin_a  (user-specified parameter)
-                                      data%phytos(g)%QNmin_b,                   & ! QNmin_b  (user-specified parameter)
-                                      data%phytos(g)%QNmax_a,                   & ! QNmax_a  (user-specified parameter)
-                                      data%phytos(g)%QNmax_b,                   & ! QNmax_b  (user-specified parameter)
-                                      data%phytos(g)%QPmin_a,                   & ! QPmin_a  (user-specified parameter)
-                                      data%phytos(g)%QPmin_b,                   & ! QPmin_b  (user-specified parameter)
-                                      data%phytos(g)%QPmax_a,                   & ! QPmax_a  (user-specified parameter)
-                                      data%phytos(g)%QPmax_b,                   & ! QPmax_b  (user-specified parameter)
-                                      data%phytos(g)%KN_a,                      & ! KN_a     (user-specified parameter)
-                                      data%phytos(g)%KN_b,                      & ! KN_b     (user-specified parameter)
-                                      data%phytos(g)%KPho_a,                    & ! KPho_a   (user-specified parameter)
-                                      data%phytos(g)%KPho_b,                    & ! KPho_b   (user-specified parameter)
-                                      data%phytos(g)%a_c2vol,                   & ! a_c2vol  (user-specified parameter)
-                                      data%phytos(g)%b_c2vol,                   & ! b_c2vol  (user-specified parameter)
-                                      data%phytos(g)%a_pmax,                    & ! a_pmax   (user-specified parameter)
-                                      data%phytos(g)%rho,                       & ! rho      (user-specified parameter)
-                                      data%phytos(g)%rho_star,                  & ! rho_star (user-specified parameter)
-                                      data%phytos(g)%b_rho,                     & ! b_rho    (user-specified parameter)
-                                      data%phytos(g)%V_s,                       & ! V_s      (user-specified parameter)
-                                      data%phytos(g)%Ea0,                       & ! Ea0      (user-specified parameter)
-                                      data%phytos(g)%Ed0,                       & ! Ed0      (user-specified parameter)
-                                      data%phytos(g)%Ei,                        & ! Ei       (user-specified parameter)
-                                      data%phytos(g)%beta,                      & ! beta     (user-specified parameter)
-                                      data%phytos(g)%phi,                       & ! phi      (user-specified parameter)
-                                      data%phytos(g)%T_std,                     & ! T_std    (user-specified parameter)
-                                      data%phytos(g)%Tau,                       & ! Tau      (user-specified parameter)
-                                      data%phytos(g)%Beta_Ainf,                 & ! Beta_Ainf(user-specified parameter)
-                                      data%phytos(g)%Kappa,                     & ! Kappa    (user-specified parameter)
-                                      data%phytos(g)%Kd_Ainf,                   & ! Kd_Ainf  (user-specified parameter)
-                                      data%phytos(g)%a_,                        & ! a_       (user-specified parameter)
-                                      data%phytos(g)%b_,                        & ! b_       (user-specified parameter)
-                                      data%phytos(g)%v_,                        & ! v_  (user-specified parameter)
-                                      p(i)%ptm_state(data%ip_rhochl))             ! rhoChl_L (per-particle dark-hours carryover, INOUT)
+         call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem),              &
+                                      p(i)%ptm_state(data%ip_par),              &
+                                      p(i)%ptm_state(data%ip_no3) + p(i)%ptm_state(data%ip_nh4), &
+                                      p(i)%ptm_state(data%ip_no3),              &
+                                      p(i)%ptm_state(data%ip_nh4),              &
+                                      p(i)%ptm_state(data%ip_frp),              &
+                                      p(i)%ptm_state(data%ip_c),                &
+                                      p(i)%ptm_state(data%ip_n),                &
+                                      p(i)%ptm_state(data%ip_p),                &
+                                      p(i)%ptm_state(data%ip_chl),              &
+                                      p(i)%ptm_state(data%ip_Topt),             &
+                                      p(i)%ptm_state(data%ip_cdiv),             &
+                                      exp(p(i)%ptm_state(data%ip_LnalphaChl)),  &
+                                      dC_, dN_, dNO3_, dNH4_, dP_, dChl_, ESD_, &
+                                      data%phytos(g)%RC,                        &
+                                      data%phytos(g)%RN,                        &
+                                      data%phytos(g)%RP,                        &
+                                      data%phytos(g)%RChl,                      &
+                                      data%phytos(g)%zeta_N,                    &
+                                      data%phytos(g)%zeta_P,                    &
+                                      data%phytos(g)%a1,                        &
+                                      data%phytos(g)%R_growth,                  &
+                                      data%phytos(g)%nx,                        &
+                                      data%phytos(g)%thetaNmax,                 &
+                                      data%phytos(g)%thetaPmax,                 &
+                                      data%phytos(g)%QNmin_a,                   &
+                                      data%phytos(g)%QNmin_b,                   &
+                                      data%phytos(g)%QNmax_a,                   &
+                                      data%phytos(g)%QNmax_b,                   &
+                                      data%phytos(g)%QPmin_a,                   &
+                                      data%phytos(g)%QPmin_b,                   &
+                                      data%phytos(g)%QPmax_a,                   &
+                                      data%phytos(g)%QPmax_b,                   &
+                                      data%phytos(g)%KN_a,                      &
+                                      data%phytos(g)%KN_b,                      &
+                                      data%phytos(g)%KPho_a,                    &
+                                      data%phytos(g)%KPho_b,                    &
+                                      data%phytos(g)%a_c2vol,                   &
+                                      data%phytos(g)%b_c2vol,                   &
+                                      data%phytos(g)%a_pmax,                    &
+                                      data%phytos(g)%rho,                       &
+                                      data%phytos(g)%rho_star,                  &
+                                      data%phytos(g)%b_rho,                     &
+                                      data%phytos(g)%V_s,                       &
+                                      data%phytos(g)%Ea0,                       &
+                                      data%phytos(g)%Ed0,                       &
+                                      data%phytos(g)%Ei,                        &
+                                      data%phytos(g)%beta,                      &
+                                      data%phytos(g)%phi,                       &
+                                      data%phytos(g)%T_std,                     &
+                                      data%phytos(g)%Tau,                       &
+                                      data%phytos(g)%Beta_Ainf,                 &
+                                      data%phytos(g)%Kappa,                     &
+                                      data%phytos(g)%Kd_Ainf,                   &
+                                      data%phytos(g)%a_,                        &
+                                      data%phytos(g)%b_,                        &
+                                      data%phytos(g)%v_,                        &
+                                      p(i)%ptm_state(data%ip_rhochl))
+
+         sv_dC(j)=dC_ ; sv_dN(j)=dN_ ; sv_dNO3(j)=dNO3_ ; sv_dNH4(j)=dNH4_
+         sv_dP(j)=dP_ ; sv_dChl(j)=dChl_ ; sv_ESD(j)=ESD_
+
+         !# Accumulate only NET REMOVAL from the water (positive d* = uptake).
+         !# Negative values are a net return to the pool and can never exhaust it,
+         !# so they must not offset another particle's demand in the sum.
+         if (dNO3_ > 0d0) dem_NO3 = dem_NO3 + dNO3_ * p(i)%ptm_state(data%ip_num)
+         if (dNH4_ > 0d0) dem_NH4 = dem_NH4 + dNH4_ * p(i)%ptm_state(data%ip_num)
+         if (dP_   > 0d0) dem_FRP = dem_FRP + dP_   * p(i)%ptm_state(data%ip_num)
+      enddo
+
+      !# RATION. Convert demand from pmol/day for the layer into the mmol/m3 it
+      !# would actually remove over this timestep (the same 1d-9/Hz*dtdays the
+      !# commit below applies), then cap it at 99% of what is present - the same
+      !# 0.99 headroom aed_phytoplankton uses. Scaling is proportional, so every
+      !# particle keeps its share of a pool it cannot collectively exhaust.
+      scl_NO3 = 1d0 ; scl_NH4 = 1d0 ; scl_FRP = 1d0
+      dem_NO3 = dem_NO3 * 1d-9 / Hz * dtdays
+      dem_NH4 = dem_NH4 * 1d-9 / Hz * dtdays
+      dem_FRP = dem_FRP * 1d-9 / Hz * dtdays
+      if (dem_NO3 > 1d-30 .and. dem_NO3 > max(no3,0d0)) scl_NO3 = max(no3,0d0)*0.99d0/dem_NO3
+      if (dem_NH4 > 1d-30 .and. dem_NH4 > max(nh4,0d0)) scl_NH4 = max(nh4,0d0)*0.99d0/dem_NH4
+      if (dem_FRP > 1d-30 .and. dem_FRP > max(frp,0d0)) scl_FRP = max(frp,0d0)*0.99d0/dem_FRP
+
+      !# Apply the scaling to the stored increments. Only positive (uptake) terms
+      !# are scaled; a negative d* is a return to the water and passes through.
+      !# dN must stay equal to dNO3+dNH4 - the cell's nitrogen gain has to match
+      !# what was actually removed from the two inorganic pools, or the particle
+      !# and the water disagree and mass is created. dC/dChl are scaled by the
+      !# same factor as the nitrogen that limits them, keeping C:N:Chl coherent.
+      do j = 1, N_
+         if (sv_dNO3(j) > 0d0) sv_dNO3(j) = sv_dNO3(j) * scl_NO3
+         if (sv_dNH4(j) > 0d0) sv_dNH4(j) = sv_dNH4(j) * scl_NH4
+         if (sv_dP(j)   > 0d0) sv_dP(j)   = sv_dP(j)   * scl_FRP
+         scl_N = 1d0
+         if (sv_dN(j) > 0d0) then
+            scl_N = (sv_dNO3(j) + sv_dNH4(j)) / sv_dN(j)
+            sv_dN(j) = sv_dNO3(j) + sv_dNH4(j)
+         endif
+         if (sv_dC(j)   > 0d0) sv_dC(j)   = sv_dC(j)   * min(scl_N, 1d0)
+         if (sv_dChl(j) > 0d0) sv_dChl(j) = sv_dChl(j) * min(scl_N, 1d0)
+      enddo
+   endif
+
+   !###########################################################################
+   !# PASS 2 of 2: commit the (possibly rationed) increments.
+   !###########################################################################
+   if (N_ > 0) then
+      do j = 1, N_
+         i = index_(j)
+         g = p(i)%ptm_istat(GRP)   ! this particle's phyto group - selects which data%phytos(g) parameter set to use
+         num_before = p(i)%ptm_state(data%ip_num)   !DEBUG
+
+         dC_ = sv_dC(j) ; dN_ = sv_dN(j) ; dNO3_ = sv_dNO3(j) ; dNH4_ = sv_dNH4(j)
+         dP_ = sv_dP(j) ; dChl_ = sv_dChl(j) ; ESD_ = sv_ESD(j)
+
 
          ! cumulate N and P uptake and oxy flux after running physiology function (per group)
          uptake(g)   =   uptake(g) + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
@@ -2083,9 +2191,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   uptake_NH4 = uptake_NH4*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1 (NH4)
   uptake_P = uptake_P*1d-9/Hz/secs_per_day !Convert uptake_P to mmol P m-3 s-1
   oxy_flux = oxy_flux*1d-9/Hz/secs_per_day !Convert oxy flux to mmol O2 m-3 s-1
-  Pmort  =  Pmort*1d-9/Hz/secs_per_day !Convert Pmort to mmol N m-3 s-1
-  Pmort_P  =  Pmort_P*1d-9/Hz/secs_per_day !Convert Pmort_P to mmol P m-3 s-1
-  Pmort_C  =  Pmort_C*1d-9/Hz/secs_per_day !Convert Pmort_C to mmol C m-3 s-1
+  !# NOTE the different divisor to the uptake terms above: uptake accumulates
+  !# dN_*ip_num, and dN_ is already a per-day RATE (pmol N cell-1 d-1), so
+  !# /secs_per_day correctly converts it to per-second. Pmort accumulates
+  !# ip_n*ip_num - an AMOUNT (pmol N), the whole nitrogen content of the cells
+  !# that died during THIS call, which must all be returned to PON now. Dividing
+  !# an amount by secs_per_day declares "this mass flows per day", so the ODE
+  !# integrating it over the host step (dtdays*secs_per_day seconds) delivered
+  !# only a fraction dtdays of it - 1/24 at dt=3600s - and silently destroyed the
+  !# other 95.8% of every dead particle's N/P/C. Divide by the actual step length
+  !# so the full amount reaches the water column.
+  Pmort  =  Pmort*1d-9/Hz/(dtdays*secs_per_day) !Convert Pmort to mmol N m-3 s-1
+  Pmort_P  =  Pmort_P*1d-9/Hz/(dtdays*secs_per_day) !Convert Pmort_P to mmol P m-3 s-1
+  Pmort_C  =  Pmort_C*1d-9/Hz/(dtdays*secs_per_day) !Convert Pmort_C to mmol C m-3 s-1
 
   ! Now increment water column properties based on particle fluxes. The bulk Eulerian
   ! nutrient/OM pools are shared across all species, so _FLUX_VAR_ uses the total
@@ -2258,6 +2376,13 @@ if (allocated(uptake))      deallocate(uptake)
 if (allocated(uptake_NO3))  deallocate(uptake_NO3)
 if (allocated(uptake_NH4))  deallocate(uptake_NH4)
 if (allocated(uptake_P))    deallocate(uptake_P)
+if (allocated(sv_dC))   deallocate(sv_dC)
+if (allocated(sv_dN))   deallocate(sv_dN)
+if (allocated(sv_dNO3)) deallocate(sv_dNO3)
+if (allocated(sv_dNH4)) deallocate(sv_dNH4)
+if (allocated(sv_dP))   deallocate(sv_dP)
+if (allocated(sv_dChl)) deallocate(sv_dChl)
+if (allocated(sv_ESD))  deallocate(sv_ESD)
 if (allocated(Pmort))   deallocate(Pmort)
 if (allocated(Pmort_P)) deallocate(Pmort_P)
 if (allocated(Pmort_C)) deallocate(Pmort_C)
