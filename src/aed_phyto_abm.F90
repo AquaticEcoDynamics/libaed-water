@@ -1402,7 +1402,7 @@ DO ng = 1, data%num_phytos
          !    WRITE(reseed_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
          !       ptm_cum_reseed_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
          !    CLOSE(reseed_log_unit)
-         END BLOCK
+         ! END BLOCK
       END DO
    END IF
 END DO
