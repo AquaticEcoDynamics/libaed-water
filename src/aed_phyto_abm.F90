@@ -1200,17 +1200,18 @@ DO i = 1, ppid
          END DO ! end search for available particles loop
 
          IF (found_slot) THEN
+            ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
             ! DIAGNOSTIC: record the split event (one of the two pathways that create a
             ! new active particle / increase the particle count - see also (2) below).
-            ptm_cum_split_count = ptm_cum_split_count + 1
-            BLOCK
-               INTEGER :: split_log_unit
-               OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
-                    POSITION='append', STATUS='unknown', ACTION='write')
-               IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
-               WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
-               CLOSE(split_log_unit)
-            END BLOCK
+            ! ptm_cum_split_count = ptm_cum_split_count + 1
+            ! BLOCK
+            !    INTEGER :: split_log_unit
+            !    OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
+            !         POSITION='append', STATUS='unknown', ACTION='write')
+            !    IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
+            !    WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
+            !    CLOSE(split_log_unit)
+            ! END BLOCK
             ! Keep grp_live in sync for the occupancy guard above: this split just
             ! created a new active particle in slot j, in the SAME group as parent i
             ! (duplicate_and_halve_particle copies the parent's group onto it).
@@ -1268,19 +1269,20 @@ IF (data%target_particle_num > 0) THEN
       n_active = n_active + 1
       n_split_this_call = n_split_this_call + 1
 
+      ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
       ! DIAGNOSTIC: record the split event, distinct from the n_split-triggered log above.
-      ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
-      BLOCK
-         INTEGER :: pm_log_unit
-         OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
-              POSITION='append', STATUS='unknown', ACTION='write')
-         IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
-            'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
-         WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
-            ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
-            largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
-         CLOSE(pm_log_unit)
-      END BLOCK
+      ! ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
+      ! BLOCK
+      !    INTEGER :: pm_log_unit
+      !    OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
+      !         POSITION='append', STATUS='unknown', ACTION='write')
+      !    IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
+      !       'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
+      !    WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
+      !       ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
+      !       largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
+      !    CLOSE(pm_log_unit)
+      ! END BLOCK
    END DO
 END IF
 
@@ -1327,22 +1329,23 @@ DO ng = 1, data%num_phytos
 
          CALL recruit_particle(j, ng, recruit_height)
 
+         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
          ! DIAGNOSTIC: record the recruitment event, distinct from the split-triggered
          ! logs above (this is the third, independent pathway that creates a new
          ! active particle).
-         ptm_cum_recruit_count = ptm_cum_recruit_count + 1
-         n_recruit_this_call = n_recruit_this_call + 1
-         recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
-         BLOCK
-            INTEGER :: recruit_log_unit
-            OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
-                 POSITION='append', STATUS='unknown', ACTION='write')
-            IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
-               'event_num,new_particle,group,height,cells_per_particle'
-            WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-               ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
-            CLOSE(recruit_log_unit)
-         END BLOCK
+         ! ptm_cum_recruit_count = ptm_cum_recruit_count + 1
+         ! n_recruit_this_call = n_recruit_this_call + 1
+         ! recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
+         ! BLOCK
+         !    INTEGER :: recruit_log_unit
+         !    OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
+         !         POSITION='append', STATUS='unknown', ACTION='write')
+         !    IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
+         !       'event_num,new_particle,group,height,cells_per_particle'
+         !    WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
+         !       ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+         !    CLOSE(recruit_log_unit)
+         ! END BLOCK
       END DO
    END IF
 END DO
@@ -1383,21 +1386,22 @@ DO ng = 1, data%num_phytos
 
          CALL recruit_particle(j, ng, recruit_height)
 
+         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
          ! DIAGNOSTIC: record the reseed event, distinct from the recruit-triggered
          ! log above (this is the fourth, independent pathway that creates a new
          ! active particle).
-         ptm_cum_reseed_count = ptm_cum_reseed_count + 1
-         n_recruit_this_call = n_recruit_this_call + 1
-         grp_live(ng) = grp_live(ng) + 1
-         BLOCK
-            INTEGER :: reseed_log_unit
-            OPEN(NEWUNIT=reseed_log_unit, FILE='ptm_reseed_events.csv', &
-                 POSITION='append', STATUS='unknown', ACTION='write')
-            IF (ptm_cum_reseed_count == 1) WRITE(reseed_log_unit,'(A)') &
-               'event_num,new_particle,group,height,cells_per_particle'
-            WRITE(reseed_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-               ptm_cum_reseed_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
-            CLOSE(reseed_log_unit)
+         ! ptm_cum_reseed_count = ptm_cum_reseed_count + 1
+         ! n_recruit_this_call = n_recruit_this_call + 1
+         ! grp_live(ng) = grp_live(ng) + 1
+         ! BLOCK
+         !    INTEGER :: reseed_log_unit
+         !    OPEN(NEWUNIT=reseed_log_unit, FILE='ptm_reseed_events.csv', &
+         !         POSITION='append', STATUS='unknown', ACTION='write')
+         !    IF (ptm_cum_reseed_count == 1) WRITE(reseed_log_unit,'(A)') &
+         !       'event_num,new_particle,group,height,cells_per_particle'
+         !    WRITE(reseed_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
+         !       ptm_cum_reseed_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+         !    CLOSE(reseed_log_unit)
          END BLOCK
       END DO
    END IF
@@ -2170,18 +2174,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             ENDIF
          END IF
 
-         !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
-         IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
-            print *, 'PTM_NUM_COLLAPSE call=', dbg_call_count, ' yday=', real_day, &
-                     ' ptid=', p(i)%ptm_istat(PTID), ' i=', i, ' layer=', layer_idx, &
-                     ' num_before=', num_before, ' num_after=', p(i)%ptm_state(data%ip_num), &
-                     ' num_lost=', num_lost, ' mort_prob_step=', mort_prob_step, &
-                     ' simMortNumDecay=', data%phytos(g)%simMortNumDecay, &
-                     ' mort_prob=', data%phytos(g)%mort_prob, ' dtdays=', dtdays, &
-                     ' ip_c=', p(i)%ptm_state(data%ip_c), ' ip_n=', p(i)%ptm_state(data%ip_n), &
-                     ' ip_p=', p(i)%ptm_state(data%ip_p), ' Cmin=', Cmin, &
-                     ' WaterTemp=', WaterTemperature, ' par=', par
-         END IF
+         ! SCB commenting out RQT's Claude-assisted debugging
+         ! !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
+         ! IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+         !    print *, 'PTM_NUM_COLLAPSE call=', dbg_call_count, ' yday=', real_day, &
+         !             ' ptid=', p(i)%ptm_istat(PTID), ' i=', i, ' layer=', layer_idx, &
+         !             ' num_before=', num_before, ' num_after=', p(i)%ptm_state(data%ip_num), &
+         !             ' num_lost=', num_lost, ' mort_prob_step=', mort_prob_step, &
+         !             ' simMortNumDecay=', data%phytos(g)%simMortNumDecay, &
+         !             ' mort_prob=', data%phytos(g)%mort_prob, ' dtdays=', dtdays, &
+         !             ' ip_c=', p(i)%ptm_state(data%ip_c), ' ip_n=', p(i)%ptm_state(data%ip_n), &
+         !             ' ip_p=', p(i)%ptm_state(data%ip_p), ' Cmin=', Cmin, &
+         !             ' WaterTemp=', WaterTemperature, ' par=', par
+         ! END IF
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
