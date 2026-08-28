@@ -635,15 +635,16 @@ VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp
 VCP = max(VCP, 0d0)
 
 dbg_call_count = dbg_call_count + 1
-if (mod(dbg_call_count, 20000) == 0) then
-   write(*,'(A,I10,18(A,ES13.5),A,I2)') ' DBG_GROWTH call=', dbg_call_count, &
-      ' Temp=', Temp, ' PAR=', PAR, ' C=', C, ' DIN=', DIN, ' muT=', muT, ' PC=', PC, &
-      ' VCN=', VCN, ' dN=', N*(VCN/QN - RNT), ' zetaN_VCN=', zeta_N*VCN, &
-      ' VCP=', VCP, ' zetaP_VCP=', zeta_P*VCP, ' RcT=', RcT, &
-      ' netC_d-1=', (PC - zeta_N*VCN - zeta_P*VCP - RcT), &
-      ' QN=', QN, ' QNmin=', QNmin, ' QNmax=', QNmax, ' QP=', QP, ' QPmin=', QPmin, &
-      ' simNFix=', simNFixation
-endif
+! SCB removing prints to standard output
+! if (mod(dbg_call_count, 20000) == 0) then
+!    write(*,'(A,I10,18(A,ES13.5),A,I2)') ' DBG_GROWTH call=', dbg_call_count, &
+!       ' Temp=', Temp, ' PAR=', PAR, ' C=', C, ' DIN=', DIN, ' muT=', muT, ' PC=', PC, &
+!       ' VCN=', VCN, ' dN=', N*(VCN/QN - RNT), ' zetaN_VCN=', zeta_N*VCN, &
+!       ' VCP=', VCP, ' zetaP_VCP=', zeta_P*VCP, ' RcT=', RcT, &
+!       ' netC_d-1=', (PC - zeta_N*VCN - zeta_P*VCP - RcT), &
+!       ' QN=', QN, ' QNmin=', QNmin, ' QNmax=', QNmax, ' QP=', QP, ' QPmin=', QPmin, &
+!       ' simNFix=', simNFixation
+! endif
 
 !Changes of cellular carbon [d-1]:
 !ML corresponds to eq. 1 in PIBM ms
