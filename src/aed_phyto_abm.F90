@@ -1936,6 +1936,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                                       data%phytos(g)%a1,                        &
                                       data%phytos(g)%R_growth,                  &
                                       data%phytos(g)%nx,                        &
+                                      data%phytos(g)%simNFixation,              &
                                       data%phytos(g)%thetaNmax,                 &
                                       data%phytos(g)%thetaPmax,                 &
                                       data%phytos(g)%QNmin_a,                   &
@@ -2002,12 +2003,22 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       !# what was actually removed from the two inorganic pools, or the particle
       !# and the water disagree and mass is created. dC/dChl are scaled by the
       !# same factor as the nitrogen that limits them, keeping C:N:Chl coherent.
+      !#
+      !# An N-fixer's dN is NOT backed by dNO3+dNH4 - GMK98_Ind_TempSizeLight sets
+      !# both to exactly 0 for a fixer (fixation doesn't draw on the DIN pool), so
+      !# the dNO3+dNH4)/dN ratio below would evaluate to 0/positive = 0 and silently
+      !# zero out that particle's carbon AND chlorophyll gain on every productive
+      !# step, while leaving losses untouched (they don't hit the `> 0d0` guards).
+      !# That is a DIN-rationing mechanism misapplied to nitrogen that was never
+      !# rationed in the first place, so skip it for fixers: scl_N stays 1.
       do j = 1, N_
+         i = index_(j)
+         g = p(i)%ptm_istat(GRP)
          if (sv_dNO3(j) > 0d0) sv_dNO3(j) = sv_dNO3(j) * scl_NO3
          if (sv_dNH4(j) > 0d0) sv_dNH4(j) = sv_dNH4(j) * scl_NH4
          if (sv_dP(j)   > 0d0) sv_dP(j)   = sv_dP(j)   * scl_FRP
          scl_N = 1d0
-         if (sv_dN(j) > 0d0) then
+         if (sv_dN(j) > 0d0 .and. data%phytos(g)%simNFixation == 0) then
             scl_N = (sv_dNO3(j) + sv_dNH4(j)) / sv_dN(j)
             sv_dN(j) = sv_dNO3(j) + sv_dNH4(j)
          endif
