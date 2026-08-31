@@ -2144,9 +2144,21 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             ! ---- num-decay mode: mort_prob shrinks the number of cells the particle
             ! represents (ip_num) by the same exponential fraction each call, instead of
             ! probabilistically killing the whole particle. Per-cell state (ip_c/n/p/chl)
-            ! is unchanged - those describe the surviving cells, not the ones lost. The
-            ! particle itself only fully dies via the Cmin/Nt_min/P_min subsistence check
-            ! above, once its shrinking total N/P/C eventually crosses that threshold.
+            ! is unchanged - those describe the surviving cells, not the ones lost.
+            !
+            ! Previously the particle only fully died via the Cmin/Nt_min/P_min
+            ! subsistence check above (which does include an ip_num < 1.0d0 arm), but
+            ! that check runs at the TOP of the *next* call against whatever ip_num this
+            ! call leaves behind - so a particle could sit at STAT=1 with (effectively)
+            ! zero viable cells for one extra call. More importantly, grp_live (the count
+            ! particle_reseed_min/target compares against) counts any STAT>0 particle
+            ! regardless of ip_num, so a population that decays toward zero without ever
+            ! separately tripping Cmin/Nt_min/P_min - plausible when per-cell C/N/P are
+            ! otherwise fine and it's only the cell COUNT collapsing - can sit there
+            ! indefinitely, satisfying the reseed floor while contributing ~0 biomass and
+            ! permanently blocking the group from ever being topped back up. Kill it
+            ! immediately, in this same call, once decay leaves it below one viable cell -
+            ! same threshold and full-kill pattern as the Bernoulli branch below.
             IF (_PTM_STAT_(i,STAT) == 1) THEN
                num_lost = p(i)%ptm_state(data%ip_num) * mort_prob_step
                _DIAG_VAR_(data%id_cum_cells_decayed(g)) = _DIAG_VAR_(data%id_cum_cells_decayed(g)) + num_lost
@@ -2155,6 +2167,24 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                Pmort_C(g) = Pmort_C(g) + p(i)%ptm_state(data%ip_c) * num_lost !Natural mortality of phytoplankton ==> DET
 
                p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) - num_lost
+
+               IF (p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+                  ! Fewer than one viable cell left: the remaining (post-decay) population
+                  ! dies too, not just the decayed-away increment already accounted above.
+                  _DIAG_VAR_(data%id_N_death(g)) = _DIAG_VAR_(data%id_N_death(g)) + 1
+                  _DIAG_VAR_(data%id_cum_death_thresh(g)) = _DIAG_VAR_(data%id_cum_death_thresh(g)) + 1
+                  Pmort(g)   = Pmort(g)   + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num)
+                  Pmort_P(g) = Pmort_P(g) + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num)
+                  Pmort_C(g) = Pmort_C(g) + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num)
+
+                  p(i)%ptm_state(data%ip_c)   = 0d0
+                  p(i)%ptm_state(data%ip_n)   = 0d0
+                  p(i)%ptm_state(data%ip_p)   = 0d0
+                  p(i)%ptm_state(data%ip_chl) = 0d0
+                  p(i)%ptm_state(data%ip_num) = 0d0
+                  _PTM_STAT_(i,STAT) = 0
+                  _PTM_STAT_(i,FLAG) = 3
+               END IF
             END IF
          ELSE
             ! ---- default mode: a per-call Bernoulli draw kills the whole particle.
