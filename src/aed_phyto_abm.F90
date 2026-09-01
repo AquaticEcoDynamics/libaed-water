@@ -207,6 +207,7 @@ MODULE aed_phyto_abm
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
+   INTEGER  :: n_starved = 0
 
    ! DIAGNOSTIC: cumulative count of successful particle splits (the only mechanism in this
    ! module that creates a new active particle / increases the particle count - "births" via
@@ -1563,9 +1564,8 @@ CONTAINS
       END DO
    END SUBROUTINE recruit_particle
 
-END SUBROUTINE aed_split_particle_phyto_abm
+END SUBROUTINE OLD_aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 !###############################################################################
 SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
@@ -2115,7 +2115,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          !# PHYTOPLANKTON MORTALITY
          ! If cellular carbon is lower than the subsistence threshold (Cmin), it dies:
-         Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM
+         Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM ! SCB answer to ML: it corresponds to 1/2 the initial c value. PIBM paper has refs justifying choice.
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. &
             (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. &
@@ -2135,7 +2135,12 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_state(data%ip_num) = 0d0
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
+
+            n_starved = n_starved + 1
+
          endif
+
+         print *, "Starved particles this time step:",  n_starved
 
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
          ! mort_prob is a per-day rate (d-1), consistent with every other rate parameter in this
@@ -2272,6 +2277,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
      _DIAG_VAR_(data%id_d_poc(ng)) = Pmort_C(ng) * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
      _DIAG_VAR_(data%id_d_oxy(ng)) = oxy_flux(ng) * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
   ENDDO
+
+!print *, 'id_frp', layer_idx, data%id_frp, _FLUX_VAR_(data%id_frp), pp_PD, RES_P, uptake_P ! RQT
 
 ! END OF CODE FROM PIBM BIOLOGY SUBROUTINE
 !------------------------------------------------------
