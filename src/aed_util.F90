@@ -51,12 +51,21 @@ MODULE aed_util
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC InitialTemp, SoilTemp
+   PUBLIC SoilTempFV, InitialTempFV, soil_props_t
    PUBLIC make_dir_path, param_file_type, CSV_TYPE, NML_TYPE
    PUBLIC find_free_lun, MYTRIM, STOPIT
 !
 
-INTEGER, PARAMETER :: CSV_TYPE = 1
-INTEGER, PARAMETER :: NML_TYPE = 2
+   !# Soil thermal properties for the cell-centred soil-temperature solver
+   !# (mirrors the thermal fields of intertidal_soil.SoilParams).
+   TYPE :: soil_props_t
+      AED_REAL :: k_mineral, k_water
+      AED_REAL :: c_mineral, c_water, c_air
+      AED_REAL :: bulk_density, mineral_density, porosity
+   END TYPE soil_props_t
+
+   INTEGER, PARAMETER :: CSV_TYPE = 1
+   INTEGER, PARAMETER :: NML_TYPE = 2
 
 !===============================================================================
 CONTAINS
@@ -68,10 +77,14 @@ FUNCTION MYTRIM(str) RESULT(res)
 !-------------------------------------------------------------------------------
 ! Useful for passing string arguments to C functions
 !-------------------------------------------------------------------------------
+!ARGUMENTS
    CHARACTER(*),TARGET :: str
+!LOCALS
    CHARACTER(:),POINTER :: res
    INTEGER :: len
-
+!
+!-------------------------------------------------------------------------------
+!BEGIN
    len = LEN_TRIM(str)+1
    str(len:len) = achar(0)
    res => str
@@ -85,6 +98,7 @@ SUBROUTINE STOPIT(message)
 !ARGUMENTS
    CHARACTER(*) :: message
 !-------------------------------------------------------------------------------
+!BEGIN
    PRINT *,message
    STOP
 END SUBROUTINE STOPIT
@@ -187,7 +201,6 @@ END FUNCTION exp_integral
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
 !###############################################################################
 !#                                                                             #
 !# A fortran implementation of the quicksort algorithm.                        #
@@ -265,7 +278,6 @@ END SUBROUTINE qsort
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
 !###############################################################################
 LOGICAL FUNCTION in_zone_set(matz, active_zones)
 !-------------------------------------------------------------------------------
@@ -290,7 +302,6 @@ LOGICAL FUNCTION in_zone_set(matz, active_zones)
    in_zone_set = res
 END FUNCTION in_zone_set
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
@@ -323,9 +334,9 @@ FUNCTION water_viscosity(temperature) RESULT(mu)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
   AED_REAL,INTENT(inout)  :: temperature
-  AED_REAL :: mu
 !
 !LOCALS
+  AED_REAL :: mu
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -361,7 +372,7 @@ END FUNCTION water_viscosity
 
 !###############################################################################
 PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
-                                                LA,schmidt_model,piston_model)
+                                   epsilon,kin_vsc,LA,schmidt_model,piston_model)
 !-------------------------------------------------------------------------------
 ! Atmospheric-surface water exchange piston velocity for O2, CO2, N2O, CH4 etc
 !-------------------------------------------------------------------------------
@@ -369,13 +380,15 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    AED_REAL,INTENT(IN)           :: wshgt,wind
    AED_REAL,INTENT(IN)           :: tem,sal
    AED_REAL,INTENT(IN),OPTIONAL  :: vel,depth
+   AED_REAL,INTENT(IN),OPTIONAL  :: epsilon,kin_vsc
    AED_REAL,INTENT(IN),OPTIONAL  :: LA
    INTEGER, INTENT(IN),OPTIONAL  :: schmidt_model, piston_model
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,windsp,vel_l
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,c,windsp,vel_l
    INTEGER  :: schmidt_model_l,piston_model_l
+   LOGICAL  :: have_la
    ! Parameters
    AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
 !
@@ -399,7 +412,10 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
 
    !-----------------------------------------------
    ! Compute k_wind
-   IF (PRESENT(LA)) THEN
+ ! IF (PRESENT(LA) .AND. LA > 0.0) THEN
+   have_la = .false.
+   IF (PRESENT(LA)) have_la= (LA > 0.0)
+   IF (have_la) THEN
 
       ! New option for the calculation of k_wind. Note that this has a
       ! "lake area" (LA) variable included in it.
@@ -496,6 +512,11 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
           a = 5.9*windsp - 49.3
         ENDIF
         k_wind = a * (schmidt/600.0)**(-x)
+      CASE (10)
+        c = 0.50
+        x = 0.50
+        k_wind = c*(epsilon*kin_vsc)**(0.25)*(schmidt)**(-x) ! this is in m/s
+        k_wind = k_wind * 3.6e5
       END SELECT
 
    ENDIF
@@ -513,7 +534,6 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
 
 END FUNCTION aed_gas_piston_velocity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
@@ -599,7 +619,6 @@ PURE AED_REAL FUNCTION aed_n2o_sat(salt,temp)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
   x = salt     !  Note that salinity argument is Practical Salinity, this is
                !  beacuse the major ionic components of seawater related to Cl
                !  are what affect the solubility of non-electrolytes in seawater
@@ -633,7 +652,6 @@ PURE AED_REAL FUNCTION aed_n2o_sat(salt,temp)
 
 END FUNCTION aed_n2o_sat
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 !###############################################################################
@@ -686,7 +704,6 @@ SUBROUTINE aed_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn
       Ts = T_std(group)
       To = T_opt(group)
 
-
       IF (Ts<0.0 .AND. To<0.0 .AND. Tm<0.0) THEN
         ! The user inputs the values of kTn, aTn and bTn directly
         kTn(group) = -Ts
@@ -717,8 +734,6 @@ SUBROUTINE aed_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn
           ENDIF
         ENDDO
         DEALLOCATE(value)
-
-
       ELSE
         in = 1.0
         a0 = v**(Ts-t20)
@@ -778,7 +793,6 @@ SUBROUTINE aed_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn
       ENDIF
 
     ENDDO
-
 END SUBROUTINE aed_bio_temp_function
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -832,6 +846,7 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
 !-------------------------------------------------------------------------------
 ! Routine to compute fraction of PO4 adsorped to sediment/particulate concentration
 !-------------------------------------------------------------------------------
+!ARGUMENTS
     INTEGER,  INTENT(IN)  :: PO4AdsorptionModel
     AED_REAL, INTENT(IN)  :: PO4tot_, ParticleConc_
     AED_REAL, INTENT(IN)  :: Kpo4p,K,Qm
@@ -1018,27 +1033,28 @@ AED_REAL FUNCTION fSal_function(salinity, minS, Smin, Smax, maxS )
    ! Ensure salinity function is not negative
    IF(fSal_function <= zero_) fSal_function = zero_
 
- END FUNCTION fSal_function
-!-------------------------------------------------------------------------------
-
+END FUNCTION fSal_function
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !===============================================================================
 SUBROUTINE InitialTemp(m,depth,wv,topTemp,botTemp,nSPinUpDays,tNew)
-
+!-------------------------------------------------------------------------------
+!ARGUMENTS
    INTEGER,intent(in)   :: m
    AED_REAL,intent(in)  :: wv,depth(0:m+1)
    AED_REAL,intent(in)  :: topTemp,botTemp,nSPinUpDays
    AED_REAL,intent(out) :: tNew(0:m+1)
-
+!LOCALS
    INTEGER  :: i
    AED_REAL :: w(m+1),t(0:m+1),tn(0:m+1),k(0:m+1),cp(m),a(m+1),b(m),c(m),d(m),z(0:m+1)
    AED_REAL :: ti, dt, da, f, g, mc, c1, c2, c3, c4
 
-
    AED_REAL :: bd = 1.3
-
-   k(0) = 20    ! boundary layer conductance in w/(m^2 k)
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   k(0) = 20   ! boundary layer conductance in w/(m^2 k)
 
    ti = 0      ! ti is time of day
    dt = 3600   ! dt is time step (sec)
@@ -1074,7 +1090,7 @@ SUBROUTINE InitialTemp(m,depth,wv,topTemp,botTemp,nSPinUpDays,tNew)
            ti = ti-24
            da = da+1
         ENDIF
-        tn(0) = 5.0 ! topTemp !ta+am*sin(.261799*(ti-6))
+        tn(0) = topTemp !ta+am*sin(.261799*(ti-6))
         DO i=1, m
             c(i) = -k(i)*f
             a(i+1) = c(i)
@@ -1107,18 +1123,21 @@ END SUBROUTINE InitialTemp
 
 !===============================================================================
 SUBROUTINE SoilTemp(m,depth,wv,topTemp,temp,heatflux)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
    INTEGER,intent(in) :: m
    AED_REAL,intent(in) :: wv(:), depth(:), topTemp
    AED_REAL,intent(inout) :: temp(m+1)
    AED_REAL,intent(out) :: heatflux
-!
+!LOCALS
     AED_REAL :: w(m+1),t(0:m+1),tn(0:m+1),k(0:m+1),cp(m),a(m+1),b(m),c(m),d(m),z(0:m+1)
     INTEGER  :: i
     AED_REAL :: ti, dt, da, f, g, mc, c1, c2, c3, c4
 
     AED_REAL :: bd = 1.3
-
-
+!
+!-------------------------------------------------------------------------------
+!BEGIN
     k(0) = 20    ! boundary layer conductance in w/(m^2 k)
 
     ti = 0      ! ti is time of day
@@ -1183,6 +1202,147 @@ END SUBROUTINE SoilTemp
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+!===============================================================================
+! Faithful port of intertidal-soil-py (intertidal_soil/temperature.py
+! soil_temp + initial_temp; conductivity/heat-capacity from soil_params.py).
+! Cell-centred finite volume, fully-implicit (backward Euler), Johansen
+! property-based thermal conductivity, harmonic-mean interface conductivities,
+! Dirichlet top (surfTemp) and bottom (deepTemp) boundary conditions.
+!===============================================================================
+PURE FUNCTION SoilCond(theta, p) RESULT(lam)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: theta
+   TYPE(soil_props_t),INTENT(in) :: p
+!LOCALS
+   AED_REAL :: lam, Sr, Ke, k_dry, k_sat
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   Sr = MIN(MAX(theta/p%porosity, zero_), one_)
+   Ke = MIN(MAX(LOG10(MAX(Sr, 1e-10)) + one_, zero_), one_)
+   k_dry = (0.135*p%bulk_density*1e3 + 64.7) &
+         / (p%mineral_density*1e3 - 0.947*p%bulk_density*1e3)
+   k_sat = p%k_mineral**(one_ - p%porosity) * p%k_water**p%porosity
+   lam = k_dry + (k_sat - k_dry)*Ke
+END FUNCTION SoilCond
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+PURE FUNCTION SoilCap(theta, p) RESULT(cap)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: theta
+   TYPE(soil_props_t),INTENT(in) :: p
+!LOCALS
+   AED_REAL :: cap
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   cap = (one_ - p%porosity)*p%c_mineral + theta*p%c_water + (p%porosity - theta)*p%c_air
+END FUNCTION SoilCap
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+SUBROUTINE SoilTempFV(n, d, vwc, surfTemp, deepTemp, dt, props, temp, heatflux)
+!-------------------------------------------------------------------------------
+!  n         : number of interior cells (= n_sed_layers - 2)
+!  d(0:n+1)  : node depths (m); d(0)=0 (surface), d(n+1)=column depth
+!  vwc(1:n)  : volumetric water content per cell
+!  surfTemp  : Dirichlet surface temperature (degC)
+!  deepTemp  : Dirichlet deep-boundary temperature (degC)
+!  dt        : time-step (s)
+!  temp(1:n) : (inout) cell-centred temperature profile (degC)
+!  heatflux  : (out) surface heat flux W/m2 (positive = into soil)
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in)  :: n
+   AED_REAL,INTENT(in) :: d(0:n+1), vwc(n), surfTemp, deepTemp, dt
+   TYPE(soil_props_t),INTENT(in) :: props
+   AED_REAL,INTENT(inout) :: temp(n)
+   AED_REAL,INTENT(out)   :: heatflux
+!LOCALS
+   INTEGER  :: i
+   AED_REAL :: dz(n), zc(n), lam(n), cap(n)
+   AED_REAL :: dzc(0:n), ki(0:n)
+   AED_REAL :: a(n), b(n), c(n), rhs(n), cp(n), dp(n), piv, fa, fb, capv
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   zc(1) = zero_ ; lam(1) = zero_
+   b(1) = zero_ ; c(1) = zero_ ; rhs(1) = zero_
+
+   DO i = 1, n
+      dz(i)  = d(i+1) - d(i)
+      zc(i)  = 0.5*(d(i) + d(i+1))
+      lam(i) = SoilCond(vwc(i), props)
+      cap(i) = SoilCap(vwc(i), props)
+   ENDDO
+   !# interface conductivities (0 = surface->cell1 .. n = cellN->deep)
+   dzc(0) = zc(1)            ;  ki(0) = lam(1)
+   DO i = 1, n-1
+      dzc(i) = zc(i+1) - zc(i)
+      ki(i)  = 2.0*lam(i+1)*lam(i) / (lam(i+1) + lam(i) + 1e-30)
+   ENDDO
+   dzc(n) = d(n+1) - zc(n)   ;  ki(n) = lam(n)
+   !# assemble tridiagonal system (Dirichlet top & bottom)
+   DO i = 1, n
+      capv = cap(i)*dz(i)/dt
+      fb   = ki(i)/dzc(i)         !# conductance to cell below / deep boundary
+      fa   = ki(i-1)/dzc(i-1)     !# conductance from cell above / surface boundary
+      b(i)   = capv + fa + fb
+      rhs(i) = capv*temp(i)
+      IF (i > 1) a(i) = -fa
+      IF (i < n) c(i) = -fb
+      IF (i == 1) rhs(i) = rhs(i) + fa*surfTemp
+      IF (i == n) rhs(i) = rhs(i) + fb*deepTemp
+   ENDDO
+   !# Thomas tridiagonal solve
+   cp(1) = c(1)/b(1)  ;  dp(1) = rhs(1)/b(1)
+   DO i = 2, n
+      piv = b(i) - a(i)*cp(i-1)
+      IF (i < n) cp(i) = c(i)/piv
+      dp(i) = (rhs(i) - a(i)*dp(i-1))/piv
+   ENDDO
+   temp(n) = dp(n)
+   DO i = n-1, 1, -1
+      temp(i) = dp(i) - cp(i)*temp(i+1)
+   ENDDO
+   heatflux = ki(0)/dzc(0) * (surfTemp - temp(1))
+END SUBROUTINE SoilTempFV
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!===============================================================================
+SUBROUTINE InitialTempFV(n, d, vwc_init, surfTemp, deepTemp, spinup_days, dt, props, temp)
+!-------------------------------------------------------------------------------
+! Spin up the cell-centred profile to quasi-equilibrium (port of initial_temp).
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in)  :: n
+   AED_REAL,INTENT(in) :: d(0:n+1), vwc_init, surfTemp, deepTemp, spinup_days, dt
+   TYPE(soil_props_t),INTENT(in) :: props
+   AED_REAL,INTENT(out) :: temp(n)
+!LOCALS
+   INTEGER  :: i, s, nsteps
+   AED_REAL :: vwc(n), hf
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   DO i = 1, n
+      temp(i) = surfTemp + (deepTemp - surfTemp)*REAL(i-1)/REAL(MAX(n-1,1))
+      vwc(i)  = vwc_init
+   ENDDO
+   nsteps = INT(spinup_days*86400.0/dt)
+   DO s = 1, nsteps
+      CALL SoilTempFV(n, d, vwc, surfTemp, deepTemp, dt, props, temp, hf)
+   ENDDO
+END SUBROUTINE InitialTempFV
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 !###############################################################################
 LOGICAL FUNCTION make_dir_path(dir)
 !-------------------------------------------------------------------------------
@@ -1202,8 +1362,9 @@ LOGICAL FUNCTION make_dir_path(dir)
 #else
 #  define DIRSEP "/"
 #endif
-!BEGIN
+!
 !-------------------------------------------------------------------------------
+!BEGIN
    len = LEN_TRIM(dir)
 !print*,'making dir path at "',TRIM(dir),'"'
    d(1:128) = ' '
@@ -1246,8 +1407,9 @@ INTEGER FUNCTION param_file_type(fname)
 !LOCALS
    INTEGER :: len, i, ic, j
    CHARACTER(len=4) :: ext
-!BEGIN
+!
 !-------------------------------------------------------------------------------
+!BEGIN
    param_file_type = -1
    len = LEN_TRIM(fname)
    IF (fname(len-3:len-3) == '.' ) THEN

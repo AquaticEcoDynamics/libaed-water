@@ -1567,7 +1567,7 @@ CONTAINS
       END DO
    END SUBROUTINE recruit_particle
 
-END SUBROUTINE OLD_aed_split_particle_phyto_abm
+END SUBROUTINE aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################

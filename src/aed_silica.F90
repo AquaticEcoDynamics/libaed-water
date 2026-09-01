@@ -78,6 +78,8 @@ MODULE aed_silica
 
 ! MODULE GLOBALS
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                             !     except diagnostics required by
+                                             !     state calculations/coupling
                                               ! 1 = basic diagnostic outputs
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
@@ -115,6 +117,8 @@ SUBROUTINE aed_define_silica(data, namlst)
    CHARACTER(len=64) :: Fsed_rsi_variable=''
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except diagnostics required by
+!                                             !     state calculations/coupling
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
 !                                             ! 3 = other metrics
@@ -152,9 +156,13 @@ SUBROUTINE aed_define_silica(data, namlst)
    IF (data%use_sed_model) &
       data%id_Fsed_rsi = aed_locate_sheet_variable(Fsed_rsi_variable)
 
+   data%id_sed_rsi = 0
+
    ! Register diagnostic variables
-   data%id_sed_rsi = aed_define_sheet_diag_variable('dsf_rsi','mmol/m2/d', &
-                     'Si exchange across sed/water interface')
+   IF (diag_level>0) THEN
+      data%id_sed_rsi = aed_define_sheet_diag_variable('dsf_rsi','mmol/m2/d', &
+                        'Si exchange across sed/water interface')
+   ENDIF
 
    ! Register environmental dependencies
    data%id_temp = aed_locate_global('temperature')
@@ -246,7 +254,7 @@ SUBROUTINE aed_calculate_benthic_silica(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_rsi) = _FLUX_VAR_B_(data%id_ben_rsi) + (-rsi_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   _DIAG_VAR_S_(data%id_sed_rsi) = rsi_flux * secs_per_day
+   IF (data%id_sed_rsi>0) _DIAG_VAR_S_(data%id_sed_rsi) = rsi_flux * secs_per_day
 
 
 END SUBROUTINE aed_calculate_benthic_silica
