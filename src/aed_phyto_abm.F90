@@ -236,6 +236,9 @@ MODULE aed_phyto_abm
    ! fractional accumulator is used instead of a fixed integer-per-call count.
    AED_REAL, SAVE, DIMENSION(:), ALLOCATABLE :: recruit_accumulator
 
+   ! DIAGNOSTIC: flag to track whether PTM_NUM_COLLAPSE log file header has been written
+   LOGICAL, SAVE :: ptm_num_collapse_header_written = .false.
+
 
 !===============================================================================
 
