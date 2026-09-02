@@ -401,15 +401,22 @@ FUNCTION extract_double(sym) RESULT(num)
 !LOCALS
     DOUBLE PRECISION  :: num
     CHARACTER(len=80) :: tbuf
-    INTEGER           :: i
+    INTEGER           :: i, n
 !
 !-------------------------------------------------------------------------------
 !BEGIN
     IF ( sym%length > 0 ) THEN
-       DO i=1,sym%length
+       ! Clamp the copy to LEN(tbuf). This reader has no comment syntax, so a trailing
+       ! annotation on a CSV row lands inside the last field - e.g. the parameter files
+       ! here carry rows like  'n0', 285176600000 ! 1 ! 5000000000000  - and once such a
+       ! field exceeds 80 characters the loop below writes past the end of tbuf and
+       ! corrupts the stack frame. Truncating is safe: the list-directed read takes only
+       ! the first token, so the annotation was never going to be parsed anyway.
+       n = MIN(sym%length, LEN(tbuf))
+       DO i=1,n
           tbuf(i:i)=sym%sym(i)
        ENDDO
-       tbuf(sym%length+1:)=' '
+       tbuf(n+1:)=' '
 
        read(tbuf,*) num
     ELSE
@@ -430,15 +437,16 @@ FUNCTION extract_integer(sym) RESULT(num)
 !LOCALS
     INTEGER           :: num
     CHARACTER(len=80) :: tbuf
-    INTEGER           :: i
+    INTEGER           :: i, n
 !
 !-------------------------------------------------------------------------------
 !BEGIN
     IF ( sym%length > 0 ) THEN
-       DO i=1,sym%length
+       n = MIN(sym%length, LEN(tbuf))   ! see extract_double: clamp, else long fields overrun tbuf
+       DO i=1,n
           tbuf(i:i)=sym%sym(i)
        ENDDO
-       tbuf(sym%length+1:)=' '
+       tbuf(n+1:)=' '
 
        read(tbuf,*) num
     ELSE
@@ -459,19 +467,25 @@ FUNCTION extract_logical(sym) RESULT(res)
 !LOCALS
     LOGICAL           :: res
     CHARACTER(len=80) :: tbuf
-    INTEGER           :: i
+    INTEGER           :: i, n
 !
 !-------------------------------------------------------------------------------
 !BEGIN
     IF ( sym%length > 0 ) THEN
-       DO i=1,sym%length
+       n = MIN(sym%length, LEN(tbuf))   ! see extract_double: clamp, else long fields overrun tbuf
+       DO i=1,n
           tbuf(i:i)=sym%sym(i)
        ENDDO
-       tbuf(sym%length+1:)=' '
+       tbuf(n+1:)=' '
 
-       res = .FALSE.
-    ELSE
+       ! The two branches were inverted: a populated symbol was copied into tbuf and then
+       ! unconditionally returned .FALSE. (so every value in the file read as false), while
+       ! an EMPTY symbol fell through to a read() of an uninitialised tbuf. Unlike the three
+       ! neighbouring extractors this one has no caller today, which is why it went unnoticed
+       ! - but it is a trap for the first LOGICAL column added to a parameter CSV.
        read(tbuf,*) res
+    ELSE
+       res = .FALSE.
     ENDIF
 END FUNCTION extract_logical
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -487,15 +501,18 @@ FUNCTION extract_string(sym) RESULT(str)
 
 !LOCALS
     CHARACTER(len=20) :: str
-    INTEGER           :: i
+    INTEGER           :: i, n
 !
 !-------------------------------------------------------------------------------
 !BEGIN
     IF ( sym%length > 0 ) THEN
-       DO i=1,sym%length
+       ! See extract_double. Note str is only 20 characters, so this one overran on any
+       ! field longer than 20 - a much lower threshold than the other three.
+       n = MIN(sym%length, LEN(str))
+       DO i=1,n
           str(i:i)=sym%sym(i)
        ENDDO
-       str(sym%length+1:)=' '
+       str(n+1:)=' '
     ELSE
        str = ''
     ENDIF

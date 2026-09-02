@@ -1,7 +1,5 @@
       https://aquatic.science.uwa.edu.au/
 
-## TESTING TESTING
-
 AED suite is a collection of community-driven libraries of modules and
 algorithms for simulation of "aquatic ecodynamics" - water quality, aquatic
 biogeochemsitry, biotic habitat and aquatic ecosystem dynamics.

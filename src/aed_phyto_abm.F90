@@ -93,6 +93,7 @@ MODULE aed_phyto_abm
       INTEGER :: id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
+      INTEGER :: id_lvol
 
       ! Phytoplankton parameters
       INTEGER  :: num_phytos
@@ -127,6 +128,34 @@ MODULE aed_phyto_abm
       AED_REAL,DIMENSION(:),ALLOCATABLE :: recruit_height_min
       AED_REAL,DIMENSION(:),ALLOCATABLE :: recruit_height_max
       INTEGER,DIMENSION(:),ALLOCATABLE  :: recruit_max_per_call
+
+      ! Bounds on per-particle cell density (kg/m3), applied to ptm_env(DENS) after the
+      ! carbohydrate-ballasting update in aed_particle_bgc_phyto_abm. Set via 'min_rho' /
+      ! 'max_rho' in the &aed_phyto_abm namelist (api.nml).
+      ! Stored here because the namelist variables of the same name were previously read
+      ! and then never used: the clamp read two SEPARATE locals declared inside
+      ! aed_particle_bgc_phyto_abm and hardcoded to the same 900./1200. defaults, so
+      ! setting min_rho/max_rho in the namelist had no effect whatsoever.
+      ! APPENDED AT THE END of the component list deliberately - inserting these
+      ! mid-structure (directly after 'phytos') produced a segfault in memmove during
+      ! model configuration, before this routine's own code was even reached.
+      AED_REAL :: min_rho = 900.
+      AED_REAL :: max_rho = 1200.
+
+      ! Per-group reseeding floor/target (2026-08): threshold-triggered population
+      ! maintenance, complementary to recruit_rate above rather than a replacement for
+      ! it. recruit_rate models an ongoing BIOLOGICAL source (continuous rate, its own
+      ! height band, participates fully in growth/mortality/biogeochemistry from the
+      ! moment it appears). Reseeding is INSTRUMENT MAINTENANCE: if a group's live
+      ! particle count falls below particle_reseed_min(g), it is topped back up to
+      ! particle_reseed_target(g) in one call. Physiology for the new particles is
+      ! seeded via the SAME recruit_particle() Gaussian-draw-around-CSV-defaults
+      ! routine recruit_rate already uses - not duplicated CSV literals - since this
+      ! model's growth kernel cannot bootstrap a particle from a zeroed C/N/P/Chl/num
+      ! state (dC/dt is proportional to C; C=0 is a fixed point, not a starting point).
+      ! 0 = disabled (default) for both.
+      INTEGER,DIMENSION(:),ALLOCATABLE :: particle_reseed_min
+      INTEGER,DIMENSION(:),ALLOCATABLE :: particle_reseed_target
 
       CONTAINS
          PROCEDURE :: define              => aed_define_phyto_abm
@@ -178,6 +207,7 @@ MODULE aed_phyto_abm
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
+   INTEGER  :: n_starved = 0
 
    ! DIAGNOSTIC: cumulative count of successful particle splits (the only mechanism in this
    ! module that creates a new active particle / increases the particle count - "births" via
@@ -195,6 +225,11 @@ MODULE aed_phyto_abm
    ! DIAGNOSTIC: cumulative count of recruitment events (the third, independent
    ! pathway that creates a new active particle - see also (1) and (2) above).
    INTEGER, SAVE  :: ptm_cum_recruit_count = 0
+
+   ! DIAGNOSTIC: cumulative count of reseed events (the fourth, independent pathway -
+   ! see block (4) in aed_split_particle_phyto_abm, and particle_reseed_min/target on
+   ! the data type).
+   INTEGER, SAVE  :: ptm_cum_reseed_count = 0
    ! Fractional-particle accumulator for recruit_rate (particles/day), one per phyto
    ! group since recruit_rate is now per-group. Allocated/sized in aed_define_phyto_abm
    ! once num_phytos is known. See block (3) in aed_split_particle_phyto_abm for why a
@@ -206,6 +241,7 @@ MODULE aed_phyto_abm
 
 
 !===============================================================================
+
 CONTAINS
 
 
@@ -539,6 +575,18 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%n_split       = pd(list(i))%n_split
        data%phytos(i)%simMortNumDecay = pd(list(i))%simMortNumDecay
 
+       ! n_split semantics (2026-08, adaptive splitting - see aed_split_particle_phyto_abm):
+       !   > 0  fixed threshold - particle splits once it exceeds this many cells
+       !        (the only behaviour this module had before; unchanged, and still the
+       !        default for any group whose CSV n_split is a normal positive value)
+       !   = 0  never split. n_split has no declared default in phyto_param_t, so an
+       !        omitted CSV column would otherwise leave this at whatever value the
+       !        compiler happens to give an uninitialised AED_REAL - map it to a very
+       !        large number instead, so "not set" reliably means "don't split".
+       !   < 0  ADAPTIVE (constant particle NUMBER rather than constant particle
+       !        WEIGHT): magnitude is not used, only the sign is a sentinel.
+       IF (data%phytos(i)%n_split == 0.d0) data%phytos(i)%n_split = 1000000.d0
+
     ENDDO
     DEALLOCATE(pd)
 END SUBROUTINE aed_phytoplankton_load_params
@@ -604,6 +652,11 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    AED_REAL           :: recruit_height_min(MAX_PHYTO_TYPES)   = 0.0d0   ! m, absolute height above lake-bottom datum
    AED_REAL           :: recruit_height_max(MAX_PHYTO_TYPES)   = 0.0d0   ! m, absolute height above lake-bottom datum
    INTEGER            :: recruit_max_per_call(MAX_PHYTO_TYPES) = 1000   ! safety cap, mirrors MAX_POPMAINTAIN_SPLITS_PER_CALL
+   ! Per-group reseeding: 0 = disabled (default) for both. target <= 0 (with min > 0)
+   ! falls back to target = min, i.e. "top up to exactly the floor". See FEATURE note
+   ! on the type definition.
+   INTEGER            :: particle_reseed_min(MAX_PHYTO_TYPES)    = 0
+   INTEGER            :: particle_reseed_target(MAX_PHYTO_TYPES) = 0
 
 !  From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
@@ -631,7 +684,8 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                     theta_mpb_growth,theta_mpb_resp,                           &
                     phyto_particle_link, R_mpbb, target_particle_num,          &
                     recruit_rate, recruit_height_min, recruit_height_max,      &
-                    recruit_max_per_call
+                    recruit_max_per_call, particle_reseed_min,                 &
+                    particle_reseed_target
 !-------------------------------------------------------------------------------
 !BEGIN
 
@@ -642,6 +696,16 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    IF (status /= 0) STOP 'Error reading namelist aed_phyto_abm'
 
    data%target_particle_num = target_particle_num
+
+   ! Particle density bounds. Defaults (900./1200.) match the values the clamp previously
+   ! hardcoded, so an unchanged namelist reproduces earlier results exactly.
+   data%min_rho = min_rho
+   data%max_rho = max_rho
+   IF ( data%max_rho <= data%min_rho ) THEN
+      print *,'aed_phyto_abm: ERROR max_rho (',data%max_rho,') must exceed min_rho (', &
+              data%min_rho,')'
+      STOP 'Invalid min_rho/max_rho in namelist aed_phyto_abm'
+   ENDIF
 
    ! Store group parameter values in the phyto derived type. data%num_phytos may end up
    ! less than the requested num_phytos if the_phytos(:) contains bad/out-of-range CSV
@@ -663,6 +727,21 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%recruit_height_max(1:data%num_phytos)   = recruit_height_max(1:data%num_phytos)
    data%recruit_max_per_call(1:data%num_phytos) = recruit_max_per_call(1:data%num_phytos)
    recruit_accumulator(1:data%num_phytos)       = 0.0d0
+
+   ! Per-group reseeding floor/target (block (4) in aed_split_particle_phyto_abm).
+   ! target <= 0 (with min > 0) falls back to target = min - "top up to the floor",
+   ! the simplest sensible default when no explicit target is given.
+   ALLOCATE(data%particle_reseed_min(data%num_phytos))
+   ALLOCATE(data%particle_reseed_target(data%num_phytos))
+   data%particle_reseed_min(1:data%num_phytos)    = particle_reseed_min(1:data%num_phytos)
+   data%particle_reseed_target(1:data%num_phytos) = particle_reseed_target(1:data%num_phytos)
+   DO grp_i = 1, data%num_phytos
+      IF (data%particle_reseed_min(grp_i) > 0 .AND. data%particle_reseed_target(grp_i) <= 0) &
+         data%particle_reseed_target(grp_i) = data%particle_reseed_min(grp_i)
+      IF (data%particle_reseed_min(grp_i) > 0 .AND. data%recruit_rate(grp_i) > 0) &
+         print *,'        WARNING aed_phyto_abm: group ',grp_i,' has both recruit_rate > 0 ', &
+                 'and particle_reseed_min > 0 - both mechanisms will add particles.'
+   ENDDO
 
    print *,"        aed_phyto_abm initialization"
 
@@ -860,6 +939,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_lht   = aed_locate_global('layer_ht')
    data%id_par   = aed_locate_global('par')
    data%id_larea = aed_locate_global('layer_area') ! ML currently state var s; use this for now but is only top layer
+   data%id_lvol  = aed_locate_global('layer_vol')
                                                    ! CAB no! top layer is col_area
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
@@ -1016,6 +1096,26 @@ INTEGER   :: i, j, ng
 INTEGER   :: n_active, largest_i, n_split_this_call
 AED_REAL  :: largest_num
 LOGICAL   :: found_slot
+
+! Adaptive (constant-particle-NUMBER) splitting (2026-08). SB's only splitting mode
+! was constant-WEIGHT: n_split > 0 is a fixed cells-per-particle threshold, so the
+! particle COUNT grows with the population and eventually hits max_particle_num, after
+! which splits silently fail (no free slot found) and per-particle statistical weight
+! ends up wildly uneven. n_split < 0 (see the sentinel handling in
+! aed_phytoplankton_load_params) opts a group INTO this alternative: the threshold
+! becomes that group's live-cell total divided by its fair share of particle slots, so
+! WEIGHT floats and COUNT is held near capacity instead. n_split > 0 is entirely
+! unaffected - this is additive, not a replacement.
+INTEGER   :: g, slots_per_grp
+AED_REAL, ALLOCATABLE :: grp_cells(:)   ! per-group total live cell count this call
+INTEGER,  ALLOCATABLE :: grp_live(:)    ! per-group live PARTICLE count this call
+AED_REAL  :: thresh
+! A split produces TWO half-size particles, not one full-size one, so a population
+! held exactly at the threshold settles to ~0.6x it, not to it - 0.45 (not the more
+! obvious 0.9) targets ~75% block occupancy at steady state. The hard occupancy guard
+! below is what actually GUARANTEES the count stays bounded, regardless of exactly
+! what steady-state ratio this constant achieves.
+AED_REAL, PARAMETER :: SPLIT_FILL = 0.45d0
 ! Safety cap on population-maintenance splits performed in a single call: each split
 ! requires an O(ppid) scan for the current largest particle plus an O(ppid) scan for a
 ! free slot, so an uncapped loop could in the worst case cost O(ppid^2) in one call.
@@ -1025,15 +1125,47 @@ INTEGER, PARAMETER :: MAX_POPMAINTAIN_SPLITS_PER_CALL = 1000
 
 INTEGER   :: n_recruit_this_call
 AED_REAL  :: rand01, recruit_height
-! Same fragile-but-precedented dt assumption as elsewhere in this file (see dtdays
-! in aed_particle_bgc_phyto_abm) - this routine has no column/layer context and so
-! cannot read the model's actual timestep.
-AED_REAL, PARAMETER :: dtdays_assumed = 1.0d0/24  ! assumes hourly host calls
+! Biological timestep in days, taken from the same host-published value that
+! aed_particle_bgc_phyto_abm uses for dtdays (aed_core%aed_ptm_dt_days). This
+! routine has no column/layer context of its own, but the value is a module
+! scalar set by aed_calculate_particles before the models run, so it is
+! available here too. Previously hardcoded to 1/24 d, which assumed the host
+! calls the particle model exactly once per hour.
+AED_REAL :: dtdays_assumed
 
 !
 
 !-------------------------------------------------------------------------------
 !BEGIN
+
+! Same host-published biological timestep the BGC routine uses (see dtdays there).
+dtdays_assumed = aed_ptm_dt_days
+
+
+! Adaptive-splitting pre-pass: one O(ppid) sweep to get each group's live cell total
+! and live particle count, needed below by any group using n_split < 0. Computed
+! unconditionally (cheap; avoids doing it per-group inside the per-particle loop,
+! which would cost O(ppid*num_phytos)) and is harmless for groups using the ordinary
+! fixed n_split > 0 threshold, which never reads grp_cells/grp_live.
+! slots_per_grp is SB's stand-in for Bejoy's n_per_grp: Bejoy derives its per-group
+! slot budget from a CONTIGUOUS BLOCK particle layout (ppid/n_grp, one block per
+! group). SB deliberately does NOT use contiguous blocks - particles are assigned
+! round-robin (see the comment on aed_particle_initialize_phyto_abm) specifically so
+! that splitting/recruitment don't have to search within a group's own block. The
+! natural equivalent budget under round-robin is simply ppid divided evenly across
+! groups; CEILING so a non-divisible ppid doesn't under-budget the group(s) that get
+! the remainder.
+ALLOCATE(grp_cells(data%num_phytos), grp_live(data%num_phytos))
+grp_cells = zero_
+grp_live  = 0
+slots_per_grp = CEILING(REAL(ppid,KIND(thresh)) / REAL(data%num_phytos,KIND(thresh)))
+DO i = 1, ppid
+   IF (p(i)%ptm_istat(STAT) > 0) THEN
+      g = p(i)%ptm_istat(GRP)
+      grp_cells(g) = grp_cells(g) + p(i)%ptm_state(data%ip_num)
+      grp_live(g)  = grp_live(g) + 1
+   ENDIF
+ENDDO
 
 ! (1) Per-particle size-triggered splitting: a particle that has grown past n_split
 !     divides in two, same as cell division elsewhere, except it also allocates a new
@@ -1041,8 +1173,22 @@ AED_REAL, PARAMETER :: dtdays_assumed = 1.0d0/24  ! assumes hourly host calls
 !     Checked per-particle against ITS OWN group's simSplit/n_split (not a single
 !     hardcoded group), since different species can have different division thresholds.
 DO i = 1, ppid
-   IF (data%phytos(p(i)%ptm_istat(GRP))%simSplit > 0) THEN
-      IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > data%phytos(p(i)%ptm_istat(GRP))%n_split) THEN
+   g = p(i)%ptm_istat(GRP)
+   IF (data%phytos(g)%simSplit > 0) THEN
+      IF (data%phytos(g)%n_split < zero_) THEN
+         ! ADAPTIVE: threshold is this group's current fair share, so it floats with
+         ! the population instead of being fixed.
+         thresh = grp_cells(g) / (REAL(slots_per_grp,KIND(thresh)) * SPLIT_FILL)
+         ! Hard occupancy guard - this, not the ratio above, is what actually
+         ! GUARANTEES the particle count stays bounded: once this group already
+         ! fills its notional share of slots, refuse to split it further regardless
+         ! of what the threshold computation says.
+         IF (REAL(grp_live(g),KIND(thresh)) >= REAL(slots_per_grp,KIND(thresh)) * SPLIT_FILL) &
+            thresh = HUGE(thresh)
+      ELSE
+         thresh = data%phytos(g)%n_split   ! fixed threshold (existing behaviour, unchanged)
+      ENDIF
+      IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > thresh) THEN
          j = 1
          found_slot = .FALSE.
          DO
@@ -1058,24 +1204,30 @@ DO i = 1, ppid
          END DO ! end search for available particles loop
 
          IF (found_slot) THEN
+            ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
             ! DIAGNOSTIC: record the split event (one of the two pathways that create a
             ! new active particle / increase the particle count - see also (2) below).
-            ! AUTO: uncomment to explore more diagnostics
-            !ptm_cum_split_count = ptm_cum_split_count + 1
-            !BLOCK
-            !   INTEGER :: split_log_unit
-            !   OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
-            !        POSITION='append', STATUS='unknown', ACTION='write')
-            !   IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
-            !   WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
-            !   CLOSE(split_log_unit)
-            !END BLOCK
+            ! ptm_cum_split_count = ptm_cum_split_count + 1
+            ! BLOCK
+            !    INTEGER :: split_log_unit
+            !    OPEN(NEWUNIT=split_log_unit, FILE='ptm_split_events.csv', &
+            !         POSITION='append', STATUS='unknown', ACTION='write')
+            !    IF (ptm_cum_split_count == 1) WRITE(split_log_unit,'(A)') 'event_num,parent_particle,new_particle,cells_per_particle_after_split'
+            !    WRITE(split_log_unit,'(I0,A,I0,A,I0,A,ES14.6)') ptm_cum_split_count, ',', i, ',', j, ',', p(i)%ptm_state(data%ip_num)
+            !    CLOSE(split_log_unit)
+            ! END BLOCK
+            ! Keep grp_live in sync for the occupancy guard above: this split just
+            ! created a new active particle in slot j, in the SAME group as parent i
+            ! (duplicate_and_halve_particle copies the parent's group onto it).
+            IF (data%phytos(g)%n_split < zero_) grp_live(g) = grp_live(g) + 1
          ELSE
             RETURN ! no free slots anywhere; further scanning this call is pointless
          END IF
       END IF ! end does particle need to split if statement
    END IF ! end this particle's group has simSplit enabled
 END DO ! end particle loop
+! grp_cells/grp_live are NOT deallocated here - block (4) below (reseeding) also
+! reads grp_live. Deallocated once, after block (4), just before CONTAINS.
 
 ! (2) Population maintenance: if the domain-wide active particle count has fallen below
 !     target_particle_num (namelist parameter, disabled when 0), repeatedly split the
@@ -1121,20 +1273,20 @@ IF (data%target_particle_num > 0) THEN
       n_active = n_active + 1
       n_split_this_call = n_split_this_call + 1
 
+      ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
       ! DIAGNOSTIC: record the split event, distinct from the n_split-triggered log above.
-      ! AUTO: uncomment to explore more diagnostics
-      !ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
-      !BLOCK
-      !   INTEGER :: pm_log_unit
-      !   OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
-      !        POSITION='append', STATUS='unknown', ACTION='write')
-      !   IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
-      !      'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
-      !   WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
-      !      ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
-      !      largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
-      !   CLOSE(pm_log_unit)
-      !END BLOCK
+      ! ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
+      ! BLOCK
+      !    INTEGER :: pm_log_unit
+      !    OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
+      !         POSITION='append', STATUS='unknown', ACTION='write')
+      !    IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
+      !       'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
+      !    WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
+      !       ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
+      !       largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
+      !    CLOSE(pm_log_unit)
+      ! END BLOCK
    END DO
 END IF
 
@@ -1181,26 +1333,86 @@ DO ng = 1, data%num_phytos
 
          CALL recruit_particle(j, ng, recruit_height)
 
+         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
          ! DIAGNOSTIC: record the recruitment event, distinct from the split-triggered
          ! logs above (this is the third, independent pathway that creates a new
          ! active particle).
-         ! AUTO: uncomment to explore more diagnostics
-         !ptm_cum_recruit_count = ptm_cum_recruit_count + 1
-         !n_recruit_this_call = n_recruit_this_call + 1
-         !recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
-         !BLOCK
-         !   INTEGER :: recruit_log_unit
-         !   OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
-         !        POSITION='append', STATUS='unknown', ACTION='write')
-         !   IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
-         !      'event_num,new_particle,group,height,cells_per_particle'
-         !   WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-         !      ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
-         !   CLOSE(recruit_log_unit)
-         !END BLOCK
+         ! ptm_cum_recruit_count = ptm_cum_recruit_count + 1
+         ! n_recruit_this_call = n_recruit_this_call + 1
+         ! recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
+         ! BLOCK
+         !    INTEGER :: recruit_log_unit
+         !    OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
+         !         POSITION='append', STATUS='unknown', ACTION='write')
+         !    IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
+         !       'event_num,new_particle,group,height,cells_per_particle'
+         !    WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
+         !       ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+         !    CLOSE(recruit_log_unit)
+         ! END BLOCK
       END DO
    END IF
 END DO
+
+! (4) Reseeding: threshold-triggered population maintenance, complementary to (3)
+!     above rather than a replacement for it (see the FEATURE note on
+!     particle_reseed_min/target in the type definition for the distinction).
+!     Gated by particle_reseed_min(g) (disabled when 0). Reuses grp_live from the
+!     adaptive-splitting pre-pass at the top of this routine, so no extra O(ppid)
+!     scan is needed to know each group's current live count.
+DO ng = 1, data%num_phytos
+   IF (data%particle_reseed_min(ng) > 0 .AND. grp_live(ng) < data%particle_reseed_min(ng)) THEN
+      n_recruit_this_call = 0
+      DO WHILE (grp_live(ng) < data%particle_reseed_target(ng) .AND. &
+                n_recruit_this_call < data%recruit_max_per_call(ng))
+
+         j = 1
+         found_slot = .FALSE.
+         DO
+            IF (j > ppid) THEN
+               print *, 'aed_split_particle(): WARNING particle_reseed_min > 0 but no free particle slots available'
+               EXIT
+            ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN
+               found_slot = .TRUE.
+               EXIT
+            END IF
+            j = j + 1
+         END DO
+         IF (.NOT. found_slot) EXIT ! no free slots anywhere; try again next call
+
+         ! Reseeded particles use the SAME height band as recruit_rate for this group
+         ! (recruit_height_min/max) - there is no separate "initial seeding depth
+         ! range" exposed on the Fortran side to draw from instead, and this group's
+         ! own recruitment band is a reasonable place to reintroduce it.
+         CALL RANDOM_NUMBER(rand01)
+         recruit_height = data%recruit_height_min(ng) + &
+                           rand01 * (data%recruit_height_max(ng) - data%recruit_height_min(ng))
+
+         CALL recruit_particle(j, ng, recruit_height)
+
+         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
+         ! DIAGNOSTIC: record the reseed event, distinct from the recruit-triggered
+         ! log above (this is the fourth, independent pathway that creates a new
+         ! active particle).
+         ! ptm_cum_reseed_count = ptm_cum_reseed_count + 1
+         ! n_recruit_this_call = n_recruit_this_call + 1
+         ! grp_live(ng) = grp_live(ng) + 1
+         ! BLOCK
+         !    INTEGER :: reseed_log_unit
+         !    OPEN(NEWUNIT=reseed_log_unit, FILE='ptm_reseed_events.csv', &
+         !         POSITION='append', STATUS='unknown', ACTION='write')
+         !    IF (ptm_cum_reseed_count == 1) WRITE(reseed_log_unit,'(A)') &
+         !       'event_num,new_particle,group,height,cells_per_particle'
+         !    WRITE(reseed_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
+         !       ptm_cum_reseed_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
+         !    CLOSE(reseed_log_unit)
+         ! END BLOCK
+      END DO
+   END IF
+END DO
+
+
+DEALLOCATE(grp_cells, grp_live)
 
 CONTAINS
 
@@ -1358,7 +1570,6 @@ CONTAINS
 END SUBROUTINE aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
 !###############################################################################
 SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
@@ -1405,6 +1616,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real      :: num_lost = 0.d0         !cells lost this call under simMortNumDecay=1 (see PHYTOPLANKTON MORTALITY)
    real      :: num_before = 0.d0       !DEBUG: ip_num at top of this particle's per-call update, to detect single-call collapses
    integer, save :: dbg_call_count = 0  !DEBUG: monotonic count of calls to this subroutine, for ordering debug output
+
    real      :: oldtt(1) = 0.   !Scratch variable for storing the old trait
    real      :: newtt(1) = 0.   !Scratch variable for storing the new trait
    real      :: vartt(1,1) = 0.   !Variance of the mutating trait
@@ -1441,6 +1653,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real    :: pp_DZP = 0.
    real    :: pp_ND = 0.
    real    :: pp_PD = 0.
+   !# Per-particle physiology increments from the GMK98 pass, held so that the
+   !# aggregate nutrient demand of every particle in this layer can be compared
+   !# against what the layer actually holds, and rationed down if it exceeds it,
+   !# BEFORE any of it is committed. See the rationing block below.
+   real, allocatable :: sv_dC(:), sv_dN(:), sv_dNO3(:), sv_dNH4(:)
+   real, allocatable :: sv_dP(:), sv_dChl(:), sv_ESD(:)
+   real    :: dem_NO3, dem_NH4, dem_FRP
+   real    :: scl_NO3, scl_NH4, scl_FRP, scl_N
    real, allocatable :: Pmort(:)
    real, allocatable :: Pmort_P(:)
    real, allocatable :: Pmort_C(:)
@@ -1473,7 +1693,11 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    INTEGER              :: Allocatestatus = 0
    real :: PHY_t = 0d0  !Total phytoplankton N
    ! additional declarations from PIBM time_settings.F90
-   real     :: dtdays       = 1.0d0/24 !ML initializing this to 1 hour
+   !# Biological timestep in days. Assigned from aed_ptm_dt_days at !BEGIN below
+   !# (published by aed_calculate_particles from the value the host passes in),
+   !# so this tracks the interval the host is actually advancing over rather
+   !# than assuming an hourly call. The initialiser is only a fallback.
+   real     :: dtdays       = 1.0d0/24
    real  :: hour_of_day   != 0
    integer  :: integer_day   != 0
    real  :: real_day
@@ -1481,8 +1705,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    integer  :: chk_lyr_new  = 0.
    integer  :: chk_lyr_old  = 0.
    real     :: p_vvel = 0. !vertical velocity calculated in AED (m/s)
-   real     :: min_rho = 900.
-   real     :: max_rho = 1200.
+   ! min_rho/max_rho were declared here as locals hardcoded to 900./1200., which shadowed
+   ! the identically-named namelist parameters and made those parameters inert. The clamp
+   ! below now reads data%min_rho / data%max_rho directly (set in aed_define_phyto_abm).
    real     :: dens_flux = 0.
 
 !End of declaration
@@ -1495,6 +1720,13 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
    ! Allocate this call's per-group accumulators/diagnostics-staging arrays (freshly
    ! each call, mirroring the existing index_/BN/BC/BP allocate-per-call pattern below).
+
+   !# Take this call's biological timestep from the host (published via
+   !# aed_calculate_particles). Was hardcoded to 1/24 d, which silently assumed
+   !# the host calls us exactly once per hour - wrong the moment the particle
+   !# model is run once per split_factor sub-step rather than once per host step.
+   dtdays = aed_ptm_dt_days
+
    ALLOCATE(PHYC(data%num_phytos));  PHYC = 0d0
    ALLOCATE(PHYN(data%num_phytos));  PHYN = 0d0
    ALLOCATE(PHYP(data%num_phytos));  PHYP = 0d0
@@ -1585,7 +1817,10 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       endif
    enddo
    ! get volume of layer
-   Hz = _STATE_VAR_(data%id_lht)*_STATE_VAR_(data%id_larea)
+   !# TRUE layer volume from the host's hypsograph. Was dz*area, which treats the
+   !# layer as a prism of constant area and so mis-scales every particle<->water
+   !# exchange; Hz appears in the denominator of every flux conversion below.
+   Hz = _STATE_VAR_(data%id_lvol)
 
    !Save number of super-individuals per layer, per group
    DO ng=1,data%num_phytos
@@ -1643,11 +1878,36 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    Pmort_C   = 0d0
    oxy_flux = 0d0
 
+   !###########################################################################
+   !# PASS 1 of 2: compute each particle's physiology increments WITHOUT
+   !# committing them, so the layer's aggregate nutrient demand is known before
+   !# any of it is taken. Pass 2 (the loop further below) applies the results,
+   !# scaled by the rationing factors computed in between.
+   !#
+   !# Every particle's uptake is a function of the SAME start-of-step no3/nh4/frp
+   !# - no particle can see what the others are taking. Michaelis-Menten throttles
+   !# each individual draw but places no bound on the sum, so with thousands of
+   !# particles in a layer the aggregate can exceed what is present. The pool then
+   !# goes negative and repair_state clamps it back to zero, fabricating mass.
+   !#
+   !# This mirrors aed_phytoplankton, which has had the same guard for its
+   !# Eulerian groups since long before this module existed (see the
+   !# "Check uptake values for availability to prevent -ve numbers" block, where
+   !# uptake is scaled by available*0.99/upTot when the total exceeds supply).
+   !# That module is naturally two-pass - it fills nuptake/puptake arrays, rations,
+   !# then applies - whereas this one computed and committed in a single sweep,
+   !# which is why the guard was never inherited. Same job, same treatment.
+   !###########################################################################
    if (N_ > 0) then
+      allocate(sv_dC(N_), sv_dN(N_), sv_dNO3(N_), sv_dNH4(N_), &
+               sv_dP(N_), sv_dChl(N_), sv_ESD(N_), stat=AllocateStatus)
+      IF (AllocateStatus /= 0) STOP "*** Problem allocating particle uptake scratch ***"
+
+      dem_NO3 = 0d0 ; dem_NH4 = 0d0 ; dem_FRP = 0d0
+
       do j = 1, N_
          i = index_(j)
-         g = p(i)%ptm_istat(GRP)   ! this particle's phyto group - selects which data%phytos(g) parameter set to use
-         num_before = p(i)%ptm_state(data%ip_num)   !DEBUG
+         g = p(i)%ptm_istat(GRP)
 
          ! set particle par, temp, and no3 using environmental conditions from this layer
          p(i)%ptm_state(data%ip_par) = par
@@ -1656,72 +1916,132 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          p(i)%ptm_state(data%ip_nh4) = nh4
          p(i)%ptm_state(data%ip_frp) = frp
 
-         ! call the PIBM function that is the primary engine for phytoplankton physiology
-         ! this is located in aed_pibm_utils.F90
-         call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem),              & ! Temp     (environmental temperature)
-                                      p(i)%ptm_state(data%ip_par),              & ! PAR      (environmental PAR)
-                                      p(i)%ptm_state(data%ip_no3) + p(i)%ptm_state(data%ip_nh4),              & ! NO3 + NH4    (environmental DIN)
-                                      p(i)%ptm_state(data%ip_no3),              & ! NO3      (environmental NO3)
-                                      p(i)%ptm_state(data%ip_nh4),              & ! NH4      (environmental NH4)
-                                      p(i)%ptm_state(data%ip_frp),              & ! FRP      (environmental FRP)
-                                      p(i)%ptm_state(data%ip_c),                & ! C        (C in particle)
-                                      p(i)%ptm_state(data%ip_n),                & ! N        (N in particle)
-                                      p(i)%ptm_state(data%ip_p),                & ! P        (P in particle)
-                                      p(i)%ptm_state(data%ip_chl),              & ! Chl      (Chl in particle)
-                                      p(i)%ptm_state(data%ip_Topt),             & ! Topt     (parameter + mutating trait; optimum temperature)
-                                      p(i)%ptm_state(data%ip_cdiv),             & ! Cdiv     (parameter + mutating trait; carbon threshold for cell division)
-                                      exp(p(i)%ptm_state(data%ip_LnalphaChl)),  & ! alphaChl (parameter + mutating trait; slope of the PI curve)
-                                      dC_,                                      & ! dC       (change in C; returned by function)
-                                      dN_,                                      & ! dN       (change in N; returned by function)
-                                      dNO3_,                                    & ! dNO3     (change in N from NO3; returned by function)
-                                      dNH4_,                                    & ! dNH4     (change in N from NH4; returned by function)
-                                      dP_,                                      & ! dP       (change in P; returned by function)
-                                      dChl_,                                    & ! dChl     (change in Chl; returned by function)
-                                      ESD_,                                     & ! ESD      (ESD of cells in particle; returned by function)
-                                      data%phytos(g)%RC,                        & ! RC       (user-specified parameter)
-                                      data%phytos(g)%RN,                        & ! RN       (user-specified parameter)
-                                      data%phytos(g)%RP,                        & ! RP       (user-specified parameter)
-                                      data%phytos(g)%RChl,                      & ! RChl     (user-specified parameter)
-                                      data%phytos(g)%zeta_N,                    & ! zeta_N   (user-specified parameter)
-                                      data%phytos(g)%zeta_P,                    & ! zeta_P   (user-specified parameter)
-                                      data%phytos(g)%a1,                        & ! a1       (user-specified parameter)
-                                      data%phytos(g)%R_growth,                  & ! mu0      (user-specified parameter)
-                                      data%phytos(g)%nx,                        & ! nx       (user-specified parameter)
-                                      data%phytos(g)%thetaNmax,                 & ! thetaNmax(user-specified parameter)
-                                      data%phytos(g)%thetaPmax,                 & ! thetaPmax(user-specified parameter)
-                                      data%phytos(g)%QNmin_a,                   & ! QNmin_a  (user-specified parameter)
-                                      data%phytos(g)%QNmin_b,                   & ! QNmin_b  (user-specified parameter)
-                                      data%phytos(g)%QNmax_a,                   & ! QNmax_a  (user-specified parameter)
-                                      data%phytos(g)%QNmax_b,                   & ! QNmax_b  (user-specified parameter)
-                                      data%phytos(g)%QPmin_a,                   & ! QPmin_a  (user-specified parameter)
-                                      data%phytos(g)%QPmin_b,                   & ! QPmin_b  (user-specified parameter)
-                                      data%phytos(g)%QPmax_a,                   & ! QPmax_a  (user-specified parameter)
-                                      data%phytos(g)%QPmax_b,                   & ! QPmax_b  (user-specified parameter)
-                                      data%phytos(g)%KN_a,                      & ! KN_a     (user-specified parameter)
-                                      data%phytos(g)%KN_b,                      & ! KN_b     (user-specified parameter)
-                                      data%phytos(g)%KPho_a,                    & ! KPho_a   (user-specified parameter)
-                                      data%phytos(g)%KPho_b,                    & ! KPho_b   (user-specified parameter)
-                                      data%phytos(g)%a_c2vol,                   & ! a_c2vol  (user-specified parameter)
-                                      data%phytos(g)%b_c2vol,                   & ! b_c2vol  (user-specified parameter)
-                                      data%phytos(g)%a_pmax,                    & ! a_pmax   (user-specified parameter)
-                                      data%phytos(g)%rho,                       & ! rho      (user-specified parameter)
-                                      data%phytos(g)%rho_star,                  & ! rho_star (user-specified parameter)
-                                      data%phytos(g)%b_rho,                     & ! b_rho    (user-specified parameter)
-                                      data%phytos(g)%V_s,                       & ! V_s      (user-specified parameter)
-                                      data%phytos(g)%Ea0,                       & ! Ea0      (user-specified parameter)
-                                      data%phytos(g)%Ed0,                       & ! Ed0      (user-specified parameter)
-                                      data%phytos(g)%Ei,                        & ! Ei       (user-specified parameter)
-                                      data%phytos(g)%beta,                      & ! beta     (user-specified parameter)
-                                      data%phytos(g)%phi,                       & ! phi      (user-specified parameter)
-                                      data%phytos(g)%T_std,                     & ! T_std    (user-specified parameter)
-                                      data%phytos(g)%Tau,                       & ! Tau      (user-specified parameter)
-                                      data%phytos(g)%Beta_Ainf,                 & ! Beta_Ainf(user-specified parameter)
-                                      data%phytos(g)%Kappa,                     & ! Kappa    (user-specified parameter)
-                                      data%phytos(g)%Kd_Ainf,                   & ! Kd_Ainf  (user-specified parameter)
-                                      data%phytos(g)%a_,                        & ! a_       (user-specified parameter)
-                                      data%phytos(g)%b_,                        & ! b_       (user-specified parameter)
-                                      data%phytos(g)%v_,                        & ! v_  (user-specified parameter)
-                                      p(i)%ptm_state(data%ip_rhochl))             ! rhoChl_L (per-particle dark-hours carryover, INOUT)
+         call GMK98_Ind_TempSizeLight(p(i)%ptm_state(data%ip_tem),              &
+                                      p(i)%ptm_state(data%ip_par),              &
+                                      p(i)%ptm_state(data%ip_no3) + p(i)%ptm_state(data%ip_nh4), &
+                                      p(i)%ptm_state(data%ip_no3),              &
+                                      p(i)%ptm_state(data%ip_nh4),              &
+                                      p(i)%ptm_state(data%ip_frp),              &
+                                      p(i)%ptm_state(data%ip_c),                &
+                                      p(i)%ptm_state(data%ip_n),                &
+                                      p(i)%ptm_state(data%ip_p),                &
+                                      p(i)%ptm_state(data%ip_chl),              &
+                                      p(i)%ptm_state(data%ip_Topt),             &
+                                      p(i)%ptm_state(data%ip_cdiv),             &
+                                      exp(p(i)%ptm_state(data%ip_LnalphaChl)),  &
+                                      dC_, dN_, dNO3_, dNH4_, dP_, dChl_, ESD_, &
+                                      data%phytos(g)%RC,                        &
+                                      data%phytos(g)%RN,                        &
+                                      data%phytos(g)%RP,                        &
+                                      data%phytos(g)%RChl,                      &
+                                      data%phytos(g)%zeta_N,                    &
+                                      data%phytos(g)%zeta_P,                    &
+                                      data%phytos(g)%a1,                        &
+                                      data%phytos(g)%R_growth,                  &
+                                      data%phytos(g)%nx,                        &
+                                      data%phytos(g)%simNFixation,              &
+                                      data%phytos(g)%thetaNmax,                 &
+                                      data%phytos(g)%thetaPmax,                 &
+                                      data%phytos(g)%QNmin_a,                   &
+                                      data%phytos(g)%QNmin_b,                   &
+                                      data%phytos(g)%QNmax_a,                   &
+                                      data%phytos(g)%QNmax_b,                   &
+                                      data%phytos(g)%QPmin_a,                   &
+                                      data%phytos(g)%QPmin_b,                   &
+                                      data%phytos(g)%QPmax_a,                   &
+                                      data%phytos(g)%QPmax_b,                   &
+                                      data%phytos(g)%KN_a,                      &
+                                      data%phytos(g)%KN_b,                      &
+                                      data%phytos(g)%KPho_a,                    &
+                                      data%phytos(g)%KPho_b,                    &
+                                      data%phytos(g)%a_c2vol,                   &
+                                      data%phytos(g)%b_c2vol,                   &
+                                      data%phytos(g)%a_pmax,                    &
+                                      data%phytos(g)%rho,                       &
+                                      data%phytos(g)%rho_star,                  &
+                                      data%phytos(g)%b_rho,                     &
+                                      data%phytos(g)%V_s,                       &
+                                      data%phytos(g)%Ea0,                       &
+                                      data%phytos(g)%Ed0,                       &
+                                      data%phytos(g)%Ei,                        &
+                                      data%phytos(g)%beta,                      &
+                                      data%phytos(g)%phi,                       &
+                                      data%phytos(g)%T_std,                     &
+                                      data%phytos(g)%Tau,                       &
+                                      data%phytos(g)%Beta_Ainf,                 &
+                                      data%phytos(g)%Kappa,                     &
+                                      data%phytos(g)%Kd_Ainf,                   &
+                                      data%phytos(g)%a_,                        &
+                                      data%phytos(g)%b_,                        &
+                                      data%phytos(g)%v_,                        &
+                                      p(i)%ptm_state(data%ip_rhochl))
+
+         sv_dC(j)=dC_ ; sv_dN(j)=dN_ ; sv_dNO3(j)=dNO3_ ; sv_dNH4(j)=dNH4_
+         sv_dP(j)=dP_ ; sv_dChl(j)=dChl_ ; sv_ESD(j)=ESD_
+
+         !# Accumulate only NET REMOVAL from the water (positive d* = uptake).
+         !# Negative values are a net return to the pool and can never exhaust it,
+         !# so they must not offset another particle's demand in the sum.
+         if (dNO3_ > 0d0) dem_NO3 = dem_NO3 + dNO3_ * p(i)%ptm_state(data%ip_num)
+         if (dNH4_ > 0d0) dem_NH4 = dem_NH4 + dNH4_ * p(i)%ptm_state(data%ip_num)
+         if (dP_   > 0d0) dem_FRP = dem_FRP + dP_   * p(i)%ptm_state(data%ip_num)
+      enddo
+
+      !# RATION. Convert demand from pmol/day for the layer into the mmol/m3 it
+      !# would actually remove over this timestep (the same 1d-9/Hz*dtdays the
+      !# commit below applies), then cap it at 99% of what is present - the same
+      !# 0.99 headroom aed_phytoplankton uses. Scaling is proportional, so every
+      !# particle keeps its share of a pool it cannot collectively exhaust.
+      scl_NO3 = 1d0 ; scl_NH4 = 1d0 ; scl_FRP = 1d0
+      dem_NO3 = dem_NO3 * 1d-9 / Hz * dtdays
+      dem_NH4 = dem_NH4 * 1d-9 / Hz * dtdays
+      dem_FRP = dem_FRP * 1d-9 / Hz * dtdays
+      if (dem_NO3 > 1d-30 .and. dem_NO3 > max(no3,0d0)) scl_NO3 = max(no3,0d0)*0.99d0/dem_NO3
+      if (dem_NH4 > 1d-30 .and. dem_NH4 > max(nh4,0d0)) scl_NH4 = max(nh4,0d0)*0.99d0/dem_NH4
+      if (dem_FRP > 1d-30 .and. dem_FRP > max(frp,0d0)) scl_FRP = max(frp,0d0)*0.99d0/dem_FRP
+
+      !# Apply the scaling to the stored increments. Only positive (uptake) terms
+      !# are scaled; a negative d* is a return to the water and passes through.
+      !# dN must stay equal to dNO3+dNH4 - the cell's nitrogen gain has to match
+      !# what was actually removed from the two inorganic pools, or the particle
+      !# and the water disagree and mass is created. dC/dChl are scaled by the
+      !# same factor as the nitrogen that limits them, keeping C:N:Chl coherent.
+      !#
+      !# An N-fixer's dN is NOT backed by dNO3+dNH4 - GMK98_Ind_TempSizeLight sets
+      !# both to exactly 0 for a fixer (fixation doesn't draw on the DIN pool), so
+      !# the dNO3+dNH4)/dN ratio below would evaluate to 0/positive = 0 and silently
+      !# zero out that particle's carbon AND chlorophyll gain on every productive
+      !# step, while leaving losses untouched (they don't hit the `> 0d0` guards).
+      !# That is a DIN-rationing mechanism misapplied to nitrogen that was never
+      !# rationed in the first place, so skip it for fixers: scl_N stays 1.
+      do j = 1, N_
+         i = index_(j)
+         g = p(i)%ptm_istat(GRP)
+         if (sv_dNO3(j) > 0d0) sv_dNO3(j) = sv_dNO3(j) * scl_NO3
+         if (sv_dNH4(j) > 0d0) sv_dNH4(j) = sv_dNH4(j) * scl_NH4
+         if (sv_dP(j)   > 0d0) sv_dP(j)   = sv_dP(j)   * scl_FRP
+         scl_N = 1d0
+         if (sv_dN(j) > 0d0 .and. data%phytos(g)%simNFixation == 0) then
+            scl_N = (sv_dNO3(j) + sv_dNH4(j)) / sv_dN(j)
+            sv_dN(j) = sv_dNO3(j) + sv_dNH4(j)
+         endif
+         if (sv_dC(j)   > 0d0) sv_dC(j)   = sv_dC(j)   * min(min(scl_N, scl_FRP), 1d0)
+         if (sv_dChl(j) > 0d0) sv_dChl(j) = sv_dChl(j) * min(scl_N, 1d0)
+      enddo
+   endif
+
+   !###########################################################################
+   !# PASS 2 of 2: commit the (possibly rationed) increments.
+   !###########################################################################
+   if (N_ > 0) then
+      do j = 1, N_
+         i = index_(j)
+         g = p(i)%ptm_istat(GRP)   ! this particle's phyto group - selects which data%phytos(g) parameter set to use
+         num_before = p(i)%ptm_state(data%ip_num)   !DEBUG
+
+         dC_ = sv_dC(j) ; dN_ = sv_dN(j) ; dNO3_ = sv_dNO3(j) ; dNH4_ = sv_dNH4(j)
+         dP_ = sv_dP(j) ; dChl_ = sv_dChl(j) ; ESD_ = sv_ESD(j)
+
 
          ! cumulate N and P uptake and oxy flux after running physiology function (per group)
          uptake(g)   =   uptake(g) + dN_ * p(i)%ptm_state(data%ip_num) ! Unit: pmol N d-1
@@ -1756,11 +2076,11 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux
 
          ! check maximum/minimum density are not exceeded
-         IF( p(i)%ptm_env(DENS)>max_rho ) THEN
-            p(i)%ptm_env(DENS)=max_rho
+         IF( p(i)%ptm_env(DENS)>data%max_rho ) THEN
+            p(i)%ptm_env(DENS)=data%max_rho
          ENDIF
-         IF(p(i)%ptm_env(DENS)<min_rho ) THEN
-            p(i)%ptm_env(DENS)=min_rho
+         IF(p(i)%ptm_env(DENS)<data%min_rho ) THEN
+            p(i)%ptm_env(DENS)=data%min_rho
          ENDIF
 
          !# PHYTOPLANKTON VVEL updates based on specified settling mode
@@ -1798,7 +2118,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          !# PHYTOPLANKTON MORTALITY
          ! If cellular carbon is lower than the subsistence threshold (Cmin), it dies:
-         Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM
+         Cmin = 0.25d0 * p(i)%ptm_state(data%ip_cdiv) ! ML why multiplied by 0.25? this is from PIBM ! SCB answer to ML: it corresponds to 1/2 the initial c value. PIBM paper has refs justifying choice.
 
          if (p(i)%ptm_state(data%ip_c) < Cmin .or. &
             (p(i)%ptm_state(data%ip_num)*p(i)%ptm_state(data%ip_n)) < Nt_min .or. &
@@ -1818,6 +2138,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_state(data%ip_num) = 0d0
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
+
+            n_starved = n_starved + 1
+
          endif
 
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
@@ -1831,9 +2154,21 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             ! ---- num-decay mode: mort_prob shrinks the number of cells the particle
             ! represents (ip_num) by the same exponential fraction each call, instead of
             ! probabilistically killing the whole particle. Per-cell state (ip_c/n/p/chl)
-            ! is unchanged - those describe the surviving cells, not the ones lost. The
-            ! particle itself only fully dies via the Cmin/Nt_min/P_min subsistence check
-            ! above, once its shrinking total N/P/C eventually crosses that threshold.
+            ! is unchanged - those describe the surviving cells, not the ones lost.
+            !
+            ! Previously the particle only fully died via the Cmin/Nt_min/P_min
+            ! subsistence check above (which does include an ip_num < 1.0d0 arm), but
+            ! that check runs at the TOP of the *next* call against whatever ip_num this
+            ! call leaves behind - so a particle could sit at STAT=1 with (effectively)
+            ! zero viable cells for one extra call. More importantly, grp_live (the count
+            ! particle_reseed_min/target compares against) counts any STAT>0 particle
+            ! regardless of ip_num, so a population that decays toward zero without ever
+            ! separately tripping Cmin/Nt_min/P_min - plausible when per-cell C/N/P are
+            ! otherwise fine and it's only the cell COUNT collapsing - can sit there
+            ! indefinitely, satisfying the reseed floor while contributing ~0 biomass and
+            ! permanently blocking the group from ever being topped back up. Kill it
+            ! immediately, in this same call, once decay leaves it below one viable cell -
+            ! same threshold and full-kill pattern as the Bernoulli branch below.
             IF (_PTM_STAT_(i,STAT) == 1) THEN
                num_lost = p(i)%ptm_state(data%ip_num) * mort_prob_step
                _DIAG_VAR_(data%id_cum_cells_decayed(g)) = _DIAG_VAR_(data%id_cum_cells_decayed(g)) + num_lost
@@ -1842,6 +2177,24 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                Pmort_C(g) = Pmort_C(g) + p(i)%ptm_state(data%ip_c) * num_lost !Natural mortality of phytoplankton ==> DET
 
                p(i)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) - num_lost
+
+               IF (p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+                  ! Fewer than one viable cell left: the remaining (post-decay) population
+                  ! dies too, not just the decayed-away increment already accounted above.
+                  _DIAG_VAR_(data%id_N_death(g)) = _DIAG_VAR_(data%id_N_death(g)) + 1
+                  _DIAG_VAR_(data%id_cum_death_thresh(g)) = _DIAG_VAR_(data%id_cum_death_thresh(g)) + 1
+                  Pmort(g)   = Pmort(g)   + p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num)
+                  Pmort_P(g) = Pmort_P(g) + p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num)
+                  Pmort_C(g) = Pmort_C(g) + p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num)
+
+                  p(i)%ptm_state(data%ip_c)   = 0d0
+                  p(i)%ptm_state(data%ip_n)   = 0d0
+                  p(i)%ptm_state(data%ip_p)   = 0d0
+                  p(i)%ptm_state(data%ip_chl) = 0d0
+                  p(i)%ptm_state(data%ip_num) = 0d0
+                  _PTM_STAT_(i,STAT) = 0
+                  _PTM_STAT_(i,FLAG) = 3
+               END IF
             END IF
          ELSE
             ! ---- default mode: a per-call Bernoulli draw kills the whole particle.
@@ -1868,25 +2221,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             ENDIF
          END IF
 
-         !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
-         IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
-            BLOCK
-               INTEGER :: collapse_log_unit
-               OPEN(NEWUNIT=collapse_log_unit, FILE='output/ptm_num_collapse.csv', &
-                    POSITION='append', STATUS='unknown', ACTION='write')
-               IF (.NOT. ptm_num_collapse_header_written) THEN
-                  WRITE(collapse_log_unit,'(A)') 'call,yday,ptid,i,layer,num_before,num_after,num_lost,mort_prob_step,simMortNumDecay,mort_prob,dtdays,ip_c,ip_n,ip_p,Cmin,WaterTemp,par'
-                  ptm_num_collapse_header_written = .true.
-               ENDIF
-               WRITE(collapse_log_unit,'(I0,A,ES14.6,A,I0,A,I0,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6,A,ES14.6)') &
-               dbg_call_count, ',', real_day, ',', p(i)%ptm_istat(PTID), ',', i, ',', layer_idx, ',', &
-               num_before, ',', p(i)%ptm_state(data%ip_num), ',', num_lost, ',', mort_prob_step, ',', &
-               data%phytos(g)%simMortNumDecay, ',', data%phytos(g)%mort_prob, ',', dtdays, ',', &
-               p(i)%ptm_state(data%ip_c), ',', p(i)%ptm_state(data%ip_n), ',', p(i)%ptm_state(data%ip_p), ',', &
-               Cmin, ',', WaterTemperature, ',', par
-               CLOSE(collapse_log_unit)
-            END BLOCK
-         END IF
+         ! SCB commenting out RQT's Claude-assisted debugging
+         ! !DEBUG: flag any single-call collapse of ip_num from a meaningful population down to <1 cell
+         ! IF (num_before > 1.0d0 .AND. p(i)%ptm_state(data%ip_num) < 1.0d0) THEN
+         !    print *, 'PTM_NUM_COLLAPSE call=', dbg_call_count, ' yday=', real_day, &
+         !             ' ptid=', p(i)%ptm_istat(PTID), ' i=', i, ' layer=', layer_idx, &
+         !             ' num_before=', num_before, ' num_after=', p(i)%ptm_state(data%ip_num), &
+         !             ' num_lost=', num_lost, ' mort_prob_step=', mort_prob_step, &
+         !             ' simMortNumDecay=', data%phytos(g)%simMortNumDecay, &
+         !             ' mort_prob=', data%phytos(g)%mort_prob, ' dtdays=', dtdays, &
+         !             ' ip_c=', p(i)%ptm_state(data%ip_c), ' ip_n=', p(i)%ptm_state(data%ip_n), &
+         !             ' ip_p=', p(i)%ptm_state(data%ip_p), ' Cmin=', Cmin, &
+         !             ' WaterTemp=', WaterTemperature, ' par=', par
+         ! END IF
       enddo !End of looping through particles
   endif !End if of N_ > 0
 
@@ -1896,9 +2243,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   uptake_NH4 = uptake_NH4*1d-9/Hz/secs_per_day !Convert uptake to mmol N m-3 s-1 (NH4)
   uptake_P = uptake_P*1d-9/Hz/secs_per_day !Convert uptake_P to mmol P m-3 s-1
   oxy_flux = oxy_flux*1d-9/Hz/secs_per_day !Convert oxy flux to mmol O2 m-3 s-1
-  Pmort  =  Pmort*1d-9/Hz/secs_per_day !Convert Pmort to mmol N m-3 s-1
-  Pmort_P  =  Pmort_P*1d-9/Hz/secs_per_day !Convert Pmort_P to mmol P m-3 s-1
-  Pmort_C  =  Pmort_C*1d-9/Hz/secs_per_day !Convert Pmort_C to mmol C m-3 s-1
+  !# NOTE the different divisor to the uptake terms above: uptake accumulates
+  !# dN_*ip_num, and dN_ is already a per-day RATE (pmol N cell-1 d-1), so
+  !# /secs_per_day correctly converts it to per-second. Pmort accumulates
+  !# ip_n*ip_num - an AMOUNT (pmol N), the whole nitrogen content of the cells
+  !# that died during THIS call, which must all be returned to PON now. Dividing
+  !# an amount by secs_per_day declares "this mass flows per day", so the ODE
+  !# integrating it over the host step (dtdays*secs_per_day seconds) delivered
+  !# only a fraction dtdays of it - 1/24 at dt=3600s - and silently destroyed the
+  !# other 95.8% of every dead particle's N/P/C. Divide by the actual step length
+  !# so the full amount reaches the water column.
+  Pmort  =  Pmort*1d-9/Hz/(dtdays*secs_per_day) !Convert Pmort to mmol N m-3 s-1
+  Pmort_P  =  Pmort_P*1d-9/Hz/(dtdays*secs_per_day) !Convert Pmort_P to mmol P m-3 s-1
+  Pmort_C  =  Pmort_C*1d-9/Hz/(dtdays*secs_per_day) !Convert Pmort_C to mmol C m-3 s-1
 
   ! Now increment water column properties based on particle fluxes. The bulk Eulerian
   ! nutrient/OM pools are shared across all species, so _FLUX_VAR_ uses the total
@@ -1921,6 +2278,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
      _DIAG_VAR_(data%id_d_poc(ng)) = Pmort_C(ng) * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
      _DIAG_VAR_(data%id_d_oxy(ng)) = oxy_flux(ng) * secs_per_day ! mmol/m3/day would need to add equivalent zoop variables here if added zoops in
   ENDDO
+
+!print *, 'id_frp', layer_idx, data%id_frp, _FLUX_VAR_(data%id_frp), pp_PD, RES_P, uptake_P ! RQT
 
 ! END OF CODE FROM PIBM BIOLOGY SUBROUTINE
 !------------------------------------------------------
@@ -2071,6 +2430,13 @@ if (allocated(uptake))      deallocate(uptake)
 if (allocated(uptake_NO3))  deallocate(uptake_NO3)
 if (allocated(uptake_NH4))  deallocate(uptake_NH4)
 if (allocated(uptake_P))    deallocate(uptake_P)
+if (allocated(sv_dC))   deallocate(sv_dC)
+if (allocated(sv_dN))   deallocate(sv_dN)
+if (allocated(sv_dNO3)) deallocate(sv_dNO3)
+if (allocated(sv_dNH4)) deallocate(sv_dNH4)
+if (allocated(sv_dP))   deallocate(sv_dP)
+if (allocated(sv_dChl)) deallocate(sv_dChl)
+if (allocated(sv_ESD))  deallocate(sv_ESD)
 if (allocated(Pmort))   deallocate(Pmort)
 if (allocated(Pmort_P)) deallocate(Pmort_P)
 if (allocated(Pmort_C)) deallocate(Pmort_C)

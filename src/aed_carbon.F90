@@ -112,6 +112,8 @@ MODULE aed_carbon
 ! MODULE GLOBALS
    AED_REAL, PARAMETER :: DDT = 0.25/24.      ! Currently assuming 15 min timestep
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                             !     except diagnostics required by
+                                             !     state calculations/coupling
                                               ! 1 = basic diagnostic outputs
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
@@ -163,6 +165,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    INTEGER           :: co2_piston_model = 1
    INTEGER           :: ch4_piston_model = 1
 
+   LOGICAL           :: simCH4    = .false.
    LOGICAL           :: simCH4ebb
    AED_REAL          :: Fsed_ch4_ebb     = zero_
    CHARACTER(len=64) :: Fsed_ebb_variable=''
@@ -194,6 +197,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except diagnostics required by
+!                                             !     state calculations/coupling
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
 !                                             ! 3 = other metrics
@@ -203,7 +208,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    NAMELIST /aed_carbon/ dic_initial,pH_initial,ch4_initial,                   &
                          ionic,Rch4ox,Kch4ox,vTch4ox,                          &
-                         methane_reactant_variable,                            &
+                         methane_reactant_variable, simCH4,                    &
                          Fsed_dic,Ksed_dic,theta_sed_dic,Fsed_dic_variable,    &
                          Fsed_ch4,Ksed_ch4,theta_sed_ch4,Fsed_ch4_variable,    &
                          atm_co2,atm_ch4,                                      &
@@ -296,8 +301,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
                                        pH_initial,minimum=zero_)
    ENDIF
 
-   IF (ch4_initial>MISVAL) THEN
-      data%simCH4 = .true.
+   data%simCH4 = simCH4
+   IF (data%simCH4) THEN
       data%id_ch4 = aed_define_variable('ch4','mmol C/m3','methane',    &
                                      ch4_initial,minimum=zero_)
       IF( data%simCH4ebb ) THEN
@@ -305,6 +310,19 @@ SUBROUTINE aed_define_carbon(data, namlst)
                                      'methane bubbles',zero_,minimum=zero_)
       ENDIF
    ENDIF
+
+   data%id_drytime        = 0
+   data%id_sed_dic        = 0
+   data%id_atm_co2        = 0
+   data%id_ch4ox          = 0
+   data%id_sed_ch4        = 0
+   data%id_atm_ch4        = 0
+   data%id_sed_ch4_ebb_3d = 0
+   data%id_ch4_ebb_df     = 0
+   data%id_sed_ch4_ebb    = 0
+   data%id_atm_ch4_ebb    = 0
+   data%id_stm_ch4        = 0
+   data%id_stw_ch4        = 0
 
    !# Register external variable dependencies
    data%use_oxy = methane_reactant_variable .NE. '' !i.e., oxygen module engaged
@@ -344,11 +362,14 @@ SUBROUTINE aed_define_carbon(data, namlst)
 
    IF( simExposed ) THEN
       !data%id_wettime = aed_define_sheet_diag_variable('wettime','d','time cell has been innundated')
-      data%id_drytime = aed_define_sheet_diag_variable('drytime','d','time cell has been exposed')
+      data%id_drytime = aed_define_sheet_diag_variable('drytime','d','time cell has been exposed', rezero=.FALSE.)
    ENDIF
 
    !# Register diagnostic variables
-   data%id_pco2 = aed_define_diag_variable('pCO2', 'atm', 'pCO2')
+   data%id_pco2 = 0
+   IF (co2_model==0 .OR. diag_level>0) THEN
+      data%id_pco2 = aed_define_diag_variable('pCO2', 'atm', 'pCO2')
+   ENDIF
    IF (diag_level>0) THEN
       data%id_sed_dic = aed_define_sheet_diag_variable('sed_dic','mmol C/m2/d', &
                             'CO2 exchange across sed/water interface')
@@ -363,9 +384,9 @@ SUBROUTINE aed_define_carbon(data, namlst)
                             'mmol C/m2/d', 'CH4 exchange across atm/water interface', surf=.TRUE.)
          IF ( data%simCH4ebb ) THEN
             data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m3/d', &
-                            'CH4 ebullition release rate')
+                            'CH4 ebullition release rate', zavg = .TRUE.)
             data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_dis','mmol C/m3/d', &
-                            'CH4 bubble dissolution rate')
+                            'CH4 bubble dissolution rate', zavg= .TRUE.)
             data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_dsf','mmol C/m2/d', &
                             'CH4 ebullition across sed/water interface')
             data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_atm', &
@@ -442,7 +463,7 @@ SUBROUTINE aed_calculate_carbon(data,column,layer_idx)
       ENDIF
 
       !# Export diagnostic variables
-      IF (diag_level>0) _DIAG_VAR_(data%id_ch4ox) =  ch4*ch4oxidation*secs_per_day
+      IF (data%id_ch4ox>0) _DIAG_VAR_(data%id_ch4ox) =  ch4*ch4oxidation*secs_per_day
    ENDIF
 
 END SUBROUTINE aed_calculate_carbon
@@ -611,7 +632,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
          !CALL CO2SYS(0,T,S,zero_,talk,TCO2,pHin,pHout,pCO2,tadum)
          CALL CO2SYS(T,S,talk,TCO2,pCO2,pH)
 
-         _DIAG_VAR_(data%id_pco2) = pCO2
+         IF (data%id_pco2>0) _DIAG_VAR_(data%id_pco2) = pCO2
          ! _STATE_VAR_(data%id_talk) = talk*(1.0D6)           ! total alkalinity (umol/kg)
 
     !    print *,'pHout',pHout, talk, pCO2
@@ -628,7 +649,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
          ! end of P. Huang edit
 
          pCO2 = aed_carbon_co2(data%ionic,temp,dic,ph)*1e-6 / Ko  !(=atm), use Yanti's script for pCO2
-         _DIAG_VAR_(data%id_pco2) = pCO2
+         IF (data%id_pco2>0) _DIAG_VAR_(data%id_pco2) = pCO2
 
       ELSEIF ( data%co2_model == 0 ) THEN
          !# Use the aed_geochemistry module for computing pCO2 & pH
@@ -653,7 +674,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
       !# Also store co2 flux across the atm/water interface as a
       !  diagnostic variable (mmmol/m2/d)
-      IF (diag_level>0) _DIAG_VAR_S_(data%id_atm_co2) = FCO2*secs_per_day
+      IF (data%id_atm_co2>0) _DIAG_VAR_S_(data%id_atm_co2) = FCO2*secs_per_day
    ENDIF
 
    !----------------------------------------------------------------------------
@@ -696,7 +717,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
 
       !# Also store CH4 flux across the atm/water interface as
       !  diagnostic variable (mmmol/m2/d)
-      IF (diag_level>0) _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
+      IF (data%id_atm_ch4>0) _DIAG_VAR_S_(data%id_atm_ch4) = FCH4*secs_per_day
    ENDIF
    !----------------------------------------------------------------------------
 END SUBROUTINE aed_calculate_surface_carbon
@@ -789,14 +810,11 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    ! Set bottom fluxes for the pelagic (flux per surface area, per second)
    ! Increment sediment flux value into derivative of water column variable
    _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
-   IF( data%simCH4 .and. diag_level>0) &
-                               _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
+   IF( data%simCH4 ) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
    ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day)
-   IF ( diag_level > 0 ) THEN
-      _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
-      IF( data%simCH4) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
-   ENDIF
+   IF (data%id_sed_dic>0) _DIAG_VAR_S_(data%id_sed_dic) = dic_flux * secs_per_day
+   IF (data%simCH4 .and. data%id_sed_ch4>0) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
 
    ! Re-distribute bubbles to the water or atmosphere, or dissolve
    IF( data%simCH4ebb ) THEN
@@ -808,18 +826,17 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
       IF( depth > data%ch4_bub_disdp) ch4_bub_disf = data%ch4_bub_disf2
       IF( data%simCH4) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + ebb_flux*ch4_bub_disf
 
-      IF (diag_level>0) THEN
+      IF (data%id_ch4_ebb_df>0) &
          _DIAG_VAR_(data%id_ch4_ebb_df) = ebb_flux*ch4_bub_disf * secs_per_day !/ dz. MH Something wrong with dz here?
 
-         ! Release the remainder to the atmosphere (mmol/m2/day)
-         _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
+      ! Release the remainder to the atmosphere (mmol/m2/day)
+      IF (data%id_atm_ch4_ebb>0) _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * (1-ch4_bub_disf) * secs_per_day
 
-         ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
-         _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+      ! Note the bubble flux, as the zone sees it  (mmol/m2/day)
+      IF (data%id_sed_ch4_ebb>0) _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
 
-         ! Note the bubble flux, as the water sees it  (mmol/m3/day)
-         _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
-      ENDIF
+      ! Note the bubble flux, as the water sees it  (mmol/m3/day)
+      IF (data%id_sed_ch4_ebb_3d>0) _DIAG_VAR_(data%id_sed_ch4_ebb_3d) = ebb_flux * secs_per_day / dz
    ENDIF
 
    ! Set sink and source terms for the benthos (change per surface area per second)
@@ -867,11 +884,11 @@ SUBROUTINE aed_calculate_dry_carbon(data,column,layer_idx)
       co2_flux = Fsed_dic * (data%theta_sed_dry**(temp-20.0))
 
       ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
-      IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_dic) = co2_flux * secs_per_day
+      IF (data%id_sed_dic>0) _DIAG_VAR_S_(data%id_sed_dic) = co2_flux * secs_per_day
 
       !# Store CO2 flux across the soil-atm interface into
       !  diagnostic variable (mmmol/m2/d)
-      IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_co2) = co2_flux * secs_per_day
+      IF (data%id_atm_co2>0) _DIAG_VAR_S_(data%id_atm_co2) = co2_flux * secs_per_day
    ENDIF
 
    !# CH4 exposed-sediment to air flux
@@ -892,15 +909,15 @@ SUBROUTINE aed_calculate_dry_carbon(data,column,layer_idx)
       ENDIF
 
       ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
-      IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
-      IF ( diag_level>0 .and. data%simCH4ebb ) _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
+      IF (data%id_sed_ch4>0) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
+      IF (data%simCH4ebb .and. data%id_sed_ch4_ebb>0) _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
 
       !# Store CH4 flux across the soil-atm interface into
       !  diagnostic variable (mmmol/m2/d)
       !print *,'CHECKKKK', data%use_sed_model_ch4 , ch4_flux * secs_per_day
 
-      IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_atm_ch4) = ch4_flux * secs_per_day
-      IF ( diag_level>0 .and. data%simCH4ebb ) _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * secs_per_day
+      IF (data%id_atm_ch4>0) _DIAG_VAR_S_(data%id_atm_ch4) = ch4_flux * secs_per_day
+      IF (data%simCH4ebb .and. data%id_atm_ch4_ebb>0) _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * secs_per_day
    END IF
 END SUBROUTINE aed_calculate_dry_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -956,7 +973,7 @@ SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
      stm_flux = _DIAG_VAR_S_(data%id_stm_areaa) * Fstm_ch4
      stm_flux = stm_flux * (data%theta_stm_ch4**(atemp-20.0))
    ENDIF
-   IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_stm_ch4) = stm_flux * secs_per_day
+    IF (data%id_stm_ch4>0) _DIAG_VAR_S_(data%id_stm_ch4) = stm_flux * secs_per_day
 
 
    IF (pc_wet<0.1) RETURN
@@ -974,7 +991,7 @@ SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
    ENDIF
 
    _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (stm_flux / water_depth)
-   IF ( diag_level>0 ) _DIAG_VAR_S_(data%id_stw_ch4) = stm_flux * secs_per_day
+   IF (data%id_stw_ch4>0) _DIAG_VAR_S_(data%id_stw_ch4) = stm_flux * secs_per_day
 END SUBROUTINE aed_calculate_riparian_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1158,7 +1175,7 @@ SUBROUTINE aed_equilibrate_carbon(data,column,layer_idx)
    ENDIF
 
    !# Set pCO2 & pH as returned
-   _DIAG_VAR_(data%id_pco2) = pCO2
+   IF (data%id_pco2>0) _DIAG_VAR_(data%id_pco2) = pCO2
    _STATE_VAR_(data%id_pH)  = pH
 END SUBROUTINE aed_equilibrate_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

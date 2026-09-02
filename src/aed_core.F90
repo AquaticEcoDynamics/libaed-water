@@ -54,6 +54,7 @@ MODULE aed_core
 
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
+   PUBLIC aed_ptm_dt_days
    PUBLIC model_list, last_model, aed_thread, aed_n_threads
    PUBLIC n_aed_models
 
@@ -202,6 +203,17 @@ MODULE aed_core
    INTEGER,PARAMETER  :: V_STATE = 1, V_DIAGNOSTIC = 2, V_EXTERNAL = 3, V_PARTICLE = 4
 
    INTEGER            :: ptm_counter = 0
+
+   !# Length of the biological timestep the particle model is currently being
+   !# advanced over, in DAYS. Published by aed_calculate_particles from the
+   !# value the host passes in, and read by the particle BGC models (see dtdays
+   !# in aed_phyto_abm) instead of a hardcoded assumption. This matters because
+   !# the host may call the particle model once per host step OR once per
+   !# split_factor sub-step; the physiology must advance by whichever interval
+   !# it is actually being handed, or growth scales with split_factor.
+   !# The 1/24 default reproduces the previous hardcoded hourly value for any
+   !# host that does not supply one.
+   AED_REAL           :: aed_ptm_dt_days = 1.0/24.0
 !===============================================================================
 CONTAINS
 

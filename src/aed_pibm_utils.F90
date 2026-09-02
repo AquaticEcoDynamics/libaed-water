@@ -306,7 +306,8 @@ Module gmk
 
 use params
 
-!This module provides several functions calculating phytoplankton physiological rates as a function of environmental conditions (e.g., temperature) and traits
+!This module provides several functions calculating phytoplankton physiological 
+!rates as a function of environmental conditions (e.g., temperature) and traits
 implicit none
 
 private
@@ -315,7 +316,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_, rhoChl_L)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, simNFixation, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_, rhoChl_L)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -351,6 +352,7 @@ real, intent(in)   :: zeta_P != 3.0d0   Cost of biosynthesis [mol C mol P-1] ML 
 real, intent(in)   :: a1     != 0.d0    Allometric exponent between mumax and alphaChl
 real, intent(in)   :: mu0    !=  5.00   Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
 real, intent(in)   :: nx != 1.d0
+integer, intent(in) :: simNFixation ! 1 = N-fixing group (aed_phyto_pars.csv 'simNFixation'); bypasses DIN limitation on N uptake below
 real, intent(in)   :: thetaNmax != 3d0  ML pull this out to nml
 real, intent(in)   :: thetaPmax != 3d0  ML pull this out to nml
 
@@ -465,10 +467,13 @@ real              :: KN     = 0.      !Half-saturation constant for N [uM]
 real              :: pN_   = 0.       !Preference factor for uptake of NH4 over NO3
 real              :: KPho     = 0.    !Half-saturation constant for P [uM]
 real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't see that this is used
+integer, save     :: dbg_call_count = 0  !DBG_GROWTH: sampling counter, temporary diagnostic
 !End of declaration
 
 if (C .le. 0d0) then
    dN   = 0.d0
+   dNO3 = 0.d0
+   dNH4 = 0.d0
    dP   = 0.d0
    dC   = 0.d0
    dChl = 0.d0
@@ -560,8 +565,13 @@ RChlT = temp_Topt(Temp, RChl, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
 RChlT = respiration(ESD_, RChlT, b_rho, V_s)
 
 !Nutrient limitation [nd]:
-Lno3 = (QN - QNmin) / dQN
-Lfrp = (QP - QPmin) / dQP
+! Capped at 1: this is a quota-space fraction that is exactly 1 by construction when
+! Q = Qmax, but Q is STATE and can transiently overshoot Qmax while C falls quickly
+! (respiration draining C faster than the quota adjusts). Left uncapped, L>1 inflates
+! PCmax above muT (superlinear growth) and inflates Ik below - and silently masks the
+! overshoot in diagnostics rather than reporting it. The <=0 test below is unaffected.
+Lno3 = min((QN - QNmin) / dQN, 1d0)
+Lfrp = min((QP - QPmin) / dQP, 1d0)
 
 if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then !if QN or QP is already at minimum, no photosynthesis occurs
    PC = 0d0
@@ -612,7 +622,11 @@ endif
 
 !DIN uptake rate by phytoplankton [mol N mol C-1 d-1]:
 !ML corresponds to eq. 8 in PIBM ms
-VCN = Vcref * (DIN - DIN_min)/ (DIN + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
+if (simNFixation /= 0) then
+  VCN = Vcref * ((QNmax - QN) / dQN)**nx  !N fixer: not DIN-limited, so no DIN/(DIN+KN) factor
+else
+  VCN = Vcref * (DIN - DIN_min)/ (DIN + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
+endif
 VCN = max(VCN, 0d0)
 
 !FRP uptake rate by phytoplankton [mol P mol C-1 d-1]:
@@ -620,9 +634,21 @@ VCN = max(VCN, 0d0)
 VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp already temperature dependent
 VCP = max(VCP, 0d0)
 
+dbg_call_count = dbg_call_count + 1
+! SCB removing prints to standard output
+! if (mod(dbg_call_count, 20000) == 0) then
+!    write(*,'(A,I10,18(A,ES13.5),A,I2)') ' DBG_GROWTH call=', dbg_call_count, &
+!       ' Temp=', Temp, ' PAR=', PAR, ' C=', C, ' DIN=', DIN, ' muT=', muT, ' PC=', PC, &
+!       ' VCN=', VCN, ' dN=', N*(VCN/QN - RNT), ' zetaN_VCN=', zeta_N*VCN, &
+!       ' VCP=', VCP, ' zetaP_VCP=', zeta_P*VCP, ' RcT=', RcT, &
+!       ' netC_d-1=', (PC - zeta_N*VCN - zeta_P*VCP - RcT), &
+!       ' QN=', QN, ' QNmin=', QNmin, ' QNmax=', QNmax, ' QP=', QP, ' QPmin=', QPmin, &
+!       ' simNFix=', simNFixation
+! endif
+
 !Changes of cellular carbon [d-1]:
 !ML corresponds to eq. 1 in PIBM ms
-dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT) 
+dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT)
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
 !RNT has to be zero to avoid continuous decline of N per cell
@@ -630,9 +656,14 @@ dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT)
 dN = N * (VCN/QN - RNT)
 
 !ML add phyto_pN function call here
-pN_ = phyto_pN(NH4, NO3, KN)
-dNH4 = dN * pN_
-dNO3 = dN * (1.- pN_)
+if (simNFixation /= 0) then
+  dNH4 = 0.0
+  dNO3 = 0.0
+else
+  pN_ = phyto_pN(NH4, NO3, KN)
+  dNH4 = dN * pN_
+  dNO3 = dN * (1.- pN_)
+endif
 
 !Changes of cellular phosphorus [pmol P cell-1 d-1]:
 !ML newly added for GLM-AED-ABM
