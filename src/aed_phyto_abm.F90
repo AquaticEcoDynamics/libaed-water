@@ -2143,8 +2143,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
 
          endif
 
-         print *, "Starved particles this time step:",  n_starved
-
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
          ! mort_prob is a per-day rate (d-1), consistent with every other rate parameter in this
          ! module (R_resp, RC, RN, RP, RChl, etc.); convert it to the probability of death over
