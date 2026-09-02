@@ -60,6 +60,8 @@ OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_totals.o \
      ${objdir}/aed_tracer.o \
      ${objdir}/aed_zooplankton.o \
+     ${objdir}/aed_methane.o \
+     ${objdir}/aed_methane_bubbles.o \
      ${objdir}/aed_water.o \
      ${objdir}/aed_common.o
 

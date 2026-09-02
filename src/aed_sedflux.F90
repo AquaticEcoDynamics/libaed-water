@@ -77,6 +77,7 @@ MODULE aed_sedflux
       INTEGER  :: id_Fsed_pop, id_Fsed_dop, id_Fsed_poc, id_Fsed_doc
       INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_ch4_ebb, id_Fsed_n2o
       INTEGER  :: id_Fsed_dic_dry, id_Fsed_ch4_dry, id_Fsed_ch4_ebb_dry, id_Fsed_n2o_dry
+      INTEGER  :: id_Fsed_ass, id_Fsed_ass_dry
       INTEGER  :: id_Fsed_oxy_pel, id_Fsed_feii
       INTEGER  :: id_Fstm_ch4, id_Ktau_0
       INTEGER  :: id_zones
@@ -89,6 +90,7 @@ MODULE aed_sedflux
                   Fsed_poc, Fsed_doc, Fsed_feii, &
                   Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o, &
                   Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry, Fsed_n2o_dry, &
+                  Fsed_ass, Fsed_ass_dry, &
                   Fstm_ch4, Ktau_0
 
       AED_REAL,DIMENSION(:),ALLOCATABLE :: &
@@ -97,6 +99,7 @@ MODULE aed_sedflux
                   Fsed_poc_P, Fsed_doc_P, Fsed_feii_P, &
                   Fsed_dic_P, Fsed_ch4_P, Fsed_ch4_ebb_P, Fsed_n2o_P, &
                   Fsed_dic_dry_P, Fsed_ch4_dry_P, Fsed_ch4_ebb_dry_P, Fsed_n2o_dry_P, &
+                  Fsed_ass_P, Fsed_ass_dry_P, &
                   Fstm_ch4_P, Ktau_0_P
 
 
@@ -111,8 +114,11 @@ MODULE aed_sedflux
 
 ! MODULE GLOBALS
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                              !     except sediment-flux link
+                                              !     variables required by other
+                                              !     module state calculations
                                               ! 1 = basic diagnostic outputs
-                                              ! 2 = flux rates, and supporitng
+                                              ! 2 = flux rates, and supporting
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
 
@@ -259,6 +265,18 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                                                !% 0
                                                !% 0 - XX
                                                !% Use if benthic_mode=2 for GLM, or using TUFLOW-FV
+   AED_REAL :: Fsed_ass(_MAX_ZONES_)  = MISVAL !% wetted acidity (ASS) flux in each sediment zone
+                                               !% $$molH+/,m^{-2}/day$$
+                                               !% float
+                                               !% 0
+                                               !% 0 - XX
+                                               !% Baseline acid flux to overlying water; consumed by aed_assflux
+   AED_REAL :: Fsed_ass_dry(_MAX_ZONES_) = MISVAL !% dry pyrite-oxidation acidity rate in each sediment zone
+                                               !% $$molH+/,m^{-2}/day$$
+                                               !% float
+                                               !% 0
+                                               !% 0 - XX
+                                               !% Dry-cell acidity generation rate; consumed by aed_assflux
    AED_REAL :: Fstm_ch4(_MAX_ZONES_)  = MISVAL !% Stem CH4 in each sediment zone
                                                !% $$mmol/,m^{-2}/s$$
                                                !% float
@@ -279,7 +297,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
                               Fsed_poc, Fsed_doc, Fsed_feii,                   &
                               Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o,      &
                               Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry,    &
-                              Fsed_n2o_dry, Fstm_ch4,                          &
+                              Fsed_n2o_dry, Fsed_ass, Fsed_ass_dry, Fstm_ch4,  &
                               Ktau_0
 
 !
@@ -362,6 +380,12 @@ SUBROUTINE load_sed_zone_data(data,namlst)
    IF (Fsed_n2o_dry(1) .NE. MISVAL ) THEN
       ALLOCATE(data%Fsed_n2o_dry_P(n_zones)) ; data%Fsed_n2o_dry_P(1:n_zones) = Fsed_n2o_dry(1:n_zones)
    ENDIF
+   IF (Fsed_ass(1) .NE. MISVAL ) THEN
+      ALLOCATE(data%Fsed_ass_P(n_zones)) ; data%Fsed_ass_P(1:n_zones) = Fsed_ass(1:n_zones)
+   ENDIF
+   IF (Fsed_ass_dry(1) .NE. MISVAL ) THEN
+      ALLOCATE(data%Fsed_ass_dry_P(n_zones)) ; data%Fsed_ass_dry_P(1:n_zones) = Fsed_ass_dry(1:n_zones)
+   ENDIF
    IF (Fstm_ch4(1) .NE. MISVAL ) THEN
       ALLOCATE(data%Fstm_ch4_P(n_zones)) ; data%Fstm_ch4_P(1:n_zones) = Fstm_ch4(1:n_zones)
    ENDIF
@@ -409,9 +433,11 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 
 !  %% NAMELIST   %%  /aed_sedflux/
    CHARACTER(len=64) :: sedflux_model=''
+   ! Use module-global default unless overridden in namelist.
+   ! 0 keeps only required sediment-flux link variables active.
 !  %% END NAMELIST   %%  /aed_sedflux/
 
-   NAMELIST /aed_sedflux/ sedflux_model
+   NAMELIST /aed_sedflux/ sedflux_model, diag_level
 
 !  %% NAMELIST   %%  /aed_sed_constant/
    INTEGER  :: nzones = 1
@@ -435,12 +461,17 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    AED_REAL :: Fsed_ch4_dry     = MISVAL
    AED_REAL :: Fsed_ch4_ebb_dry = MISVAL
    AED_REAL :: Fsed_n2o_dry     = MISVAL
+   AED_REAL :: Fsed_ass         = MISVAL
+   AED_REAL :: Fsed_ass_dry     = MISVAL
    AED_REAL :: Fstm_ch4         = MISVAL
    AED_REAL :: Ktau_0           = MISVAL
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except sediment-flux link
+!                                             !     variables required by other
+!                                             !     module state calculations
 !                                             ! 1 = basic diagnostic outputs
-!                                             ! 2 = flux rates, and supporitng
+!                                             ! 2 = flux rates, and supporting
 !                                             ! 3 = other metrics
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST   %%  /aed_sed_constant/
@@ -451,7 +482,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
                      Fsed_poc, Fsed_doc, Fsed_feii,                             &
                      Fsed_dic, Fsed_ch4, Fsed_ch4_ebb, Fsed_n2o,                &
                      Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry, Fsed_n2o_dry,&
-                     Fstm_ch4, Ktau_0
+                     Fsed_ass, Fsed_ass_dry, Fstm_ch4, Ktau_0
 
 !
 !-------------------------------------------------------------------------------
@@ -494,6 +525,8 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       data%Fsed_ch4_dry  = Fsed_ch4_dry
       data%Fsed_ch4_ebb_dry  = Fsed_ch4_ebb_dry
       data%Fsed_n2o_dry  = Fsed_n2o_dry
+      data%Fsed_ass  = Fsed_ass
+      data%Fsed_ass_dry  = Fsed_ass_dry
       data%Fstm_ch4  = Fstm_ch4
       data%Ktau_0   = Ktau_0
 
@@ -531,6 +564,8 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       IF (ALLOCATED(data%Fsed_ch4_dry_P))  Fsed_ch4_dry  = data%Fsed_ch4_dry_P(1)
       IF (ALLOCATED(data%Fsed_ch4_ebb_dry_P))  Fsed_ch4_ebb_dry  = data%Fsed_ch4_ebb_dry_P(1)
       IF (ALLOCATED(data%Fsed_n2o_dry_P))  Fsed_n2o_dry  = data%Fsed_n2o_dry_P(1)
+      IF (ALLOCATED(data%Fsed_ass_P))  Fsed_ass  = data%Fsed_ass_P(1)
+      IF (ALLOCATED(data%Fsed_ass_dry_P))  Fsed_ass_dry  = data%Fsed_ass_dry_P(1)
       IF (ALLOCATED(data%Fstm_ch4_P))  Fstm_ch4  = data%Fstm_ch4_P(1)
       IF (ALLOCATED(data%Ktau_0_P))  Ktau_0  = data%Ktau_0_P(1)
    ELSE
@@ -557,12 +592,17 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    data%id_Fsed_ch4_dry = 0
    data%id_Fsed_ch4_ebb_dry = 0
    data%id_Fsed_n2o_dry = 0
+   data%id_Fsed_ass = 0
+   data%id_Fsed_ass_dry = 0
    data%id_Fstm_ch4 = 0
    data%id_Ktau_0 = 0
 
 
-   ! Register state variables
-   ! NOTE the "_sheet_"  which specifies the variable is benthic.
+   ! Register sediment-flux link variables.
+   ! NOTE: these are also consumed by other AED modules via
+   ! aed_locate_sheet_variable(...), so they remain available at diag_level=0
+   ! whenever configured (value provided, i.e. > MISVAL).
+   ! NOTE the "_sheet_" which specifies the variable is benthic.
    IF ( Fsed_oxy .GT. MISVAL ) &
       data%id_Fsed_oxy = aed_define_sheet_diag_variable('Fsed_oxy','mmol O2/m2/d',  &
                                           'flux rate of oxygen across the swi')
@@ -624,6 +664,12 @@ SUBROUTINE aed_define_sedflux(data, namlst)
    IF ( Fsed_n2o_dry .GT. MISVAL ) &
       data%id_Fsed_n2o_dry = aed_define_sheet_diag_variable('Fsed_n2o_dry','mmol N/m2/d',   &
                                           'flux rate of n2o across the sediment-air interface')
+   IF ( Fsed_ass .GT. MISVAL ) &
+      data%id_Fsed_ass = aed_define_sheet_diag_variable('Fsed_ass','molH+/m2/d',   &
+                                          'wetted acidity flux rate across the swi')
+   IF ( Fsed_ass_dry .GT. MISVAL ) &
+      data%id_Fsed_ass_dry = aed_define_sheet_diag_variable('Fsed_ass_dry','molH+/m2/d',   &
+                                          'dry pyrite-oxidation acidity generation rate')
    IF ( Fstm_ch4 .GT. MISVAL ) &
       data%id_Fstm_ch4 = aed_define_sheet_diag_variable('Fstm_ch4','mmol C/m2/d',   &
                                           'flux rate of ch4 across the vegetation-air interface')
@@ -632,28 +678,30 @@ SUBROUTINE aed_define_sedflux(data, namlst)
                                           'critical shear stress modifier')
 
    IF ( data%sed_modl == SED_CONSTANT_2D ) THEN
-      CALL aed_set_const_var(data%id_Fsed_oxy)
-      CALL aed_set_const_var(data%id_Fsed_rsi)
-      CALL aed_set_const_var(data%id_Fsed_amm)
-      CALL aed_set_const_var(data%id_Fsed_nit)
-      CALL aed_set_const_var(data%id_Fsed_frp)
-      CALL aed_set_const_var(data%id_Fsed_pon)
-      CALL aed_set_const_var(data%id_Fsed_don)
-      CALL aed_set_const_var(data%id_Fsed_pop)
-      CALL aed_set_const_var(data%id_Fsed_dop)
-      CALL aed_set_const_var(data%id_Fsed_poc)
-      CALL aed_set_const_var(data%id_Fsed_doc)
-      CALL aed_set_const_var(data%id_Fsed_feii)
-      CALL aed_set_const_var(data%id_Fsed_dic)
-      CALL aed_set_const_var(data%id_Fsed_ch4)
-      CALL aed_set_const_var(data%id_Fsed_ch4_ebb)
-      CALL aed_set_const_var(data%id_Fsed_n2o)
-      CALL aed_set_const_var(data%id_Fsed_dic_dry)
-      CALL aed_set_const_var(data%id_Fsed_ch4_dry)
-      CALL aed_set_const_var(data%id_Fsed_ch4_ebb_dry)
-      CALL aed_set_const_var(data%id_Fsed_n2o_dry)
-      CALL aed_set_const_var(data%id_Fstm_ch4)
-      CALL aed_set_const_var(data%id_Ktau_0)
+      IF (data%id_Fsed_oxy > 0) CALL aed_set_const_var(data%id_Fsed_oxy)
+      IF (data%id_Fsed_rsi > 0) CALL aed_set_const_var(data%id_Fsed_rsi)
+      IF (data%id_Fsed_amm > 0) CALL aed_set_const_var(data%id_Fsed_amm)
+      IF (data%id_Fsed_nit > 0) CALL aed_set_const_var(data%id_Fsed_nit)
+      IF (data%id_Fsed_frp > 0) CALL aed_set_const_var(data%id_Fsed_frp)
+      IF (data%id_Fsed_pon > 0) CALL aed_set_const_var(data%id_Fsed_pon)
+      IF (data%id_Fsed_don > 0) CALL aed_set_const_var(data%id_Fsed_don)
+      IF (data%id_Fsed_pop > 0) CALL aed_set_const_var(data%id_Fsed_pop)
+      IF (data%id_Fsed_dop > 0) CALL aed_set_const_var(data%id_Fsed_dop)
+      IF (data%id_Fsed_poc > 0) CALL aed_set_const_var(data%id_Fsed_poc)
+      IF (data%id_Fsed_doc > 0) CALL aed_set_const_var(data%id_Fsed_doc)
+      IF (data%id_Fsed_feii > 0) CALL aed_set_const_var(data%id_Fsed_feii)
+      IF (data%id_Fsed_dic > 0) CALL aed_set_const_var(data%id_Fsed_dic)
+      IF (data%id_Fsed_ch4 > 0) CALL aed_set_const_var(data%id_Fsed_ch4)
+      IF (data%id_Fsed_ch4_ebb > 0) CALL aed_set_const_var(data%id_Fsed_ch4_ebb)
+      IF (data%id_Fsed_n2o > 0) CALL aed_set_const_var(data%id_Fsed_n2o)
+      IF (data%id_Fsed_dic_dry > 0) CALL aed_set_const_var(data%id_Fsed_dic_dry)
+      IF (data%id_Fsed_ch4_dry > 0) CALL aed_set_const_var(data%id_Fsed_ch4_dry)
+      IF (data%id_Fsed_ch4_ebb_dry > 0) CALL aed_set_const_var(data%id_Fsed_ch4_ebb_dry)
+      IF (data%id_Fsed_n2o_dry > 0) CALL aed_set_const_var(data%id_Fsed_n2o_dry)
+      IF (data%id_Fsed_ass > 0) CALL aed_set_const_var(data%id_Fsed_ass)
+      IF (data%id_Fsed_ass_dry > 0) CALL aed_set_const_var(data%id_Fsed_ass_dry)
+      IF (data%id_Fstm_ch4 > 0) CALL aed_set_const_var(data%id_Fstm_ch4)
+      IF (data%id_Ktau_0 > 0) CALL aed_set_const_var(data%id_Ktau_0)
    ENDIF
 
 END SUBROUTINE aed_define_sedflux
@@ -685,6 +733,7 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
    AED_REAL :: Fsed_n2o = 0., Fsed_ch4_ebb = 0.
    AED_REAL :: Fsed_ch4_dry = 0., Fsed_dic_dry = 0.
    AED_REAL :: Fsed_n2o_dry = 0., Fsed_ch4_ebb_dry = 0.
+   AED_REAL :: Fsed_ass = 0., Fsed_ass_dry = 0.
    AED_REAL :: Fstm_ch4 = 0.
    AED_REAL :: Ktau_0 = 0.
 !
@@ -714,6 +763,8 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
        Fsed_ch4_dry  = data%Fsed_ch4_dry
        Fsed_ch4_ebb_dry  = data%Fsed_ch4_ebb_dry
        Fsed_n2o_dry  = data%Fsed_n2o_dry
+       Fsed_ass  = data%Fsed_ass
+       Fsed_ass_dry  = data%Fsed_ass_dry
        Fstm_ch4  = data%Fstm_ch4
        Ktau_0  = data%Ktau_0
    ELSEIF ( data%sed_modl .EQ. SED_CONSTANT_2D .OR. data%sed_modl .EQ. SED_DYNAMIC_2D ) THEN
@@ -755,6 +806,8 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
        IF ( data%id_Fsed_ch4_dry  > 0 ) Fsed_ch4_dry  = data%Fsed_ch4_dry_P(zone)
        IF ( data%id_Fsed_ch4_ebb_dry  > 0 ) Fsed_ch4_ebb_dry  = data%Fsed_ch4_ebb_dry_P(zone)
        IF ( data%id_Fsed_n2o_dry  > 0 ) Fsed_n2o_dry  = data%Fsed_n2o_dry_P(zone)
+       IF ( data%id_Fsed_ass  > 0 ) Fsed_ass  = data%Fsed_ass_P(zone)
+       IF ( data%id_Fsed_ass_dry  > 0 ) Fsed_ass_dry  = data%Fsed_ass_dry_P(zone)
        IF ( data%id_Fstm_ch4  > 0 ) Fstm_ch4 = data%Fstm_ch4_P(zone)
        IF ( data%id_Ktau_0  > 0 ) Ktau_0 = data%Ktau_0_P(zone)
    ENDIF
@@ -780,6 +833,8 @@ SUBROUTINE aed_initialize_benthic_sedflux(data, column, layer_idx)
    IF ( data%id_Fsed_ch4_dry  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_dry)  = Fsed_ch4_dry
    IF ( data%id_Fsed_ch4_ebb_dry  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ch4_ebb_dry)  = Fsed_ch4_ebb_dry
    IF ( data%id_Fsed_n2o_dry  > 0 ) _DIAG_VAR_S_(data%id_Fsed_n2o_dry)  = Fsed_n2o_dry
+   IF ( data%id_Fsed_ass  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ass)  = Fsed_ass
+   IF ( data%id_Fsed_ass_dry  > 0 ) _DIAG_VAR_S_(data%id_Fsed_ass_dry)  = Fsed_ass_dry
    IF ( data%id_Fstm_ch4  > 0 ) _DIAG_VAR_S_(data%id_Fstm_ch4)  = Fstm_ch4
    IF ( data%id_Ktau_0  > 0 ) _DIAG_VAR_S_(data%id_Ktau_0)  = Ktau_0
 

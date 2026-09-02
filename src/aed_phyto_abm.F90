@@ -236,6 +236,9 @@ MODULE aed_phyto_abm
    ! fractional accumulator is used instead of a fixed integer-per-call count.
    AED_REAL, SAVE, DIMENSION(:), ALLOCATABLE :: recruit_accumulator
 
+   ! DIAGNOSTIC: flag to track whether PTM_NUM_COLLAPSE log file header has been written
+   LOGICAL, SAVE :: ptm_num_collapse_header_written = .false.
+
 
 !===============================================================================
 
@@ -1564,7 +1567,7 @@ CONTAINS
       END DO
    END SUBROUTINE recruit_particle
 
-END SUBROUTINE OLD_aed_split_particle_phyto_abm
+END SUBROUTINE aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !###############################################################################
@@ -2139,8 +2142,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             n_starved = n_starved + 1
 
          endif
-
-         print *, "Starved particles this time step:",  n_starved
 
          ! Now probabilistic mortality to compensate because we don't have zoops, disease, or senescence in ABM
          ! mort_prob is a per-day rate (d-1), consistent with every other rate parameter in this

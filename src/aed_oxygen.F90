@@ -95,13 +95,14 @@ MODULE aed_oxygen
 
 ! MODULE GLOBALS
    INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
+                                          !     except diagnostics required by
+                                          !     state calculations/coupling
                                           ! 1 = basic diagnostic outputs
                                           ! 2-10 = most diagnostic outputs
                                           ! >10 = debug/checking outputs
 
 !===============================================================================
 CONTAINS
-
 
 
 !###############################################################################
@@ -192,6 +193,8 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 
 ! %% From Module Globals
 !  INTEGER :: diag_level = 10             ! 0 = no diagnostic outputs
+!                                         !     except diagnostics required by
+!                                         !     state calculations/coupling
 !                                         ! 1 = basic diagnostic outputs
 !                                         ! 2-10 = most diagnostic outputs
 !                                         ! >10 = debug/checking outputs
@@ -225,6 +228,12 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%id_oxy = aed_define_variable('oxy','mmol O2/m3','oxygen',     &
                                     oxy_initial,minimum=oxy_min,maximum=oxy_max)
 
+   data%id_oxy_sat = 0
+   data%id_sed_oxy = 0
+   data%id_atm_oxy_exch = 0
+   data%id_sed_oxy_pel = 0
+   data%id_atm_oxy_exch3d = 0
+
    ! Register the link to external variables
    IF (data%use_sed_model) data%id_Fsed_oxy = aed_locate_sheet_variable(Fsed_oxy_variable)
 
@@ -240,7 +249,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                      'oxy_atm', 'mmol O2/m2/d', 'O2 exchange across atm/water interface', surf=.TRUE.)
     IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
-                     'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand')
+                     'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand', zavg=.TRUE.)
 
      data%id_atm_oxy_exch3d = aed_define_diag_variable(      &
                      'oxy_atmv', 'mmol O2/m3/d', 'O2 conc. change due to atmospheric flux')
@@ -256,12 +265,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%id_lht = aed_locate_global('layer_ht')
    data%id_cell_vel = -1
    IF( oxy_piston_model>3 )data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
-
 END SUBROUTINE aed_define_oxygen
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -323,15 +327,12 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    _FLUX_VAR_T_(data%id_oxy) = oxy_atm_flux
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
-   IF (diag_level>0) THEN
-     _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
-     _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
-   ENDIF
+    IF (data%id_atm_oxy_exch>0) _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
+    IF (data%id_oxy_sat>0)      _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
-   IF (diag_level>9) &
-     _DIAG_VAR_(data%id_atm_oxy_exch3d) = oxy_atm_flux * secs_per_day / _STATE_VAR_(data%id_lht)
-
+    IF (data%id_atm_oxy_exch3d>0) &
+       _DIAG_VAR_(data%id_atm_oxy_exch3d) = oxy_atm_flux * secs_per_day / _STATE_VAR_(data%id_lht)
 END SUBROUTINE aed_calculate_surface_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -349,7 +350,7 @@ SUBROUTINE aed_calculate_oxygen(data,column,layer_idx)
 !LOCALS
    AED_REAL :: oxy, temp, salt
    AED_REAL :: f_pres, coxy_sat
-
+!
 !-------------------------------------------------------------------------------
 !BEGIN
    ! Get dependent state variables from physical driver
@@ -365,8 +366,7 @@ SUBROUTINE aed_calculate_oxygen(data,column,layer_idx)
    coxy_sat = f_pres * aed_oxygen_sat(salt,temp)
 
    ! Export diagnostic variables
-   IF (diag_level>0) _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
-
+   IF (data%id_oxy_sat>0) _DIAG_VAR_(data%id_oxy_sat) =  (oxy/coxy_sat)*100.
 END SUBROUTINE aed_calculate_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -394,7 +394,6 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
 
@@ -431,13 +430,12 @@ SUBROUTINE aed_calculate_benthic_oxygen(data,column,layer_idx)
    !_FLUX_VAR_B_(data%id_ben_oxy) = _FLUX_VAR_B_(data%id_ben_oxy) + (-oxy_flux)
 
    ! Also store sediment flux as diagnostic variable.
-   IF (diag_level>0)   _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
-   IF (diag_level>9) THEN
+    IF (data%id_sed_oxy>0) _DIAG_VAR_S_(data%id_sed_oxy) = oxy_flux * secs_per_day
+
+    IF (data%id_sed_oxy_pel>0) THEN
      dz = _STATE_VAR_(data%id_lht)
      _DIAG_VAR_(data%id_sed_oxy_pel) = oxy_flux * secs_per_day / dz
    ENDIF
-
-
 END SUBROUTINE aed_calculate_benthic_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -456,7 +454,6 @@ PURE AED_REAL FUNCTION aed_oxygen_fp(altitude,air_temp)
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-
   ! Pressure at altitude
   p_H = p_SL * exp((9.81/(287.0*0.0065)) * log((288.0-0.0065*altitude)/288.0))
 
@@ -469,10 +466,7 @@ PURE AED_REAL FUNCTION aed_oxygen_fp(altitude,air_temp)
   END IF
 
   aed_oxygen_fp = (p_H/p_SL) * ( (1.0-(p_vap/p_H)) / (1.0-(p_vap/p_SL)) )
-
 END FUNCTION aed_oxygen_fp
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
 
 END MODULE aed_oxygen
