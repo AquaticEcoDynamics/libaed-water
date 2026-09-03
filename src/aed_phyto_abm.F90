@@ -47,12 +47,44 @@ MODULE aed_phyto_abm
    USE trait_functions
    USE gmk
    USE mGf90
+   USE ISO_C_BINDING, ONLY: C_INT
 
    IMPLICIT NONE
 
    PRIVATE
 !
    PUBLIC aed_phyto_abm_data_t
+!
+   ! Free-slot queue shared with the C-side PTM code (GLM/src/glm_ptm.c) - see the
+   ! header comment on its implementation there. Every "find a free particle slot"
+   ! search in this file (4 sites below) used to scan p(1:ppid) from j=1 looking for
+   ! STAT==0, an O(ppid) search repeated once per split/recruit/reseed event (and,
+   ! in population maintenance, up to MAX_POPMAINTAIN_SPLITS_PER_CALL times in a
+   ! single call). These two calls make that O(1): ptm_free_pop() returns a free
+   ! slot as a 0-based C index (-1 if none are free - the same "no more available
+   ! particles" case the old scan handled by falling off the end of ppid), and
+   ! ptm_free_push() returns one when a particle dies. No module dependency is
+   ! needed for this - it is a direct BIND(C) link to the symbols glm_ptm.c
+   ! defines, resolved at final-executable link time like every other
+   ! host/AED C/Fortran boundary in this codebase.
+   INTERFACE
+      FUNCTION ptm_free_pop() BIND(C, name="ptm_free_pop") RESULT(slot0)
+         IMPORT :: C_INT
+         INTEGER(C_INT) :: slot0
+      END FUNCTION ptm_free_pop
+
+      SUBROUTINE ptm_free_push(slot0, tag) BIND(C, name="ptm_free_push")
+         IMPORT :: C_INT
+         INTEGER(C_INT), VALUE :: slot0, tag
+      END SUBROUTINE ptm_free_push
+   END INTERFACE
+
+   ! GLM/src/glm_globals.c's max_particle_num, exposed the same way
+   ! particle_random_seed already is (see glm_api_aed.F90). Needed to recover a
+   ! particle's GLOBAL (domain-wide, 0-based) slot number from its PTID inside
+   ! aed_particle_bgc_phyto_abm - see the comment at those ptm_free_push() call
+   ! sites for why that recovery is necessary at all.
+   INTEGER(C_INT), BIND(C, name="max_particle_num") :: max_particle_num
 !
    TYPE,extends(aed_model_data_t) :: aed_phyto_abm_data_t
       !# Variable identifiers
@@ -1096,6 +1128,14 @@ INTEGER   :: i, j, ng
 INTEGER   :: n_active, largest_i, n_split_this_call
 AED_REAL  :: largest_num
 LOGICAL   :: found_slot
+! Max-heap (parallel arrays, 1-based, standard binary-heap layout) used by
+! population maintenance below to find the repeatedly-changing largest active
+! particle in O(log ppid) per split instead of an O(ppid) rescan per split -
+! see the heap_sift_up/heap_sift_down CONTAINed subroutines and the comment
+! at the population-maintenance block itself.
+AED_REAL, ALLOCATABLE :: heap_val(:)
+INTEGER,  ALLOCATABLE :: heap_idx(:)
+INTEGER   :: heap_n, heap_cap, heap_alloc_stat
 
 ! Adaptive (constant-particle-NUMBER) splitting (2026-08). SB's only splitting mode
 ! was constant-WEIGHT: n_split > 0 is a fixed cells-per-particle threshold, so the
@@ -1116,11 +1156,12 @@ AED_REAL  :: thresh
 ! below is what actually GUARANTEES the count stays bounded, regardless of exactly
 ! what steady-state ratio this constant achieves.
 AED_REAL, PARAMETER :: SPLIT_FILL = 0.45d0
-! Safety cap on population-maintenance splits performed in a single call: each split
-! requires an O(ppid) scan for the current largest particle plus an O(ppid) scan for a
-! free slot, so an uncapped loop could in the worst case cost O(ppid^2) in one call.
-! This still allows fast recovery (this routine runs once per host timestep) without
-! that pathological cost.
+! Safety cap on population-maintenance splits performed in a single call. Originally
+! needed because each split cost an O(ppid) scan for the current largest particle
+! plus an O(ppid) scan for a free slot - O(ppid^2) worst case for one call. Both
+! scans are now O(log ppid)/O(1) (heap + free-slot queue - see below), so the cap is
+! no longer needed for that reason, but is kept anyway as a sane bound on how many
+! particles population maintenance may create in a single host step.
 INTEGER, PARAMETER :: MAX_POPMAINTAIN_SPLITS_PER_CALL = 1000
 
 INTEGER   :: n_recruit_this_call
@@ -1173,6 +1214,12 @@ ENDDO
 !     Checked per-particle against ITS OWN group's simSplit/n_split (not a single
 !     hardcoded group), since different species can have different division thresholds.
 DO i = 1, ppid
+   ! Inactive slot: GRP may still hold the -9999 initialization sentinel (see the
+   ! fill in aed_ptm_init), not a valid 1..num_phytos index - indexing
+   ! data%phytos(g) below would be an out-of-bounds access. Skip before reading GRP,
+   ! rather than after (the STAT check used to be the innermost condition, well
+   ! after g was already used to index data%phytos(g) twice).
+   IF (p(i)%ptm_istat(STAT) <= 0) CYCLE
    g = p(i)%ptm_istat(GRP)
    IF (data%phytos(g)%simSplit > 0) THEN
       IF (data%phytos(g)%n_split < zero_) THEN
@@ -1188,22 +1235,14 @@ DO i = 1, ppid
       ELSE
          thresh = data%phytos(g)%n_split   ! fixed threshold (existing behaviour, unchanged)
       ENDIF
-      IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > thresh) THEN
-         j = 1
-         found_slot = .FALSE.
-         DO
-            IF (j > ppid) THEN
-               print *, 'aed_split_particle(): WARNING no more available particles; skipping particle split'
-               EXIT
-            ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN ! SCB change 7/13 - check for inactivity only
-               CALL duplicate_and_halve_particle(i, j)
-               found_slot = .TRUE.
-               EXIT
-            END IF
-            j = j + 1
-         END DO ! end search for available particles loop
-
+      IF (p(i)%ptm_state(data%ip_num) > thresh) THEN
+         ! Was a scan of p(1:ppid) from j=1 for the first STAT==0 slot - now an
+         ! O(1) pop from the free-slot queue shared with the C-side PTM code
+         ! (see the INTERFACE block near the top of this module).
+         j = ptm_free_pop() + 1
+         found_slot = (j > 0)
          IF (found_slot) THEN
+            CALL duplicate_and_halve_particle(i, j)
             ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
             ! DIAGNOSTIC: record the split event (one of the two pathways that create a
             ! new active particle / increase the particle count - see also (2) below).
@@ -1221,6 +1260,7 @@ DO i = 1, ppid
             ! (duplicate_and_halve_particle copies the parent's group onto it).
             IF (data%phytos(g)%n_split < zero_) grp_live(g) = grp_live(g) + 1
          ELSE
+            print *, 'aed_split_particle(): WARNING no more available particles; skipping particle split'
             RETURN ! no free slots anywhere; further scanning this call is pointless
          END IF
       END IF ! end does particle need to split if statement
@@ -1241,53 +1281,88 @@ IF (data%target_particle_num > 0) THEN
       IF (p(i)%ptm_istat(STAT) > 0) n_active = n_active + 1
    END DO
 
-   n_split_this_call = 0
-   DO WHILE (n_active < data%target_particle_num .AND. n_split_this_call < MAX_POPMAINTAIN_SPLITS_PER_CALL)
-      ! find the largest active particle
-      largest_i = -1
-      largest_num = -1.0d0
+   ! Only pay for the heap when maintenance will actually run this call - in
+   ! steady state (population already at/above target, the common case) this
+   ! whole block is skipped, same as the original.
+   IF (n_active < data%target_particle_num) THEN
+      ! Each iteration below needs "the CURRENTLY largest active particle" - and
+      ! since splitting it HALVES its ip_num, the answer changes every iteration
+      ! (the freshly-halved particle may or may not still be the largest). A
+      ! max-heap keyed on ip_num answers "which is largest" in O(1) and lets a
+      ! split (pop the max, push its two halves back) run in O(log ppid), versus
+      ! the O(ppid) rescan-of-everything the old code repeated for every one of
+      ! up to MAX_POPMAINTAIN_SPLITS_PER_CALL splits. Sized for the worst case:
+      ! every currently-active particle, plus every split adding one net entry
+      ! (one popped, two pushed).
+      heap_cap = n_active + MAX_POPMAINTAIN_SPLITS_PER_CALL + 1
+      ALLOCATE(heap_val(heap_cap), heap_idx(heap_cap), STAT=heap_alloc_stat)
+      IF (heap_alloc_stat /= 0) STOP "*** Problem allocating population-maintenance heap ***"
+
+      heap_n = 0
       DO i = 1, ppid
-         IF (p(i)%ptm_istat(STAT) > 0 .AND. p(i)%ptm_state(data%ip_num) > largest_num) THEN
-            largest_num = p(i)%ptm_state(data%ip_num)
-            largest_i = i
+         IF (p(i)%ptm_istat(STAT) > 0) THEN
+            heap_n = heap_n + 1
+            heap_val(heap_n) = p(i)%ptm_state(data%ip_num)
+            heap_idx(heap_n) = i
+            CALL heap_sift_up(heap_val, heap_idx, heap_n)
          END IF
       END DO
-      IF (largest_i < 0 .OR. largest_num < 2.0d0) EXIT ! nothing left worth splitting
 
-      ! find a free slot to hold the new particle
-      j = 1
-      found_slot = .FALSE.
-      DO
-         IF (j > ppid) THEN
+      n_split_this_call = 0
+      DO WHILE (n_active < data%target_particle_num .AND. n_split_this_call < MAX_POPMAINTAIN_SPLITS_PER_CALL)
+         IF (heap_n == 0) EXIT ! nothing active left to split (mirrors the old largest_i<0 case)
+
+         ! pop the max: same "largest active particle" the old O(ppid) rescan found
+         largest_i = heap_idx(1)
+         largest_num = heap_val(1)
+         heap_val(1) = heap_val(heap_n); heap_idx(1) = heap_idx(heap_n)
+         heap_n = heap_n - 1
+         CALL heap_sift_down(heap_val, heap_idx, heap_n, 1)
+
+         IF (largest_num < 2.0d0) EXIT ! nothing left worth splitting - heap-max<2 means ALL are
+
+         ! O(1) pop from the free-slot queue shared with the C-side PTM code
+         ! (see the INTERFACE block near the top of this module) - was an
+         ! O(ppid) scan of p(1:ppid) from j=1 for the first STAT==0 slot.
+         j = ptm_free_pop() + 1
+         IF (j <= 0) THEN
             print *, 'aed_split_particle(): WARNING population below target_particle_num but no free particle slots available'
-            EXIT
-         ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN
-            found_slot = .TRUE.
-            EXIT
+            EXIT ! no free slots anywhere; give up until next call
          END IF
-         j = j + 1
+
+         CALL duplicate_and_halve_particle(largest_i, j)
+         n_active = n_active + 1
+         n_split_this_call = n_split_this_call + 1
+
+         ! push both halves (largest_i and its new twin j) back onto the heap
+         heap_n = heap_n + 1
+         heap_val(heap_n) = p(largest_i)%ptm_state(data%ip_num)
+         heap_idx(heap_n) = largest_i
+         CALL heap_sift_up(heap_val, heap_idx, heap_n)
+
+         heap_n = heap_n + 1
+         heap_val(heap_n) = p(j)%ptm_state(data%ip_num)
+         heap_idx(heap_n) = j
+         CALL heap_sift_up(heap_val, heap_idx, heap_n)
+
+         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
+         ! DIAGNOSTIC: record the split event, distinct from the n_split-triggered log above.
+         ! ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
+         ! BLOCK
+         !    INTEGER :: pm_log_unit
+         !    OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
+         !         POSITION='append', STATUS='unknown', ACTION='write')
+         !    IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
+         !       'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
+         !    WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
+         !       ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
+         !       largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
+         !    CLOSE(pm_log_unit)
+         ! END BLOCK
       END DO
-      IF (.NOT. found_slot) EXIT ! no free slots anywhere; give up until next call
 
-      CALL duplicate_and_halve_particle(largest_i, j)
-      n_active = n_active + 1
-      n_split_this_call = n_split_this_call + 1
-
-      ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
-      ! DIAGNOSTIC: record the split event, distinct from the n_split-triggered log above.
-      ! ptm_cum_popmaintain_split_count = ptm_cum_popmaintain_split_count + 1
-      ! BLOCK
-      !    INTEGER :: pm_log_unit
-      !    OPEN(NEWUNIT=pm_log_unit, FILE='ptm_popmaintain_split_events.csv', &
-      !         POSITION='append', STATUS='unknown', ACTION='write')
-      !    IF (ptm_cum_popmaintain_split_count == 1) WRITE(pm_log_unit,'(A)') &
-      !       'event_num,active_count_before_this_split,target_particle_num,parent_particle,new_particle,cells_per_particle_after_split'
-      !    WRITE(pm_log_unit,'(I0,A,I0,A,I0,A,I0,A,I0,A,ES14.6)') &
-      !       ptm_cum_popmaintain_split_count, ',', n_active - 1, ',', data%target_particle_num, ',', &
-      !       largest_i, ',', j, ',', p(largest_i)%ptm_state(data%ip_num)
-      !    CLOSE(pm_log_unit)
-      ! END BLOCK
-   END DO
+      DEALLOCATE(heap_val, heap_idx)
+   END IF
 END IF
 
 ! (3) General recruitment: an ongoing, rate-controlled source of brand-new active
@@ -1308,21 +1383,15 @@ DO ng = 1, data%num_phytos
       DO WHILE (recruit_accumulator(ng) >= 1.0d0 .AND. n_recruit_this_call < data%recruit_max_per_call(ng))
 
          ! find a free slot (any slot regardless of which group previously occupied it -
-         ! correctness comes from recruit_particle setting GRP=ng on the new occupant)
-         j = 1
-         found_slot = .FALSE.
-         DO
-            IF (j > ppid) THEN
-               print *, 'aed_split_particle(): WARNING recruit_rate > 0 but no free particle slots available'
-               EXIT
-            ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN
-               found_slot = .TRUE.
-               EXIT
-            END IF
-            j = j + 1
-         END DO
-         IF (.NOT. found_slot) EXIT ! no free slots anywhere; keep the fractional
-                                     ! accumulator so nothing is lost - try again next call
+         ! correctness comes from recruit_particle setting GRP=ng on the new occupant).
+         ! O(1) pop from the shared free-slot queue (see the INTERFACE block near
+         ! the top of this module) instead of an O(ppid) scan from j=1.
+         j = ptm_free_pop() + 1
+         IF (j <= 0) THEN
+            print *, 'aed_split_particle(): WARNING recruit_rate > 0 but no free particle slots available'
+            EXIT ! no free slots anywhere; keep the fractional
+                 ! accumulator so nothing is lost - try again next call
+         END IF
 
          ! ---- draw an independently-random height within this group's recruitment band,
          !      matching the ptm_addparticles() random-within-band precedent used
@@ -1366,19 +1435,12 @@ DO ng = 1, data%num_phytos
       DO WHILE (grp_live(ng) < data%particle_reseed_target(ng) .AND. &
                 n_recruit_this_call < data%recruit_max_per_call(ng))
 
-         j = 1
-         found_slot = .FALSE.
-         DO
-            IF (j > ppid) THEN
-               print *, 'aed_split_particle(): WARNING particle_reseed_min > 0 but no free particle slots available'
-               EXIT
-            ELSE IF (p(j)%ptm_istat(STAT) == 0) THEN
-               found_slot = .TRUE.
-               EXIT
-            END IF
-            j = j + 1
-         END DO
-         IF (.NOT. found_slot) EXIT ! no free slots anywhere; try again next call
+         ! O(1) pop from the shared free-slot queue instead of an O(ppid) scan.
+         j = ptm_free_pop() + 1
+         IF (j <= 0) THEN
+            print *, 'aed_split_particle(): WARNING particle_reseed_min > 0 but no free particle slots available'
+            EXIT ! no free slots anywhere; try again next call
+         END IF
 
          ! Reseeded particles use the SAME height band as recruit_rate for this group
          ! (recruit_height_min/max) - there is no separate "initial seeding depth
@@ -1567,6 +1629,58 @@ CONTAINS
       END DO
    END SUBROUTINE recruit_particle
 
+   !###########################################################################
+   ! Standard array-based binary max-heap (1-based, parent i has children 2i/2i+1),
+   ! operating on parallel value/index arrays so the caller's "index" payload
+   ! (a particle index into p(:)) rides along with its key (ip_num) through every
+   ! swap. Used by population maintenance above to track the largest active
+   ! particle across repeated pop-max/split/push-back-both-halves cycles in
+   ! O(log ppid) each, instead of an O(ppid) rescan of every particle per split.
+   !
+   ! sift_up: element newly placed at position n may be larger than its parent -
+   ! swap upward until the heap property (parent >= children) holds again.
+   SUBROUTINE heap_sift_up(val, idx, n)
+      AED_REAL, INTENT(inout) :: val(:)
+      INTEGER,  INTENT(inout) :: idx(:)
+      INTEGER,  INTENT(in)    :: n
+      INTEGER  :: c, par, ti
+      AED_REAL :: tv
+      c = n
+      DO WHILE (c > 1)
+         par = c / 2
+         IF (val(par) >= val(c)) EXIT
+         tv = val(par); val(par) = val(c); val(c) = tv
+         ti = idx(par); idx(par) = idx(c); idx(c) = ti
+         c = par
+      END DO
+   END SUBROUTINE heap_sift_up
+
+   ! sift_down: element at `start` (typically the root, after being overwritten by
+   ! what was the last element) may be smaller than a child - swap downward until
+   ! the heap property holds again, within the first n elements.
+   SUBROUTINE heap_sift_down(val, idx, n, start)
+      AED_REAL, INTENT(inout) :: val(:)
+      INTEGER,  INTENT(inout) :: idx(:)
+      INTEGER,  INTENT(in)    :: n, start
+      INTEGER  :: par, lc, rc, largest, ti
+      AED_REAL :: tv
+      par = start
+      DO
+         lc = 2*par; rc = 2*par + 1
+         largest = par
+         IF (lc <= n) THEN
+            IF (val(lc) > val(largest)) largest = lc
+         END IF
+         IF (rc <= n) THEN
+            IF (val(rc) > val(largest)) largest = rc
+         END IF
+         IF (largest == par) EXIT
+         tv = val(par); val(par) = val(largest); val(largest) = tv
+         ti = idx(par); idx(par) = idx(largest); idx(largest) = ti
+         par = largest
+      END DO
+   END SUBROUTINE heap_sift_down
+
 END SUBROUTINE aed_split_particle_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1689,7 +1803,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real   :: P_min = 0.0 !Minimal amount phosphorus of each super-individual (number of cells * P content per cell)
    integer:: N_PAR = 0
    INTEGER, ALLOCATABLE :: index_(:)    !The indexes of particles in each grid
-   INTEGER, ALLOCATABLE :: scratch(:)    !The scratch indexes of particles in each grid
    INTEGER              :: Allocatestatus = 0
    real :: PHY_t = 0d0  !Total phytoplankton N
    ! additional declarations from PIBM time_settings.F90
@@ -1791,29 +1904,21 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    N_ = 0
 
    !Get the indices of particles in this grid (for grazing loss)
-   allocate(index_(0), stat=AllocateStatus)
+   ! Single allocation sized to the upper bound (N_PAR), filled by one O(N_PAR) scan.
+   ! Previously grown one element at a time via allocate+copy+move_alloc PER ACTIVE
+   ! PARTICLE - O(N_PAR^2) heap traffic in this call alone, since p is already the
+   ! layer-filtered particle list from aed_calculate_particles (N_PAR is this layer's
+   ! particle count, not the whole domain's). Everything below reads only the first
+   ! N_ entries (loops run 1..N_, never size(index_)), so an index_ allocated to the
+   ! upper bound and partially filled is exactly equivalent.
+   allocate(index_(N_PAR), stat=AllocateStatus)
    IF (AllocateStatus /= 0) STOP "*** Problem in allocating index_***"
 
    do i = 1, N_PAR
       if (_PTM_STAT_(i,STAT) == 1) then !Ignore dead super-individuals ! SCB - ADD water column flag check here?
          N_ = N_ + 1
          N_by_group(p(i)%ptm_istat(GRP)) = N_by_group(p(i)%ptm_istat(GRP)) + 1
-         if (N_ == 1) then
-             allocate(scratch(1), stat=Allocatestatus)
-             IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
-             scratch(1) = i ! _PTM_STAT_(i,STAT) ! SCB - note that Claude identified this as a likely bug - this was the recommended fix
-
-            !Update index_ and scratch has been deallocated
-            call move_alloc(scratch, index_)
-         else
-             allocate(scratch(size(index_) + 1), stat=Allocatestatus)
-             IF (AllocateStatus /= 0) STOP "*** Problem in allocating scratch***"
-             scratch(1:size(index_)) = index_
-             scratch(size(index_) + 1) = i
-
-            !Update index_ and scratch has been deallocated
-            call move_alloc(scratch, index_)
-         endif
+         index_(N_) = i
       endif
    enddo
    ! get volume of layer
@@ -2138,6 +2243,22 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_state(data%ip_num) = 0d0
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
+            ! BUG FIX: i is this LAYER's local index into p(1:ppid) here (p is the
+            ! per-layer filtered list aed_calculate_particles builds - see
+            ! aed_ptm.F90), NOT the domain-wide global slot glm_ptm.c's free-slot
+            ! queue is indexed by (that identification only holds in
+            ! aed_split_particle_phyto_abm, which is called with the WHOLE domain
+            ! as p(:)). i-1 was pushed here directly for a while, which handed the
+            ! queue essentially arbitrary small numbers (this layer's own particle
+            ! count, typically in the tens to low hundreds) instead of real global
+            ! slots - silently freeing whatever unrelated (and possibly still
+            ! active) slot that small number happened to name, while the true
+            ! slot leaked from the queue forever. PTID is generation*max_particle_num
+            ! + (global_slot+1) at every assignment (ptm_addparticles,
+            ! duplicate_and_halve_particle, recruit_particle all follow this same
+            ! scheme), so (PTID-1) MOD max_particle_num recovers the real global
+            ! slot regardless of how many times this slot has been reused.
+            CALL ptm_free_push(INT(MOD(p(i)%ptm_istat(PTID) - 1, max_particle_num), C_INT), 1)   ! tag 1 = subsistence threshold death
 
             n_starved = n_starved + 1
 
@@ -2194,6 +2315,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                   p(i)%ptm_state(data%ip_num) = 0d0
                   _PTM_STAT_(i,STAT) = 0
                   _PTM_STAT_(i,FLAG) = 3
+                  ! i is this layer's local index, not the global slot - see the
+                  ! matching comment at the subsistence-threshold push above.
+                  CALL ptm_free_push(INT(MOD(p(i)%ptm_istat(PTID) - 1, max_particle_num), C_INT), 2)   ! tag 2 = num-decay-to-zero death
                END IF
             END IF
          ELSE
@@ -2218,6 +2342,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                p(i)%ptm_state(data%ip_num) = 0d0
                _PTM_STAT_(i,STAT) = 0
                _PTM_STAT_(i,FLAG) = 3
+               ! i is this layer's local index, not the global slot - see the
+               ! matching comment at the subsistence-threshold push above.
+               CALL ptm_free_push(INT(MOD(p(i)%ptm_istat(PTID) - 1, max_particle_num), C_INT), 3)   ! tag 3 = default Bernoulli mortality
             ENDIF
          END IF
 
