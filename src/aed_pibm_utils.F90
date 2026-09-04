@@ -454,6 +454,11 @@ real              :: RcT    = 0.d0    !Temperature dependent C-based respiration
 real              :: RNT    = 0.d0    !Temperature dependent N-based respiration rate [d-1]
 real              :: RPT    = 0.d0    !Temperature dependent P-based respiration rate [d-1]
 real              :: RChlT  = 0.d0    !Temperature dependent Chl-based respiration rate [d-1]
+! temp_Topt(...) and respiration(...) are each exactly linear in their rate argument
+! (mumax0 / r_s respectively) - see the shared-factor comments at their call sites
+! below - so muT/RcT/RNT/RPT/RChlT below share one temp_Topt evaluation and one
+! respiration evaluation instead of five and four respectively.
+real              :: temp_scale, resp_scale
 
 ! Maximal specific N uptake as a function of temp. under resource (nutrient and light) replete conditions [mol N mol C-1 d-1]:
 real              :: Vcref  = 0.
@@ -535,7 +540,14 @@ muT = mu0 * exp(a1 * (alphaChl_ - .1)) !0.1 is the average alphaChl value
 !Temperature dependent maximal growth rate at 1 ug C cell-1
 !ML from Chen 2022; this function calls JOHNSON, TK, and alloscale functions;
 !corresponds to eq.10 in PIBM manuscript
-muT = temp_Topt(Temp, muT, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+! temp_Topt(tC, mumax0, Topt_, Ea0, Ed0, Ei, beta, phi, T_std) is EXACTLY LINEAR in
+! mumax0: mumax = mumax0*exp(TK(Topt_,T_std)*Ei) inside temp_Topt, and JOHNSON's
+! result is mumax times a shape term that never touches mumax0. RC/RN/RP/RChl below
+! are each passed through temp_Topt with the SAME Topt_/Ea0/Ed0/Ei/beta/phi/T_std as
+! muT here, so the same scale factor applies to all five - evaluate it once (call
+! with rate=1) instead of five times (each of which is 3x alloscale + 1x JOHNSON).
+temp_scale = temp_Topt(Temp, 1.0, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+muT = temp_scale * muT
 
 !Apply the size-scaling relationship following Wirtz (2011)
 !ML eq. 13 in PIBM manuscript; eq. 14 in Wirtz; coefficients drawn from Wirtz
@@ -548,21 +560,22 @@ Vcref  = muT * QNmax
 Vcrefp = muT * QPmax
 
 !Assume the same temperature dependence of respiration as on photosynthetic rate (long-term adaptation; Barton et al. 2020):
+! respiration(ESD, r_s, b_rho, V_s) is likewise exactly linear in r_s (y = r_s * a
+! shape term built from ESD/b_rho/V_s alone), and RC/RN/RP/RChl below all share the
+! same ESD_/b_rho/V_s - so the same one-shared-factor trick applies a second time.
+resp_scale = respiration(ESD_, 1.0, b_rho, V_s)
+
 !ML these two lines correspond to third term on right-hand side (RHS) of eq. 1 in PIBM paper
-RcT   = temp_Topt(Temp, RC,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RcT   = respiration(ESD_, RcT, b_rho, V_s)
+RcT   = RC * temp_scale * resp_scale
 
 !ML these two lines correspond to second term on RHS of eq. 2 in PIBM paper
-RNT   = temp_Topt(Temp, RN,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RNT   = respiration(ESD_, RNT, b_rho, V_s)
+RNT   = RN * temp_scale * resp_scale
 
 !ML these two lines newly added to GLM-AED-ABM to have P mirror N
-RPT   = temp_Topt(Temp, RP,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RPT   = respiration(ESD_, RPT, b_rho, V_s)
+RPT   = RP * temp_scale * resp_scale
 
 !ML these two lines correspond to second term on RHS of eq. 3 in PIBM paper
-RChlT = temp_Topt(Temp, RChl, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RChlT = respiration(ESD_, RChlT, b_rho, V_s)
+RChlT = RChl * temp_scale * resp_scale
 
 !Nutrient limitation [nd]:
 ! Capped at 1: this is a quota-space fraction that is exactly 1 by construction when
