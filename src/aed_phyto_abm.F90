@@ -2073,7 +2073,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          ENDIF
 
          ! Update density
-         p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux
+         p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux * dtdays
 
          ! check maximum/minimum density are not exceeded
          IF( p(i)%ptm_env(DENS)>data%max_rho ) THEN
