@@ -1407,8 +1407,8 @@ DO ng = 1, data%num_phytos
          ! logs above (this is the third, independent pathway that creates a new
          ! active particle).
          ! ptm_cum_recruit_count = ptm_cum_recruit_count + 1
-         ! n_recruit_this_call = n_recruit_this_call + 1
-         ! recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
+          n_recruit_this_call = n_recruit_this_call + 1
+          recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
          ! BLOCK
          !    INTEGER :: recruit_log_unit
          !    OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
