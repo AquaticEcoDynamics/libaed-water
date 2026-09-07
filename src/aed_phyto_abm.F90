@@ -121,6 +121,7 @@ MODULE aed_phyto_abm
       ! hours. Registered LAST (after ip_LnalphaChl) so it doesn't shift the fixed VVEL+N offsets
       ! GLM/src/glm_ptm.c uses to read the other particle state variables out of ptm_env.
       INTEGER :: ip_rhochl
+      INTEGER :: ip_fgas
       INTEGER,DIMENSION(:),ALLOCATABLE :: id_d_oxy, id_d_nit, id_d_amm, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
@@ -173,6 +174,25 @@ MODULE aed_phyto_abm
       ! model configuration, before this routine's own code was even reached.
       AED_REAL :: min_rho = 900.
       AED_REAL :: max_rho = 1200.
+
+      ! Carbon-based density parameters. When f_carbon > 0, cell density is
+      ! derived from cellular carbon content and cell volume (mixture model)
+      ! instead of the c1/c3 carbohydrate-ballasting ODE.
+      !   rho_cell = pw + (rho_organic - pw) * V_organic / V_cell
+      !   V_organic = (C * 12) / (f_carbon * rho_organic)   [C in pmol, 12 pg/pmol]
+      ! Set via 'f_carbon' / 'rho_organic' in the &aed_phyto_abm namelist.
+      ! f_carbon <= 0 disables carbon-based density and uses the c1/c3 ODE.
+      AED_REAL :: f_carbon = 0.0       ! carbon mass fraction of organic matter (0.5 typical)
+      AED_REAL :: rho_organic = 1300.   ! density of organic matter (kg/m3)
+
+      ! Gas vesicle parameters (active only when f_gas_max > 0 AND f_carbon > 0).
+      ! Per-particle f_gas (volume fraction of cell occupied by gas vesicles, 0..f_gas_max)
+      ! is synthesised in light and collapsed by turgor when cellular C rises.
+      AED_REAL :: f_gas_max      = 0.0    ! max gas vesicle volume fraction (0.08 typical)
+      AED_REAL :: r_gas_synth    = 0.5    ! synthesis rate (d-1)
+      AED_REAL :: C_turgor       = 0.7    ! C/Cdiv ratio above which turgor collapses vesicles
+      AED_REAL :: r_gas_collapse = 5.0    ! collapse rate (d-1)
+      AED_REAL :: C_gas_cost    = 0.01   ! carbon cost of vesicle synthesis (pmol C per um3 cell vol per unit f_gas)
 
       ! Per-group reseeding floor/target (2026-08): threshold-triggered population
       ! maintenance, complementary to recruit_rate above rather than a replacement for
@@ -675,6 +695,13 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    AED_REAL           :: theta_mpb_resp   = 1.05
    AED_REAL           :: min_rho = 900.
    AED_REAL           :: max_rho = 1200.
+   AED_REAL           :: f_carbon = 0.0
+   AED_REAL           :: rho_organic = 1300.
+   AED_REAL           :: f_gas_max = 0.0
+   AED_REAL           :: r_gas_synth = 0.5
+   AED_REAL           :: C_turgor = 0.7
+   AED_REAL           :: r_gas_collapse = 5.0
+   AED_REAL           :: C_gas_cost = 0.01
    INTEGER            :: do_mpb = 0
    INTEGER            :: n_zones = 0
    AED_REAL           :: active_zones(1000) = 0
@@ -712,6 +739,9 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                       si_uptake_target_variable,                               &
                     dbase, zerolimitfudgefactor,     &
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
+                    f_carbon, rho_organic,                                    &
+                    f_gas_max, r_gas_synth, C_turgor, r_gas_collapse,        &
+                    C_gas_cost,                                              &
                     resus_link, n_zones, active_zones, diag_level,             &
                     theta_mpb_growth,theta_mpb_resp,                           &
                     phyto_particle_link, R_mpbb, target_particle_num,          &
@@ -737,6 +767,33 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
       print *,'aed_phyto_abm: ERROR max_rho (',data%max_rho,') must exceed min_rho (', &
               data%min_rho,')'
       STOP 'Invalid min_rho/max_rho in namelist aed_phyto_abm'
+   ENDIF
+
+   ! Carbon-based density parameters.
+   data%f_carbon = f_carbon
+   data%rho_organic = rho_organic
+   IF ( data%f_carbon > zero_ ) THEN
+      print *,'        aed_phyto_abm: carbon-based density ENABLED'
+      print *,'          f_carbon    =', data%f_carbon
+      print *,'          rho_organic =', data%rho_organic
+   ENDIF
+
+   data%f_gas_max      = f_gas_max
+   data%r_gas_synth    = r_gas_synth
+   data%C_turgor       = C_turgor
+   data%r_gas_collapse = r_gas_collapse
+   data%C_gas_cost     = C_gas_cost
+   IF ( data%f_gas_max > zero_ ) THEN
+      print *,'        aed_phyto_abm: gas vesicle dynamics ENABLED'
+      print *,'          f_gas_max      =', data%f_gas_max
+      print *,'          r_gas_synth    =', data%r_gas_synth
+      print *,'          C_turgor       =', data%C_turgor
+      print *,'          r_gas_collapse =', data%r_gas_collapse
+      print *,'          C_gas_cost     =', data%C_gas_cost
+      IF ( data%f_carbon <= zero_ ) THEN
+         print *,'aed_phyto_abm: WARNING f_gas_max>0 but f_carbon<=0; gas vesicles require carbon-based density'
+         STOP 'Gas vesicles require f_carbon > 0'
+      ENDIF
    ENDIF
 
    ! Store group parameter values in the phyto derived type. data%num_phytos may end up
@@ -832,6 +889,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! last so it doesn't shift the fixed VVEL+N offsets glm_ptm.c uses for the other variables.
    data%ip_rhochl = aed_define_ptm_variable('phy_rhochl', 'gChl/molC', 'carbon production allocated to Chl synthesis, carried over from the last daylight period', initial = 0.0d0)
 
+   data%ip_fgas = aed_define_ptm_variable('phy_fgas', '-', 'gas vesicle volume fraction', initial = 0.0d0)
 
    ! Diagnostic outputs for particle properties. One entry per simulated phyto group,
    ! with the variable name suffixed by that group's p_name (mirroring the Eulerian
@@ -1514,6 +1572,7 @@ CONTAINS
       p(j)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
       p(j)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
       p(j)%ptm_state(data%ip_rhochl) = p(i)%ptm_state(data%ip_rhochl)
+      p(j)%ptm_state(data%ip_fgas) = p(i)%ptm_state(data%ip_fgas)
 
       !then split the number of cells for both old and new particles
       p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
@@ -1601,6 +1660,7 @@ CONTAINS
       p(j)%ptm_state(data%ip_nh4) = 0.0d0
       p(j)%ptm_state(data%ip_frp) = 0.0d0
       p(j)%ptm_state(data%ip_rhochl) = 0.0d0
+      p(j)%ptm_state(data%ip_fgas) = 0.0d0
 
       ! ---- traits + cell C/N/P/Chl/num: base CSV defaults, Gaussian-perturbed ----
       DO v = 1, NInit
@@ -1822,6 +1882,13 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    ! the identically-named namelist parameters and made those parameters inert. The clamp
    ! below now reads data%min_rho / data%max_rho directly (set in aed_define_phyto_abm).
    real     :: dens_flux = 0.
+   real     :: C_mass = 0.       ! carbon mass per cell (pg)
+   real     :: Vol_cell = 0.     ! cell volume (um3)
+   real     :: V_organic = 0.    ! organic matter volume per cell (um3)
+   real     :: f_gas = 0.        ! current gas vesicle volume fraction
+   real     :: turgor = 0.       ! turgor collapse driver
+   real     :: df_synth = 0.     ! gas vesicle synthesis increment this step
+   real     :: dC_gas = 0.       ! carbon cost of gas vesicle synthesis (pmol C)
 
 !End of declaration
 !
@@ -2166,19 +2233,49 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          ! Update ESD
          p(i)%ptm_env(DIAM) = ESD_*1d-6 !meters
 
-         !# PHYTOPLANKTON CELL DENSITY
-         ! density increases during carbohydrate creation (daytime)
-         dens_flux = zero_
-         IF( par>zero_ ) THEN
-            dens_flux = data%phytos(g)%c1 * &
-            (one_ - EXP(-par/data%phytos(g)%I_K) ) - data%phytos(g)%c3
+         !# GAS VESICLE DYNAMICS (before density, so updated f_gas feeds into rho_cell)
+         IF ( data%f_gas_max > zero_ ) THEN
+            f_gas = p(i)%ptm_state(data%ip_fgas)
+            df_synth = data%r_gas_synth * (data%f_gas_max - f_gas) &
+                       * (one_ - EXP(-par / data%phytos(g)%I_K)) * dtdays
+            turgor = p(i)%ptm_state(data%ip_c) / (data%C_turgor * p(i)%ptm_state(data%ip_cdiv)) - 1.d0
+            IF ( turgor < zero_ ) turgor = zero_
+            f_gas = f_gas + df_synth - data%r_gas_collapse * f_gas * turgor * dtdays
+            IF ( f_gas < zero_ ) f_gas = zero_
+            IF ( f_gas > data%f_gas_max ) f_gas = data%f_gas_max
+            p(i)%ptm_state(data%ip_fgas) = f_gas
+            !-- Carbon cost of gas vesicle protein synthesis
+            IF ( data%C_gas_cost > zero_ .AND. df_synth > zero_ ) THEN
+               Vol_cell = (3.1415926535d0 / 6.d0) * ESD_**3
+               dC_gas = data%C_gas_cost * df_synth * Vol_cell
+               p(i)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c) - dC_gas
+               IF ( p(i)%ptm_state(data%ip_c) < zero_ ) p(i)%ptm_state(data%ip_c) = zero_
+            ENDIF
          ELSE
-            ! darkness
-            dens_flux = -data%phytos(g)%c3
+            f_gas = zero_
          ENDIF
 
-         ! Update density
-         p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux * dtdays
+         !# PHYTOPLANKTON CELL DENSITY
+         IF ( data%f_carbon > zero_ ) THEN
+            !-- Carbon-based density with optional gas vesicle buoyancy.
+            pw = _STATE_VAR_(data%id_dens)
+            C_mass   = p(i)%ptm_state(data%ip_c) * 12.d0
+            Vol_cell = (3.1415926535d0 / 6.d0) * ESD_**3
+            V_organic = C_mass / (data%f_carbon * data%rho_organic * 1.d-3)
+            IF ( V_organic > Vol_cell ) V_organic = Vol_cell
+            p(i)%ptm_env(DENS) = pw + (data%rho_organic - pw) * V_organic / Vol_cell &
+                                    - pw * f_gas
+         ELSE
+            !-- Original c1/c3 carbohydrate-ballasting ODE (Chung et al. 2014).
+            dens_flux = zero_
+            IF( par>zero_ ) THEN
+               dens_flux = data%phytos(g)%c1 * &
+               (one_ - EXP(-par/data%phytos(g)%I_K) ) - data%phytos(g)%c3
+            ELSE
+               dens_flux = -data%phytos(g)%c3
+            ENDIF
+            p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux * dtdays
+         ENDIF
 
          ! check maximum/minimum density are not exceeded
          IF( p(i)%ptm_env(DENS)>data%max_rho ) THEN
