@@ -1510,13 +1510,14 @@ DO ng = 1, data%num_phytos
 
          CALL recruit_particle(j, ng, recruit_height)
 
+         n_recruit_this_call = n_recruit_this_call + 1
+         grp_live(ng) = grp_live(ng) + 1
+
          ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
          ! DIAGNOSTIC: record the reseed event, distinct from the recruit-triggered
          ! log above (this is the fourth, independent pathway that creates a new
          ! active particle).
          ! ptm_cum_reseed_count = ptm_cum_reseed_count + 1
-         ! n_recruit_this_call = n_recruit_this_call + 1
-         ! grp_live(ng) = grp_live(ng) + 1
          ! BLOCK
          !    INTEGER :: reseed_log_unit
          !    OPEN(NEWUNIT=reseed_log_unit, FILE='ptm_reseed_events.csv', &
