@@ -97,6 +97,10 @@ MODULE aed_bio_utils
       ! decays ip_num (cells represented) each call, so the particle stays alive but
       ! represents fewer individuals. See aed_particle_bgc_phyto_abm.
       INTEGER  :: simMortNumDecay
+      ! Per-group density and gas vesicle parameters
+      INTEGER  :: cell_density_model   ! 1 = c1/c3 carbohydrate ballast, 2 = internal carbon
+      AED_REAL :: f_carbon, rho_organic
+      AED_REAL :: f_gas_max, r_gas_synth, C_turgor, r_gas_collapse, C_gas_cost
    END TYPE phyto_data_t
 
 
@@ -133,6 +137,9 @@ MODULE aed_bio_utils
       AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
       INTEGER  :: simMortNumDecay
+      ! Per-group density and gas vesicle parameters
+      AED_REAL :: f_carbon, rho_organic
+      AED_REAL :: f_gas_max, r_gas_synth, C_turgor, r_gas_collapse, C_gas_cost
    END TYPE phyto_param_t
    ! %% END NAMELIST   %% phyto_param_t
 

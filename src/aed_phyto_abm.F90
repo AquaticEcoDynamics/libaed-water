@@ -175,25 +175,6 @@ MODULE aed_phyto_abm
       AED_REAL :: min_rho = 900.
       AED_REAL :: max_rho = 1200.
 
-      ! Carbon-based density parameters. When f_carbon > 0, cell density is
-      ! derived from cellular carbon content and cell volume (mixture model)
-      ! instead of the c1/c3 carbohydrate-ballasting ODE.
-      !   rho_cell = pw + (rho_organic - pw) * V_organic / V_cell
-      !   V_organic = (C * 12) / (f_carbon * rho_organic)   [C in pmol, 12 pg/pmol]
-      ! Set via 'f_carbon' / 'rho_organic' in the &aed_phyto_abm namelist.
-      ! f_carbon <= 0 disables carbon-based density and uses the c1/c3 ODE.
-      AED_REAL :: f_carbon = 0.0       ! carbon mass fraction of organic matter (0.5 typical)
-      AED_REAL :: rho_organic = 1300.   ! density of organic matter (kg/m3)
-
-      ! Gas vesicle parameters (active only when f_gas_max > 0 AND f_carbon > 0).
-      ! Per-particle f_gas (volume fraction of cell occupied by gas vesicles, 0..f_gas_max)
-      ! is synthesised in light and collapsed by turgor when cellular C rises.
-      AED_REAL :: f_gas_max      = 0.0    ! max gas vesicle volume fraction (0.08 typical)
-      AED_REAL :: r_gas_synth    = 0.5    ! synthesis rate (d-1)
-      AED_REAL :: C_turgor       = 0.7    ! C/Cdiv ratio above which turgor collapses vesicles
-      AED_REAL :: r_gas_collapse = 5.0    ! collapse rate (d-1)
-      AED_REAL :: C_gas_cost    = 0.01   ! carbon cost of vesicle synthesis (pmol C per um3 cell vol per unit f_gas)
-
       ! Per-group reseeding floor/target (2026-08): threshold-triggered population
       ! maintenance, complementary to recruit_rate above rather than a replacement for
       ! it. recruit_rate models an ongoing BIOLOGICAL source (continuous rate, its own
@@ -331,6 +312,13 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
    pd%f1           = 0.675        ! Ross and Sharples (2007)
    pd%f2           = 0.750        !  "
    pd%d_phy        = 1e-5
+   pd%f_carbon     = 0.0
+   pd%rho_organic  = 1300.
+   pd%f_gas_max    = 0.0
+   pd%r_gas_synth  = 0.5
+   pd%C_turgor     = 0.7
+   pd%r_gas_collapse = 5.0
+   pd%C_gas_cost   = 0.0
 
    ALLOCATE(values(nccols))
 
@@ -448,7 +436,13 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('simSplit')      ; pd(dcol)%simSplit      = extract_integer(values(ccol))
             CASE ('n_split')       ; pd(dcol)%n_split       = extract_double(values(ccol))
             CASE ('simMortNumDecay'); pd(dcol)%simMortNumDecay = extract_integer(values(ccol))
-
+            CASE ('f_carbon')      ; pd(dcol)%f_carbon      = extract_double(values(ccol))
+            CASE ('rho_organic')   ; pd(dcol)%rho_organic   = extract_double(values(ccol))
+            CASE ('f_gas_max')     ; pd(dcol)%f_gas_max     = extract_double(values(ccol))
+            CASE ('r_gas_synth')   ; pd(dcol)%r_gas_synth   = extract_double(values(ccol))
+            CASE ('C_turgor')      ; pd(dcol)%C_turgor      = extract_double(values(ccol))
+            CASE ('r_gas_collapse'); pd(dcol)%r_gas_collapse = extract_double(values(ccol))
+            CASE ('C_gas_cost')    ; pd(dcol)%C_gas_cost    = extract_double(values(ccol))
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
          END SELECT
@@ -468,7 +462,8 @@ END FUNCTION load_csv
 
 
 !###############################################################################
-SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, resuspension)
+SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, &
+                                         cell_density_model, resuspension)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CLASS (aed_phyto_abm_data_t),INTENT(inout) :: data
@@ -476,6 +471,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
    INTEGER,INTENT(inout)       :: count
    INTEGER,INTENT(in)          :: list(*)
    INTEGER,INTENT(in)          :: settling(*)
+   INTEGER,INTENT(in)          :: cell_density_model
    AED_REAL,INTENT(in)         :: resuspension(*)
 !
 !LOCALS
@@ -521,6 +517,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%p0           = pd(list(i))%p0
        data%phytos(i)%w_p          = pd(list(i))%w_p/secs_per_day
        data%phytos(i)%settling     = settling(i)
+       data%phytos(i)%cell_density_model = cell_density_model
       !data%phytos(i)%resuspension = resuspension(i)
        data%phytos(i)%Xcc          = pd(list(i))%Xcc
        data%phytos(i)%R_growth     = pd(list(i))%R_growth!ML/secs_per_day not how it's used in PIBM
@@ -627,6 +624,14 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        data%phytos(i)%n_split       = pd(list(i))%n_split
        data%phytos(i)%simMortNumDecay = pd(list(i))%simMortNumDecay
 
+       data%phytos(i)%f_carbon       = pd(list(i))%f_carbon
+       data%phytos(i)%rho_organic    = pd(list(i))%rho_organic
+       data%phytos(i)%f_gas_max      = pd(list(i))%f_gas_max
+       data%phytos(i)%r_gas_synth    = pd(list(i))%r_gas_synth
+       data%phytos(i)%C_turgor       = pd(list(i))%C_turgor
+       data%phytos(i)%r_gas_collapse = pd(list(i))%r_gas_collapse
+       data%phytos(i)%C_gas_cost     = pd(list(i))%C_gas_cost
+
        ! n_split semantics (2026-08, adaptive splitting - see aed_split_particle_phyto_abm):
        !   > 0  fixed threshold - particle splits once it exceeds this many cells
        !        (the only behaviour this module had before; unchanged, and still the
@@ -664,6 +669,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    INTEGER            :: num_phytos = 0
    INTEGER            :: the_phytos(MAX_PHYTO_TYPES) = 0
    INTEGER            :: settling(MAX_PHYTO_TYPES)     = _MOB_CONST_
+   INTEGER            :: cell_density_model = 1
    AED_REAL           :: resuspension(MAX_PHYTO_TYPES) = 0.
    CHARACTER(len=64)  :: resus_link='NCS_resus'
    CHARACTER(len=64)  :: phyto_particle_link=''            !   For FV API 2.0 (To be implemented)
@@ -695,13 +701,6 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    AED_REAL           :: theta_mpb_resp   = 1.05
    AED_REAL           :: min_rho = 900.
    AED_REAL           :: max_rho = 1200.
-   AED_REAL           :: f_carbon = 0.0
-   AED_REAL           :: rho_organic = 1300.
-   AED_REAL           :: f_gas_max = 0.0
-   AED_REAL           :: r_gas_synth = 0.5
-   AED_REAL           :: C_turgor = 0.7
-   AED_REAL           :: r_gas_collapse = 5.0
-   AED_REAL           :: C_gas_cost = 0.01
    INTEGER            :: do_mpb = 0
    INTEGER            :: n_zones = 0
    AED_REAL           :: active_zones(1000) = 0
@@ -727,7 +726,8 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
 
 
 
-   NAMELIST /aed_phyto_abm/ num_phytos, the_phytos, settling, resuspension,&
+   NAMELIST /aed_phyto_abm/ num_phytos, the_phytos, settling,              &
+                    cell_density_model, resuspension,                     &
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
                     n_excretion_target_variable,n_mortality_target_variable,   &
@@ -739,9 +739,6 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                       si_uptake_target_variable,                               &
                     dbase, zerolimitfudgefactor,     &
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
-                    f_carbon, rho_organic,                                    &
-                    f_gas_max, r_gas_synth, C_turgor, r_gas_collapse,        &
-                    C_gas_cost,                                              &
                     resus_link, n_zones, active_zones, diag_level,             &
                     theta_mpb_growth,theta_mpb_resp,                           &
                     phyto_particle_link, R_mpbb, target_particle_num,          &
@@ -769,40 +766,14 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
       STOP 'Invalid min_rho/max_rho in namelist aed_phyto_abm'
    ENDIF
 
-   ! Carbon-based density parameters.
-   data%f_carbon = f_carbon
-   data%rho_organic = rho_organic
-   IF ( data%f_carbon > zero_ ) THEN
-      print *,'        aed_phyto_abm: carbon-based density ENABLED'
-      print *,'          f_carbon    =', data%f_carbon
-      print *,'          rho_organic =', data%rho_organic
-   ENDIF
-
-   data%f_gas_max      = f_gas_max
-   data%r_gas_synth    = r_gas_synth
-   data%C_turgor       = C_turgor
-   data%r_gas_collapse = r_gas_collapse
-   data%C_gas_cost     = C_gas_cost
-   IF ( data%f_gas_max > zero_ ) THEN
-      print *,'        aed_phyto_abm: gas vesicle dynamics ENABLED'
-      print *,'          f_gas_max      =', data%f_gas_max
-      print *,'          r_gas_synth    =', data%r_gas_synth
-      print *,'          C_turgor       =', data%C_turgor
-      print *,'          r_gas_collapse =', data%r_gas_collapse
-      print *,'          C_gas_cost     =', data%C_gas_cost
-      IF ( data%f_carbon <= zero_ ) THEN
-         print *,'aed_phyto_abm: WARNING f_gas_max>0 but f_carbon<=0; gas vesicles require carbon-based density'
-         STOP 'Gas vesicles require f_carbon > 0'
-      ENDIF
-   ENDIF
-
    ! Store group parameter values in the phyto derived type. data%num_phytos may end up
    ! less than the requested num_phytos if the_phytos(:) contains bad/out-of-range CSV
    ! column indices (aed_phytoplankton_load_params EXITs early in that case) - so the
    ! per-group arrays below are sized from data%num_phytos (the actual count), not the
    ! raw namelist num_phytos.
    CALL aed_phytoplankton_load_params(data,dbase,                                &
-                                      num_phytos,the_phytos,settling,resuspension)
+                                      num_phytos,the_phytos,settling,            &
+                                      cell_density_model,resuspension)
 
    ! Per-group recruitment parameters and their fractional-particle accumulator
    ! (target_particle_num stays a single scalar - see FEATURE note on the type definition)
@@ -2235,20 +2206,20 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          p(i)%ptm_env(DIAM) = ESD_*1d-6 !meters
 
          !# GAS VESICLE DYNAMICS (before density, so updated f_gas feeds into rho_cell)
-         IF ( data%f_gas_max > zero_ ) THEN
+         IF ( data%phytos(g)%f_gas_max > zero_ ) THEN
             f_gas = p(i)%ptm_state(data%ip_fgas)
-            df_synth = data%r_gas_synth * (data%f_gas_max - f_gas) &
+            df_synth = data%phytos(g)%r_gas_synth * (data%phytos(g)%f_gas_max - f_gas) &
                        * (one_ - EXP(-par / data%phytos(g)%I_K)) * dtdays
-            turgor = p(i)%ptm_state(data%ip_c) / (data%C_turgor * p(i)%ptm_state(data%ip_cdiv)) - 1.d0
+            turgor = p(i)%ptm_state(data%ip_c) / (data%phytos(g)%C_turgor * p(i)%ptm_state(data%ip_cdiv)) - 1.d0
             IF ( turgor < zero_ ) turgor = zero_
-            f_gas = f_gas + df_synth - data%r_gas_collapse * f_gas * turgor * dtdays
+            f_gas = f_gas + df_synth - data%phytos(g)%r_gas_collapse * f_gas * turgor * dtdays
             IF ( f_gas < zero_ ) f_gas = zero_
-            IF ( f_gas > data%f_gas_max ) f_gas = data%f_gas_max
+            IF ( f_gas > data%phytos(g)%f_gas_max ) f_gas = data%phytos(g)%f_gas_max
             p(i)%ptm_state(data%ip_fgas) = f_gas
             !-- Carbon cost of gas vesicle protein synthesis
-            IF ( data%C_gas_cost > zero_ .AND. df_synth > zero_ ) THEN
+            IF ( data%phytos(g)%C_gas_cost > zero_ .AND. df_synth > zero_ ) THEN
                Vol_cell = (3.1415926535d0 / 6.d0) * ESD_**3
-               dC_gas = data%C_gas_cost * df_synth * Vol_cell
+               dC_gas = data%phytos(g)%C_gas_cost * df_synth * Vol_cell
                p(i)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c) - dC_gas
                IF ( p(i)%ptm_state(data%ip_c) < zero_ ) p(i)%ptm_state(data%ip_c) = zero_
             ENDIF
@@ -2257,14 +2228,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          ENDIF
 
          !# PHYTOPLANKTON CELL DENSITY
-         IF ( data%f_carbon > zero_ ) THEN
+         IF ( data%phytos(g)%cell_density_model == 2 ) THEN
             !-- Carbon-based density with optional gas vesicle buoyancy.
             pw = _STATE_VAR_(data%id_dens)
             C_mass   = p(i)%ptm_state(data%ip_c) * 12.d0
             Vol_cell = (3.1415926535d0 / 6.d0) * ESD_**3
-            V_organic = C_mass / (data%f_carbon * data%rho_organic * 1.d-3)
+            V_organic = C_mass / (data%phytos(g)%f_carbon * data%phytos(g)%rho_organic * 1.d-3)
             IF ( V_organic > Vol_cell ) V_organic = Vol_cell
-            p(i)%ptm_env(DENS) = pw + (data%rho_organic - pw) * V_organic / Vol_cell &
+            p(i)%ptm_env(DENS) = pw + (data%phytos(g)%rho_organic - pw) * V_organic / Vol_cell &
                                     - pw * f_gas
          ELSE
             !-- Original c1/c3 carbohydrate-ballasting ODE (Chung et al. 2014).
