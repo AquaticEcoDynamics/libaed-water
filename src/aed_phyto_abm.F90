@@ -121,7 +121,6 @@ MODULE aed_phyto_abm
       ! hours. Registered LAST (after ip_LnalphaChl) so it doesn't shift the fixed VVEL+N offsets
       ! GLM/src/glm_ptm.c uses to read the other particle state variables out of ptm_env.
       INTEGER :: ip_rhochl
-      INTEGER :: ip_fgas
       INTEGER,DIMENSION(:),ALLOCATABLE :: id_d_oxy, id_d_nit, id_d_amm, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
@@ -312,13 +311,6 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
    pd%f1           = 0.675        ! Ross and Sharples (2007)
    pd%f2           = 0.750        !  "
    pd%d_phy        = 1e-5
-   pd%f_carbon     = 0.0
-   pd%rho_organic  = 1300.
-   pd%f_gas_max    = 0.0
-   pd%r_gas_synth  = 0.5
-   pd%C_turgor     = 0.7
-   pd%r_gas_collapse = 5.0
-   pd%C_gas_cost   = 0.0
 
    ALLOCATE(values(nccols))
 
@@ -436,13 +428,6 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('simSplit')      ; pd(dcol)%simSplit      = extract_integer(values(ccol))
             CASE ('n_split')       ; pd(dcol)%n_split       = extract_double(values(ccol))
             CASE ('simMortNumDecay'); pd(dcol)%simMortNumDecay = extract_integer(values(ccol))
-            CASE ('f_carbon')      ; pd(dcol)%f_carbon      = extract_double(values(ccol))
-            CASE ('rho_organic')   ; pd(dcol)%rho_organic   = extract_double(values(ccol))
-            CASE ('f_gas_max')     ; pd(dcol)%f_gas_max     = extract_double(values(ccol))
-            CASE ('r_gas_synth')   ; pd(dcol)%r_gas_synth   = extract_double(values(ccol))
-            CASE ('C_turgor')      ; pd(dcol)%C_turgor      = extract_double(values(ccol))
-            CASE ('r_gas_collapse'); pd(dcol)%r_gas_collapse = extract_double(values(ccol))
-            CASE ('C_gas_cost')    ; pd(dcol)%C_gas_cost    = extract_double(values(ccol))
 
             CASE DEFAULT ; print *, 'Unknown row "', TRIM(name), '"'
          END SELECT
@@ -623,14 +608,6 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, &
        data%phytos(i)%simSplit      = pd(list(i))%simSplit
        data%phytos(i)%n_split       = pd(list(i))%n_split
        data%phytos(i)%simMortNumDecay = pd(list(i))%simMortNumDecay
-
-       data%phytos(i)%f_carbon       = pd(list(i))%f_carbon
-       data%phytos(i)%rho_organic    = pd(list(i))%rho_organic
-       data%phytos(i)%f_gas_max      = pd(list(i))%f_gas_max
-       data%phytos(i)%r_gas_synth    = pd(list(i))%r_gas_synth
-       data%phytos(i)%C_turgor       = pd(list(i))%C_turgor
-       data%phytos(i)%r_gas_collapse = pd(list(i))%r_gas_collapse
-       data%phytos(i)%C_gas_cost     = pd(list(i))%C_gas_cost
 
        ! n_split semantics (2026-08, adaptive splitting - see aed_split_particle_phyto_abm):
        !   > 0  fixed threshold - particle splits once it exceeds this many cells
@@ -859,8 +836,6 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ! local to that subroutine - see the long comment in aed_pibm_utils.F90 for why. Registered
    ! last so it doesn't shift the fixed VVEL+N offsets glm_ptm.c uses for the other variables.
    data%ip_rhochl = aed_define_ptm_variable('phy_rhochl', 'gChl/molC', 'carbon production allocated to Chl synthesis, carried over from the last daylight period', initial = 0.0d0)
-
-   data%ip_fgas = aed_define_ptm_variable('phy_fgas', '-', 'gas vesicle volume fraction', initial = 0.0d0)
 
    ! Diagnostic outputs for particle properties. One entry per simulated phyto group,
    ! with the variable name suffixed by that group's p_name (mirroring the Eulerian
@@ -1544,7 +1519,6 @@ CONTAINS
       p(j)%ptm_state(data%ip_Topt) = p(i)%ptm_state(data%ip_Topt)
       p(j)%ptm_state(data%ip_LnalphaChl) = p(i)%ptm_state(data%ip_LnalphaChl)
       p(j)%ptm_state(data%ip_rhochl) = p(i)%ptm_state(data%ip_rhochl)
-      p(j)%ptm_state(data%ip_fgas) = p(i)%ptm_state(data%ip_fgas)
 
       !then split the number of cells for both old and new particles
       p(j)%ptm_state(data%ip_num) = p(i)%ptm_state(data%ip_num) / 2
@@ -1632,7 +1606,6 @@ CONTAINS
       p(j)%ptm_state(data%ip_nh4) = 0.0d0
       p(j)%ptm_state(data%ip_frp) = 0.0d0
       p(j)%ptm_state(data%ip_rhochl) = 0.0d0
-      p(j)%ptm_state(data%ip_fgas) = 0.0d0
 
       ! ---- traits + cell C/N/P/Chl/num: base CSV defaults, Gaussian-perturbed ----
       DO v = 1, NInit
@@ -1854,13 +1827,6 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    ! the identically-named namelist parameters and made those parameters inert. The clamp
    ! below now reads data%min_rho / data%max_rho directly (set in aed_define_phyto_abm).
    real     :: dens_flux = 0.
-   real     :: C_mass = 0.       ! carbon mass per cell (pg)
-   real     :: Vol_cell = 0.     ! cell volume (um3)
-   real     :: V_organic = 0.    ! organic matter volume per cell (um3)
-   real     :: f_gas = 0.        ! current gas vesicle volume fraction
-   real     :: turgor = 0.       ! turgor collapse driver
-   real     :: df_synth = 0.     ! gas vesicle synthesis increment this step
-   real     :: dC_gas = 0.       ! carbon cost of gas vesicle synthesis (pmol C)
 
 !End of declaration
 !
@@ -2205,49 +2171,15 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
          ! Update ESD
          p(i)%ptm_env(DIAM) = ESD_*1d-6 !meters
 
-         !# GAS VESICLE DYNAMICS (before density, so updated f_gas feeds into rho_cell)
-         IF ( data%phytos(g)%f_gas_max > zero_ ) THEN
-            f_gas = p(i)%ptm_state(data%ip_fgas)
-            df_synth = data%phytos(g)%r_gas_synth * (data%phytos(g)%f_gas_max - f_gas) &
-                       * (one_ - EXP(-par / data%phytos(g)%I_K)) * dtdays
-            turgor = p(i)%ptm_state(data%ip_c) / (data%phytos(g)%C_turgor * p(i)%ptm_state(data%ip_cdiv)) - 1.d0
-            IF ( turgor < zero_ ) turgor = zero_
-            f_gas = f_gas + df_synth - data%phytos(g)%r_gas_collapse * f_gas * turgor * dtdays
-            IF ( f_gas < zero_ ) f_gas = zero_
-            IF ( f_gas > data%phytos(g)%f_gas_max ) f_gas = data%phytos(g)%f_gas_max
-            p(i)%ptm_state(data%ip_fgas) = f_gas
-            !-- Carbon cost of gas vesicle protein synthesis
-            IF ( data%phytos(g)%C_gas_cost > zero_ .AND. df_synth > zero_ ) THEN
-               Vol_cell = (3.1415926535d0 / 6.d0) * ESD_**3
-               dC_gas = data%phytos(g)%C_gas_cost * df_synth * Vol_cell
-               p(i)%ptm_state(data%ip_c) = p(i)%ptm_state(data%ip_c) - dC_gas
-               IF ( p(i)%ptm_state(data%ip_c) < zero_ ) p(i)%ptm_state(data%ip_c) = zero_
-            ENDIF
-         ELSE
-            f_gas = zero_
-         ENDIF
-
          !# PHYTOPLANKTON CELL DENSITY
-         IF ( data%phytos(g)%cell_density_model == 2 ) THEN
-            !-- Carbon-based density with optional gas vesicle buoyancy.
-            pw = _STATE_VAR_(data%id_dens)
-            C_mass   = p(i)%ptm_state(data%ip_c) * 12.d0
-            Vol_cell = (3.1415926535d0 / 6.d0) * ESD_**3
-            V_organic = C_mass / (data%phytos(g)%f_carbon * data%phytos(g)%rho_organic * 1.d-3)
-            IF ( V_organic > Vol_cell ) V_organic = Vol_cell
-            p(i)%ptm_env(DENS) = pw + (data%phytos(g)%rho_organic - pw) * V_organic / Vol_cell &
-                                    - pw * f_gas
+         dens_flux = zero_
+         IF( par>zero_ ) THEN
+            dens_flux = data%phytos(g)%c1 * &
+            (one_ - EXP(-par/data%phytos(g)%I_K) ) - data%phytos(g)%c3
          ELSE
-            !-- Original c1/c3 carbohydrate-ballasting ODE (Chung et al. 2014).
-            dens_flux = zero_
-            IF( par>zero_ ) THEN
-               dens_flux = data%phytos(g)%c1 * &
-               (one_ - EXP(-par/data%phytos(g)%I_K) ) - data%phytos(g)%c3
-            ELSE
-               dens_flux = -data%phytos(g)%c3
-            ENDIF
-            p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux * dtdays
+            dens_flux = -data%phytos(g)%c3
          ENDIF
+         p(i)%ptm_env(DENS) = p(i)%ptm_env(DENS) + dens_flux * dtdays
 
          ! check maximum/minimum density are not exceeded
          IF( p(i)%ptm_env(DENS)>data%max_rho ) THEN
