@@ -55,6 +55,7 @@ MODULE aed_core
    PUBLIC host_has_cell_vel
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC aed_ptm_dt_days
+   PUBLIC aed_ptm_n_reserved, aed_set_ptm_reserved
    PUBLIC model_list, last_model, aed_thread, aed_n_threads
    PUBLIC n_aed_models
 
@@ -214,8 +215,33 @@ MODULE aed_core
    !# The 1/24 default reproduces the previous hardcoded hourly value for any
    !# host that does not supply one.
    AED_REAL           :: aed_ptm_dt_days = 1.0/24.0
+
+   !# Particle slots 1..aed_ptm_n_reserved are owned by the host for the whole run
+   !# and are never allocated to a newly created particle (see next_free_slot in
+   !# aed_phyto_abm). A host sets this when its particle identities must survive
+   !# independently of the biology - ELCOM's drifters, for instance, exist even with
+   !# do_particle_bgc = .FALSE., carry their own physical state, and have NetCDF
+   !# records indexed by drifter number, so re-issuing a drifter's slot after its
+   !# phytoplankton died would silently swap that drifter's biology for a stranger's.
+   !# 0 (the default) leaves the whole pool allocatable, which is GLM's behaviour.
+   INTEGER            :: aed_ptm_n_reserved = 0
 !===============================================================================
 CONTAINS
+
+
+!###############################################################################
+SUBROUTINE aed_set_ptm_reserved(n)
+!-------------------------------------------------------------------------------
+! Reserve the first n particle slots for the host (see aed_ptm_n_reserved above).
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in) :: n
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   aed_ptm_n_reserved = MAX(n, 0)
+END SUBROUTINE aed_set_ptm_reserved
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################

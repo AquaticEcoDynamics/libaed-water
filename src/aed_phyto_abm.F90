@@ -47,7 +47,6 @@ MODULE aed_phyto_abm
    USE trait_functions
    USE gmk
    USE mGf90
-   USE ISO_C_BINDING, ONLY: C_INT
 
    IMPLICIT NONE
 
@@ -55,36 +54,15 @@ MODULE aed_phyto_abm
 !
    PUBLIC aed_phyto_abm_data_t
 !
-   ! Free-slot queue shared with the C-side PTM code (GLM/src/glm_ptm.c) - see the
-   ! header comment on its implementation there. Every "find a free particle slot"
-   ! search in this file (4 sites below) used to scan p(1:ppid) from j=1 looking for
-   ! STAT==0, an O(ppid) search repeated once per split/recruit/reseed event (and,
-   ! in population maintenance, up to MAX_POPMAINTAIN_SPLITS_PER_CALL times in a
-   ! single call). These two calls make that O(1): ptm_free_pop() returns a free
-   ! slot as a 0-based C index (-1 if none are free - the same "no more available
-   ! particles" case the old scan handled by falling off the end of ppid), and
-   ! ptm_free_push() returns one when a particle dies. No module dependency is
-   ! needed for this - it is a direct BIND(C) link to the symbols glm_ptm.c
-   ! defines, resolved at final-executable link time like every other
-   ! host/AED C/Fortran boundary in this codebase.
-   INTERFACE
-      FUNCTION ptm_free_pop() BIND(C, name="ptm_free_pop") RESULT(slot0)
-         IMPORT :: C_INT
-         INTEGER(C_INT) :: slot0
-      END FUNCTION ptm_free_pop
-
-      SUBROUTINE ptm_free_push(slot0, tag) BIND(C, name="ptm_free_push")
-         IMPORT :: C_INT
-         INTEGER(C_INT), VALUE :: slot0, tag
-      END SUBROUTINE ptm_free_push
-   END INTERFACE
-
-   ! GLM/src/glm_globals.c's max_particle_num, exposed the same way
-   ! particle_random_seed already is (see glm_api_aed.F90). Needed to recover a
-   ! particle's GLOBAL (domain-wide, 0-based) slot number from its PTID inside
-   ! aed_particle_bgc_phyto_abm - see the comment at those ptm_free_push() call
-   ! sites for why that recovery is necessary at all.
-   INTEGER(C_INT), BIND(C, name="max_particle_num") :: max_particle_num
+   ! Rolling start position for the free-slot search (see next_free_slot, CONTAINed
+   ! in aed_split_particle_phyto_abm). Saved across calls so that a burst of
+   ! allocations - population maintenance can make up to
+   ! MAX_POPMAINTAIN_SPLITS_PER_CALL of them, and reseeding up to
+   ! (particle_reseed_target - particle_reseed_min) per group - does not re-walk the
+   ! prefix the preceding allocations just filled. It is only ever a hint: every
+   ! candidate slot is still tested against STAT/FLAG, so a stale cursor cannot
+   ! hand out a slot that is not genuinely free.
+   INTEGER :: search_cursor = 1
 !
    TYPE,extends(aed_model_data_t) :: aed_phyto_abm_data_t
       !# Variable identifiers
@@ -1143,7 +1121,7 @@ INTEGER   :: heap_n, heap_cap, heap_alloc_stat
 
 ! Adaptive (constant-particle-NUMBER) splitting (2026-08). SB's only splitting mode
 ! was constant-WEIGHT: n_split > 0 is a fixed cells-per-particle threshold, so the
-! particle COUNT grows with the population and eventually hits max_particle_num, after
+! particle COUNT grows with the population and eventually fills the slot pool, after
 ! which splits silently fail (no free slot found) and per-particle statistical weight
 ! ends up wildly uneven. n_split < 0 (see the sentinel handling in
 ! aed_phytoplankton_load_params) opts a group INTO this alternative: the threshold
@@ -1240,10 +1218,7 @@ DO i = 1, ppid
          thresh = data%phytos(g)%n_split   ! fixed threshold (existing behaviour, unchanged)
       ENDIF
       IF (p(i)%ptm_state(data%ip_num) > thresh) THEN
-         ! Was a scan of p(1:ppid) from j=1 for the first STAT==0 slot - now an
-         ! O(1) pop from the free-slot queue shared with the C-side PTM code
-         ! (see the INTERFACE block near the top of this module).
-         j = ptm_free_pop() + 1
+         j = next_free_slot()
          found_slot = (j > 0)
          IF (found_slot) THEN
             CALL duplicate_and_halve_particle(i, j)
@@ -1325,10 +1300,7 @@ IF (data%target_particle_num > 0) THEN
 
          IF (largest_num < 2.0d0) EXIT ! nothing left worth splitting - heap-max<2 means ALL are
 
-         ! O(1) pop from the free-slot queue shared with the C-side PTM code
-         ! (see the INTERFACE block near the top of this module) - was an
-         ! O(ppid) scan of p(1:ppid) from j=1 for the first STAT==0 slot.
-         j = ptm_free_pop() + 1
+         j = next_free_slot()
          IF (j <= 0) THEN
             print *, 'aed_split_particle(): WARNING population below target_particle_num but no free particle slots available'
             EXIT ! no free slots anywhere; give up until next call
@@ -1388,9 +1360,7 @@ DO ng = 1, data%num_phytos
 
          ! find a free slot (any slot regardless of which group previously occupied it -
          ! correctness comes from recruit_particle setting GRP=ng on the new occupant).
-         ! O(1) pop from the shared free-slot queue (see the INTERFACE block near
-         ! the top of this module) instead of an O(ppid) scan from j=1.
-         j = ptm_free_pop() + 1
+         j = next_free_slot()
          IF (j <= 0) THEN
             print *, 'aed_split_particle(): WARNING recruit_rate > 0 but no free particle slots available'
             EXIT ! no free slots anywhere; keep the fractional
@@ -1439,8 +1409,7 @@ DO ng = 1, data%num_phytos
       DO WHILE (grp_live(ng) < data%particle_reseed_target(ng) .AND. &
                 n_recruit_this_call < data%recruit_max_per_call(ng))
 
-         ! O(1) pop from the shared free-slot queue instead of an O(ppid) scan.
-         j = ptm_free_pop() + 1
+         j = next_free_slot()
          IF (j <= 0) THEN
             print *, 'aed_split_particle(): WARNING particle_reseed_min > 0 but no free particle slots available'
             EXIT ! no free slots anywhere; try again next call
@@ -1482,6 +1451,44 @@ END DO
 DEALLOCATE(grp_cells, grp_live)
 
 CONTAINS
+
+   !###########################################################################
+   ! Lowest free slot at or after the rolling cursor, wrapping once; -1 if none
+   ! are free - the same "no more available particles" signal all four call sites
+   ! above already handle. A slot is free when STAT==0 AND FLAG==EXIT(3), which
+   ! is exactly what every death path sets, so the particle array is its own
+   ! bookkeeping and there is no separate free list that could disagree with it.
+   !
+   ! p(:) here is the WHOLE domain (aed_split_particle_phyto_abm is called once
+   ! per step with every particle), so a local index is a global slot and no
+   ! PTID arithmetic is needed to convert between them.
+   !
+   ! search_cursor (module level) only avoids re-walking the prefix that
+   ! consecutive allocations within one call have just filled, turning a burst of
+   ! K allocations from O(K*ppid) into roughly O(ppid). It is a hint, never a
+   ! source of truth: every candidate is validated below, so a stale cursor
+   ! cannot return a slot that is not genuinely free.
+   !
+   ! Slots at or below aed_ptm_n_reserved (aed_core) belong to the host for the
+   ! whole run and are never handed out - see the note on that variable.
+   INTEGER FUNCTION next_free_slot()
+      INTEGER :: k, s, lo
+
+      next_free_slot = -1
+      lo = aed_ptm_n_reserved + 1
+      IF (lo > ppid) RETURN
+      IF (search_cursor < lo .OR. search_cursor > ppid) search_cursor = lo
+
+      DO k = 1, ppid - aed_ptm_n_reserved
+         s = search_cursor
+         search_cursor = search_cursor + 1
+         IF (search_cursor > ppid) search_cursor = lo
+         IF (p(s)%ptm_istat(STAT) == 0 .AND. p(s)%ptm_istat(FLAG) == 3) THEN
+            next_free_slot = s
+            RETURN
+         END IF
+      END DO
+   END FUNCTION next_free_slot
 
    !###########################################################################
    ! Duplicate particle i's attributes into slot j, halve ip_num on both so the
@@ -2242,24 +2249,14 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_state(data%ip_p)   = 0d0
             p(i)%ptm_state(data%ip_chl) = 0d0
             p(i)%ptm_state(data%ip_num) = 0d0
+            !# Marking the slot STAT=0/FLAG=EXIT is all that is needed to return it
+            !# to circulation: next_free_slot scans for exactly that condition. (This
+            !# used to also push the slot onto a separate free list, which required
+            !# recovering the global slot from PTID because i is this LAYER's local
+            !# index here, not the domain-wide slot - a conversion that had already
+            !# caused one real bug. No list, no conversion, nothing to get wrong.)
             _PTM_STAT_(i,STAT) = 0
             _PTM_STAT_(i,FLAG) = 3
-            ! BUG FIX: i is this LAYER's local index into p(1:ppid) here (p is the
-            ! per-layer filtered list aed_calculate_particles builds - see
-            ! aed_ptm.F90), NOT the domain-wide global slot glm_ptm.c's free-slot
-            ! queue is indexed by (that identification only holds in
-            ! aed_split_particle_phyto_abm, which is called with the WHOLE domain
-            ! as p(:)). i-1 was pushed here directly for a while, which handed the
-            ! queue essentially arbitrary small numbers (this layer's own particle
-            ! count, typically in the tens to low hundreds) instead of real global
-            ! slots - silently freeing whatever unrelated (and possibly still
-            ! active) slot that small number happened to name, while the true
-            ! slot leaked from the queue forever. PTID is generation*max_particle_num
-            ! + (global_slot+1) at every assignment (ptm_addparticles,
-            ! duplicate_and_halve_particle, recruit_particle all follow this same
-            ! scheme), so (PTID-1) MOD max_particle_num recovers the real global
-            ! slot regardless of how many times this slot has been reused.
-            CALL ptm_free_push(INT(MOD(p(i)%ptm_istat(PTID) - 1, max_particle_num), C_INT), 1)   ! tag 1 = subsistence threshold death
 
             n_starved = n_starved + 1
 
@@ -2314,11 +2311,10 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                   p(i)%ptm_state(data%ip_p)   = 0d0
                   p(i)%ptm_state(data%ip_chl) = 0d0
                   p(i)%ptm_state(data%ip_num) = 0d0
+                  !# STAT=0/FLAG=EXIT returns the slot to circulation - see the note
+                  !# at the subsistence-threshold death above.
                   _PTM_STAT_(i,STAT) = 0
                   _PTM_STAT_(i,FLAG) = 3
-                  ! i is this layer's local index, not the global slot - see the
-                  ! matching comment at the subsistence-threshold push above.
-                  CALL ptm_free_push(INT(MOD(p(i)%ptm_istat(PTID) - 1, max_particle_num), C_INT), 2)   ! tag 2 = num-decay-to-zero death
                END IF
             END IF
          ELSE
@@ -2341,11 +2337,10 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                p(i)%ptm_state(data%ip_p)   = 0d0
                p(i)%ptm_state(data%ip_chl) = 0d0
                p(i)%ptm_state(data%ip_num) = 0d0
+               !# STAT=0/FLAG=EXIT returns the slot to circulation - see the note at
+               !# the subsistence-threshold death above.
                _PTM_STAT_(i,STAT) = 0
                _PTM_STAT_(i,FLAG) = 3
-               ! i is this layer's local index, not the global slot - see the
-               ! matching comment at the subsistence-threshold push above.
-               CALL ptm_free_push(INT(MOD(p(i)%ptm_istat(PTID) - 1, max_particle_num), C_INT), 3)   ! tag 3 = default Bernoulli mortality
             ENDIF
          END IF
 
