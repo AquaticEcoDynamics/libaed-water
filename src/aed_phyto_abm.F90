@@ -1830,10 +1830,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    integer  :: chk_lyr_new  = 0.
    integer  :: chk_lyr_old  = 0.
    real     :: p_vvel = 0. !vertical velocity calculated in AED (m/s)
-   ! min_rho/max_rho were declared here as locals hardcoded to 900./1200., which shadowed
-   ! the identically-named namelist parameters and made those parameters inert. The clamp
-   ! below now reads data%min_rho / data%max_rho directly (set in aed_define_phyto_abm).
    real     :: dens_flux = 0.
+   real, parameter :: pi_ = 3.14159265358979
 
 !End of declaration
 !
@@ -2196,6 +2194,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
             p(i)%ptm_env(DENS)=data%min_rho
          ENDIF
 
+         !# PHYTOPLANKTON CELL MASS = volume (sphere, from ESD) * cell density.
+         p(i)%ptm_env(MASS) = (pi_/6.0) * (p(i)%ptm_env(DIAM)**3) * p(i)%ptm_env(DENS)
+
          !# PHYTOPLANKTON VVEL updates based on specified settling mode
          SELECT CASE (data%phytos(g)%settling)
 
@@ -2219,7 +2220,7 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
                ! Update p_vvel (Stokes' Law)
                pw   = _STATE_VAR_(data%id_dens)
                mu   = water_viscosity(WaterTemperature)
-               p_vvel = -9.807*((ESD_*1d-6)**2.)*( p(i)%ptm_env(DENS)-pw ) / ( 18.*mu ) 
+               p_vvel = -9.807*((ESD_*1d-6)**2.)*( p(i)%ptm_env(DENS)-pw ) / ( 18.*mu )
                p(i)%ptm_env(VVEL) = p_vvel
 
             CASE DEFAULT
