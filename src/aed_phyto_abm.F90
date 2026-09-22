@@ -169,6 +169,7 @@ MODULE aed_phyto_abm
 
       CONTAINS
          PROCEDURE :: define              => aed_define_phyto_abm
+         PROCEDURE :: calculate_column    => aed_calculate_column_phyto_abm
 !        PROCEDURE :: calculate           => aed_calculate_phyto_abm
 !        PROCEDURE :: calculate_benthic   => aed_calculate_benthic_phyto_abm
 !        PROCEDURE :: calculate_riparian  => aed_calculate_riparian_phyto_abm
@@ -240,11 +241,6 @@ MODULE aed_phyto_abm
    ! see block (4) in aed_split_particle_phyto_abm, and particle_reseed_min/target on
    ! the data type).
    INTEGER, SAVE  :: ptm_cum_reseed_count = 0
-   ! Fractional-particle accumulator for recruit_rate (particles/day), one per phyto
-   ! group since recruit_rate is now per-group. Allocated/sized in aed_define_phyto_abm
-   ! once num_phytos is known. See block (3) in aed_split_particle_phyto_abm for why a
-   ! fractional accumulator is used instead of a fixed integer-per-call count.
-   AED_REAL, SAVE, DIMENSION(:), ALLOCATABLE :: recruit_accumulator
 
    ! DIAGNOSTIC: flag to track whether PTM_NUM_COLLAPSE log file header has been written
    LOGICAL, SAVE :: ptm_num_collapse_header_written = .false.
@@ -730,18 +726,16 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
                                       num_phytos,the_phytos,settling,            &
                                       cell_density_model,resuspension)
 
-   ! Per-group recruitment parameters and their fractional-particle accumulator
-   ! (target_particle_num stays a single scalar - see FEATURE note on the type definition)
+   ! Per-group recruitment parameters (target_particle_num stays a single scalar -
+   ! see FEATURE note on the type definition)
    ALLOCATE(data%recruit_rate(data%num_phytos))
    ALLOCATE(data%recruit_height_min(data%num_phytos))
    ALLOCATE(data%recruit_height_max(data%num_phytos))
    ALLOCATE(data%recruit_max_per_call(data%num_phytos))
-   ALLOCATE(recruit_accumulator(data%num_phytos))
    data%recruit_rate(1:data%num_phytos)         = recruit_rate(1:data%num_phytos)
    data%recruit_height_min(1:data%num_phytos)   = recruit_height_min(1:data%num_phytos)
    data%recruit_height_max(1:data%num_phytos)   = recruit_height_max(1:data%num_phytos)
    data%recruit_max_per_call(1:data%num_phytos) = recruit_max_per_call(1:data%num_phytos)
-   recruit_accumulator(1:data%num_phytos)       = 0.0d0
 
    ! Per-group reseeding floor/target (block (4) in aed_split_particle_phyto_abm).
    ! target <= 0 (with min > 0) falls back to target = min - "top up to the floor",
@@ -1348,52 +1342,37 @@ END IF
 !     immigration). Gated by recruit_rate(g) (particles/day, disabled when 0).
 !     Per-group (unlike population maintenance in (2) above): each species recruits
 !     independently at its own rate, into its own height band.
+!
+!     Implemented as a stateless per-call Bernoulli draw (probability =
+!     recruit_rate(g)*dtdays_assumed of recruiting one particle this call) rather
+!     than a fractional accumulator carried between calls: recruit_rate*dtdays_assumed
+!     stays well under 1 for realistic rates/timesteps, so this reproduces a Poisson
+!     process with the correct long-run mean rate, and - unlike an accumulator -
+!     carries no state between calls, so there is nothing for a restart to lose.
 DO ng = 1, data%num_phytos
    IF (data%recruit_rate(ng) > 0) THEN
       ! NOTE: same fragile-but-precedented dt assumption as elsewhere in this file
       ! (see dtdays in aed_particle_bgc_phyto_abm) - this routine has no column/
       ! layer context and so cannot read the model's actual timestep.
-      recruit_accumulator(ng) = recruit_accumulator(ng) + data%recruit_rate(ng) * dtdays_assumed
-
-      n_recruit_this_call = 0
-      DO WHILE (recruit_accumulator(ng) >= 1.0d0 .AND. n_recruit_this_call < data%recruit_max_per_call(ng))
+      CALL RANDOM_NUMBER(rand01)
+      IF (rand01 < data%recruit_rate(ng) * dtdays_assumed) THEN
 
          ! find a free slot (any slot regardless of which group previously occupied it -
          ! correctness comes from recruit_particle setting GRP=ng on the new occupant).
          j = next_free_slot()
          IF (j <= 0) THEN
             print *, 'aed_split_particle(): WARNING recruit_rate > 0 but no free particle slots available'
-            EXIT ! no free slots anywhere; keep the fractional
-                 ! accumulator so nothing is lost - try again next call
+         ELSE
+            ! ---- draw an independently-random height within this group's recruitment band,
+            !      matching the ptm_addparticles() random-within-band precedent used
+            !      for initial seeding (GLM/src/glm_ptm.c) ----
+            CALL RANDOM_NUMBER(rand01)
+            recruit_height = data%recruit_height_min(ng) + &
+                              rand01 * (data%recruit_height_max(ng) - data%recruit_height_min(ng))
+
+            CALL recruit_particle(j, ng, recruit_height)
          END IF
-
-         ! ---- draw an independently-random height within this group's recruitment band,
-         !      matching the ptm_addparticles() random-within-band precedent used
-         !      for initial seeding (GLM/src/glm_ptm.c) ----
-         CALL RANDOM_NUMBER(rand01)
-         recruit_height = data%recruit_height_min(ng) + &
-                           rand01 * (data%recruit_height_max(ng) - data%recruit_height_min(ng))
-
-         CALL recruit_particle(j, ng, recruit_height)
-
-         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
-         ! DIAGNOSTIC: record the recruitment event, distinct from the split-triggered
-         ! logs above (this is the third, independent pathway that creates a new
-         ! active particle).
-         ! ptm_cum_recruit_count = ptm_cum_recruit_count + 1
-          n_recruit_this_call = n_recruit_this_call + 1
-          recruit_accumulator(ng) = recruit_accumulator(ng) - 1.0d0
-         ! BLOCK
-         !    INTEGER :: recruit_log_unit
-         !    OPEN(NEWUNIT=recruit_log_unit, FILE='ptm_recruit_events.csv', &
-         !         POSITION='append', STATUS='unknown', ACTION='write')
-         !    IF (ptm_cum_recruit_count == 1) WRITE(recruit_log_unit,'(A)') &
-         !       'event_num,new_particle,group,height,cells_per_particle'
-         !    WRITE(recruit_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-         !       ptm_cum_recruit_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
-         !    CLOSE(recruit_log_unit)
-         ! END BLOCK
-      END DO
+      END IF
    END IF
 END DO
 
@@ -1427,22 +1406,7 @@ DO ng = 1, data%num_phytos
 
          n_recruit_this_call = n_recruit_this_call + 1
          grp_live(ng) = grp_live(ng) + 1
-
-         ! SCB commenting out Claude-assisted RQT diagnostics that are slowing down code
-         ! DIAGNOSTIC: record the reseed event, distinct from the recruit-triggered
-         ! log above (this is the fourth, independent pathway that creates a new
-         ! active particle).
-         ! ptm_cum_reseed_count = ptm_cum_reseed_count + 1
-         ! BLOCK
-         !    INTEGER :: reseed_log_unit
-         !    OPEN(NEWUNIT=reseed_log_unit, FILE='ptm_reseed_events.csv', &
-         !         POSITION='append', STATUS='unknown', ACTION='write')
-         !    IF (ptm_cum_reseed_count == 1) WRITE(reseed_log_unit,'(A)') &
-         !       'event_num,new_particle,group,height,cells_per_particle'
-         !    WRITE(reseed_log_unit,'(I0,A,I0,A,I0,A,ES14.6,A,ES14.6)') &
-         !       ptm_cum_reseed_count, ',', j, ',', ng, ',', recruit_height, ',', p(j)%ptm_state(data%ip_num)
-         !    CLOSE(reseed_log_unit)
-         ! END BLOCK
+         
       END DO
    END IF
 END DO
@@ -2416,15 +2380,17 @@ PHYC = 0
 PHYN = 0
 PHYP = 0
 CHL  = 0
-DO ng=1,data%num_phytos
-   _DIAG_VAR_(data%id_phyc(ng)) = 0.
-   _DIAG_VAR_(data%id_phyn(ng)) = 0.
-   _DIAG_VAR_(data%id_phyp(ng)) = 0.
-   _DIAG_VAR_(data%id_chl(ng)) = 0.
-   _DIAG_VAR_(data%id_mcdiv(ng)) = 0.
-   _DIAG_VAR_(data%id_mtopt(ng)) = 0.
-   _DIAG_VAR_(data%id_mlnalpha(ng)) = 0.
-ENDDO
+! NOTE: the per-layer _DIAG_VAR_ reset that used to live here has moved to
+! aed_calculate_column_phyto_abm. This routine is only reached for layers that
+! actually contain particles - aed_calculate_particles does
+! "IF (layer_particles%n == 0) CYCLE" (aed_ptm.F90) - so resetting here left
+! every empty layer holding whatever the diagnostic array happened to contain
+! from a previously processed cell. aed_light_extinction_phyto_abm then read
+! id_phyc for EVERY layer and turned that stale value into light attenuation.
+! Harmless-looking in GLM (one column, so staleness came from the same layer a
+! timestep earlier) but severe in a 3-D host: in ELCOM, 70% of zero-chlorophyll
+! cells carried spurious extinction (mean 4.5 /m) and bioextc was uncorrelated
+! with local chlorophyll (r = 0.06).
 
 !loop through all super-individuals to divide, mutate, and convert into Eulerian concentrations
 IF (N_ > 0) THEN
@@ -2576,6 +2542,66 @@ END SUBROUTINE aed_particle_bgc_phyto_abm
 
 
 !###############################################################################
+!###############################################################################
+SUBROUTINE aed_calculate_column_phyto_abm(data,column,layer_map)
+!------------------------------------------------------------------------------+
+! Reset this module's per-layer diagnostics across the WHOLE column.
+!
+! Must run for every layer, including layers holding no particles, because
+! aed_calculate_particles skips empty layers entirely and so cannot clear them.
+! aed_api calls calculate_fluxes (which reaches here via aed_calculate_column)
+! before aed_calculate_particles and before BioExtinction, so the ordering is
+! reset -> accumulate -> read.
+!------------------------------------------------------------------------------+
+!ARGUMENTS
+   CLASS (aed_phyto_abm_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_map(:)
+!
+!LOCALS
+   INTEGER :: lev, layer_idx, ng
+!
+!------------------------------------------------------------------------------+
+!BEGIN
+   DO lev = 1,SIZE(layer_map)
+      layer_idx = layer_map(lev)
+      DO ng = 1,data%num_phytos
+         _DIAG_VAR_(data%id_count(ng))              = zero_
+         _DIAG_VAR_(data%id_phyc(ng))               = zero_
+         _DIAG_VAR_(data%id_phyn(ng))               = zero_
+         _DIAG_VAR_(data%id_phyp(ng))               = zero_
+         _DIAG_VAR_(data%id_chl(ng))                = zero_
+         _DIAG_VAR_(data%id_mtopt(ng))              = zero_
+         _DIAG_VAR_(data%id_vtopt(ng))              = zero_
+         _DIAG_VAR_(data%id_mcdiv(ng))              = zero_
+         _DIAG_VAR_(data%id_vcdiv(ng))              = zero_
+         _DIAG_VAR_(data%id_mlnalpha(ng))           = zero_
+         _DIAG_VAR_(data%id_vlnalpha(ng))           = zero_
+         _DIAG_VAR_(data%id_cov_TA(ng))             = zero_
+         _DIAG_VAR_(data%id_cov_TL(ng))             = zero_
+         _DIAG_VAR_(data%id_cov_AL(ng))             = zero_
+         _DIAG_VAR_(data%id_N_birth(ng))            = zero_
+         _DIAG_VAR_(data%id_N_mutate(ng))           = zero_
+         _DIAG_VAR_(data%id_N_death(ng))            = zero_
+         _DIAG_VAR_(data%id_cum_birth(ng))          = zero_
+         _DIAG_VAR_(data%id_cum_death_thresh(ng))   = zero_
+         _DIAG_VAR_(data%id_cum_death_prob(ng))     = zero_
+         _DIAG_VAR_(data%id_cum_cells_decayed(ng))  = zero_
+         _DIAG_VAR_(data%id_NPPc(ng))               = zero_
+         _DIAG_VAR_(data%id_cells(ng))              = zero_
+         _DIAG_VAR_(data%id_d_nit(ng))              = zero_
+         _DIAG_VAR_(data%id_d_amm(ng))              = zero_
+         _DIAG_VAR_(data%id_d_pon(ng))              = zero_
+         _DIAG_VAR_(data%id_d_frp(ng))              = zero_
+         _DIAG_VAR_(data%id_d_pop(ng))              = zero_
+         _DIAG_VAR_(data%id_d_poc(ng))              = zero_
+         _DIAG_VAR_(data%id_d_oxy(ng))              = zero_
+      ENDDO
+   ENDDO
+END SUBROUTINE aed_calculate_column_phyto_abm
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 SUBROUTINE aed_light_extinction_phyto_abm(data,column,layer_idx,extinction)
 !------------------------------------------------------------------------------+
 ! Get the light extinction coefficient due to biogeochemical variables
