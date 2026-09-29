@@ -129,6 +129,7 @@ MODULE aed_core
       INTEGER           :: particle_link
       INTEGER           :: index
       LOGICAL           :: rezero
+      LOGICAL           :: output   !# .FALSE. = inter-module use only, hosts need not write it
       CLASS(aed_prefix_list_t),POINTER :: req => null()
    END TYPE aed_variable_t
    !#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -544,6 +545,7 @@ SUBROUTINE extend_allocated_variables(pcount)
    all_vars(a_vars+1:a_vars+count)%zavg = .true.
    all_vars(a_vars+1:a_vars+count)%zavg_req = .false.
    all_vars(a_vars+1:a_vars+count)%const = .false.
+   all_vars(a_vars+1:a_vars+count)%output = .true.
 
    a_vars = a_vars + count
 END SUBROUTINE extend_allocated_variables
@@ -726,13 +728,15 @@ END FUNCTION aed_define_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(ret)
+FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero, output) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: zavg
    LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep,
    										 !use this flag to not rezero
+   LOGICAL,INTENT(in),OPTIONAL :: output !Default .TRUE.; .FALSE. marks a diagnostic
+   										 !for inter-module use that hosts need not output
 !
 !LOCALS
    INTEGER :: ret
@@ -761,12 +765,14 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(re
    ELSE
       all_vars(ret)%rezero = .TRUE.
    ENDIF
+
+   IF ( PRESENT(output) ) all_vars(ret)%output = output
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
-FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezero) RESULT(ret)
+FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezero, output) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
@@ -774,6 +780,8 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezer
    LOGICAL,INTENT(in),OPTIONAL :: zavg
    LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep,
    										 !use this flag to not rezero
+   LOGICAL,INTENT(in),OPTIONAL :: output !Default .TRUE.; .FALSE. marks a diagnostic
+   										 !for inter-module use that hosts need not output
 !
 !LOCALS
    INTEGER :: ret
@@ -810,6 +818,8 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezer
    ELSE
       all_vars(ret)%rezero = .TRUE.
    ENDIF
+
+   IF ( PRESENT(output) ) all_vars(ret)%output = output
 END FUNCTION aed_define_sheet_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
