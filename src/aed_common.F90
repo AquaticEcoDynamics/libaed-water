@@ -77,6 +77,7 @@ MODULE aed_common
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status, aed_get_var
    PUBLIC aed_provide_global, aed_provide_sheet_global, aed_thread, aed_n_threads
+   PUBLIC aed_set_timestep, aed_get_timestep
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
 
    !#---------------------------------------------------------------------------

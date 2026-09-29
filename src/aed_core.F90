@@ -53,6 +53,7 @@ MODULE aed_core
    PUBLIC aed_locate_global,           aed_locate_sheet_global
 
    PUBLIC host_has_cell_vel
+   PUBLIC aed_set_timestep, aed_get_timestep
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC model_list, last_model, aed_thread, aed_n_threads
    PUBLIC n_aed_models
@@ -175,6 +176,11 @@ MODULE aed_core
 
    LOGICAL :: host_has_cell_vel = .false.
 
+   !# Host timestep (seconds) and substep split factor, set by the API once the
+   !# host has handed over its environment. Not available during define.
+   AED_REAL :: host_timestep = -1.
+   INTEGER  :: host_split_factor = 1
+
 #ifdef f2003
    USE, intrinsic :: iso_fortran_env, ONLY : stdin=>input_unit, &
                                              stdout=>output_unit, &
@@ -228,6 +234,53 @@ INTEGER FUNCTION aed_init_core(dname, have_cell_vel)
    IF (PRESENT(have_cell_vel)) host_has_cell_vel = have_cell_vel
    aed_init_core = 0
 END FUNCTION aed_init_core
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_set_timestep(dt, split_factor)
+!-------------------------------------------------------------------------------
+! Record the host model timestep (seconds). Called by the API/host once the
+! environment is known; modules read it back with aed_get_timestep.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: dt
+   INTEGER,INTENT(in),OPTIONAL :: split_factor
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   host_timestep = dt
+   IF ( PRESENT(split_factor) ) host_split_factor = MAX(split_factor, 1)
+END SUBROUTINE aed_set_timestep
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+FUNCTION aed_get_timestep(substep) RESULT(dt)
+!-------------------------------------------------------------------------------
+! Return the host model timestep in seconds. With substep=.TRUE. return the
+! effective step seen by the kinetics when the API splits the host step.
+! Only valid at run time - the host has not supplied dt when define is called.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   LOGICAL,INTENT(in),OPTIONAL :: substep
+!
+!LOCALS
+   AED_REAL :: dt
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   IF ( host_timestep <= zero_ ) THEN
+      print *,'STOP: aed_get_timestep called before the host timestep was set'
+      print *,'      (it is not available during define - call it at run time)'
+      STOP
+   ENDIF
+
+   dt = host_timestep
+   IF ( PRESENT(substep) ) THEN
+      IF ( substep ) dt = host_timestep / host_split_factor
+   ENDIF
+END FUNCTION aed_get_timestep
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
