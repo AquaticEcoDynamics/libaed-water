@@ -55,6 +55,7 @@
 			<File RelativePath="..\src\aed_pibm_utils.F90"/>
 			<File RelativePath="..\src\aed_sedflux.F90"/>
 			<File RelativePath="..\src\aed_silica.F90"/>
+			<File RelativePath="..\src\aed_spectra.F90"/>
 			<File RelativePath="..\src\aed_totals.F90"/>
 			<File RelativePath="..\src\aed_tracer.F90"/>
 			<File RelativePath="..\src\aed_util.F90"/>

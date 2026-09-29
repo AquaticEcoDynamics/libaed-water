@@ -34,6 +34,7 @@ include make_defs.inc
 
 OBJS=${objdir}/aed_core.o \
      ${objdir}/aed_util.o \
+     ${objdir}/aed_spectra.o \
      ${objdir}/aed_bio_utils.o \
      ${objdir}/aed_zoop_utils.o \
      ${objdir}/aed_bio_particles.o \
