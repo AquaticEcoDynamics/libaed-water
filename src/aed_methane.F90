@@ -237,7 +237,7 @@ SUBROUTINE aed_define_methane(data, namlst)
    read(namlst,nml=aed_methane,iostat=status)
    IF (status /= 0) THEN
       print *,'Error reading namelist for &aed_methane'
-      STOP
+      ERROR STOP 1
    ENDIF
 
    IF (ebb_model>0) THEN
