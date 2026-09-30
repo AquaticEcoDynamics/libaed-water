@@ -75,19 +75,45 @@ CONTAINS
 !###############################################################################
 FUNCTION MYTRIM(str) RESULT(res)
 !-------------------------------------------------------------------------------
-! Useful for passing string arguments to C functions
+! NUL-terminate a Fortran string for passing to a C function.
+!
+! 2026-08-23: this used to terminate IN PLACE --
+!
+!     CHARACTER(*),TARGET  :: str
+!     CHARACTER(:),POINTER :: res
+!     len = LEN_TRIM(str)+1
+!     str(len:len) = achar(0)          ! <-- one past the end when str has no trailing blank
+!     res => str
+!
+! -- and wrote out of bounds whenever LEN_TRIM(str) == LEN(str). The first bounds-checked run
+! ever made of this tree stopped here:
+!
+!     At line 89 of file src/aed_util.F90
+!     Fortran runtime error: Substring out of bounds: upper bound (25) of 'str'
+!                            exceeds string length (24)
+!
+! Every caller passes a field of aed_variable_t -- MYTRIM(tv%units) / MYTRIM(tv%longname) in the
+! NetCDF-attribute path. `units` is CHARACTER(len=24) and the next field in the type is
+! AED_REAL :: initial, so a 24-character units string wrote a zero byte into the variable
+! registry's numeric metadata. Where it landed depended on the compiler's struct layout, which is
+! why rebuilds appeared to perturb unrelated diagnostics.
+!
+! It also mutated the caller's buffer permanently: after one call, tv%units held an embedded NUL
+! where a trailing blank had been, so anything reading it later saw a different string.
+!
+! Returning an allocatable copy fixes both. Each call gets its own storage, so the two calls in
+! `set_nc_attributes(..., MYTRIM(tv%units), MYTRIM(tv%longname), ...)` cannot collide, and the
+! bytes handed to C are unchanged for every string that was not already overflowing:
+! TRIM(str)//NUL, exactly what the old code produced up to the terminator.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
-   CHARACTER(*),TARGET :: str
+   CHARACTER(*),INTENT(in) :: str
 !LOCALS
-   CHARACTER(:),POINTER :: res
-   INTEGER :: len
+   CHARACTER(:),ALLOCATABLE :: res
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   len = LEN_TRIM(str)+1
-   str(len:len) = achar(0)
-   res => str
+   res = TRIM(str)//achar(0)
 END FUNCTION MYTRIM
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -100,7 +126,7 @@ SUBROUTINE STOPIT(message)
 !-------------------------------------------------------------------------------
 !BEGIN
    PRINT *,message
-   STOP
+   ERROR STOP 1
 END SUBROUTINE STOPIT
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -536,7 +562,11 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
         ! k = K (Sc/600)^-x : Borge et al., 2004
         a = 2.58
         x = 0.50
-        k_wind = (1.0 + (1.719*vel_l**x)*(depth**x) + a*windsp) * (schmidt/600.0)**(-x)
+        ! FIX 2026-08-29: the flow term used depth**x. The published relation
+        ! (as in CASE 4 above, Ho et al. 2016) is k ~ v^0.5 * h^(-0.5) - gas
+        ! transfer from stream turbulence INCREASES as the water gets shallower.
+        ! With depth**(+x) it grew with depth, inverting the physics.
+        k_wind = (1.0 + (1.719*vel_l**x)*(depth**(-x)) + a*windsp) * (schmidt/600.0)**(-x)
       CASE (7)
         ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CO2
         x = 0.50
@@ -559,8 +589,12 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
       CASE (10)
         c = 0.50
         x = 0.50
-        k_wind = c*(epsilon*kin_vsc)**(0.25)*(schmidt)**(-x) ! this is in m/s
-        k_wind = k_wind * 3.6e5
+        IF (PRESENT(epsilon) .AND. PRESENT(kin_vsc)) THEN
+          k_wind = c*(epsilon*kin_vsc)**(0.25)*(schmidt)**(-x) ! this is in m/s
+          k_wind = k_wind * 3.6e5
+        ELSE
+          k_wind = zero_
+        ENDIF
       END SELECT
 
    ENDIF
@@ -733,9 +767,14 @@ SUBROUTINE aed_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn
     write(*,"(11X,'Solving temperature functions for phytoplankton - ')")
     write(*,"(11X,' using the form : f(T) = v^(T-20)-v^(k(T-a))+b')")
 
-    tol   = 0.05
-
     DO group=1,numg
+
+      ! FIX 2026-08-29: tol was initialised ONCE before this loop. The Newton
+      ! iteration below relaxes it (tol=tol+0.01 every 100 iterations) and never
+      ! restores it, so one slow-converging group permanently loosened the
+      ! tolerance for every group solved after it - making the fitted aTn/bTn/kTn
+      ! order-dependent. Reset the tolerance at the top of each group.
+      tol   = 0.05
 
       ! Set the constants for the correct group
       v = theta(group)
@@ -809,7 +848,15 @@ SUBROUTINE aed_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn
               * log(v) * (Ts * v**(k * Ts) - Tm * v**(k * Tm))
           ENDIF
           ! Find the next iteration of k
-          k = k - G / devG
+          ! FIX 2026-08-29: the Newton step was unguarded; devG==0 (a stationary
+          ! point of the objective) produced a divide-by-zero and k=NaN, after
+          ! which the DO WHILE test is always false and the loop spins forever.
+          ! Nudge k instead and let the iteration re-approach.
+          IF ( devG == zero_ ) THEN
+            k = k + 0.1
+          ELSE
+            k = k - G / devG
+          ENDIF
         ENDDO
 
         ! Get the remaining model constants
@@ -833,7 +880,7 @@ SUBROUTINE aed_bio_temp_function(numg, theta, T_std, T_opt, T_max, aTn, bTn, kTn
 
       IF (kTn(group) < 0.1 .AND. bTn(group) > 100.0) THEN
          print *,'Cannot solve for fT for: ', name(group)
-         STOP
+         ERROR STOP 1
       ENDIF
 
     ENDDO
