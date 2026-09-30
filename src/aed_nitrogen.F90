@@ -158,9 +158,12 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    AED_REAL          :: Kdnra_oxy     = 150.0
    AED_REAL          :: Kpart_ammox   =  20.0     !Ko2_4
    AED_REAL          :: Kin_deamm     =   0.886   !Ko2_5
-   AED_REAL          :: Rno2o2
-   AED_REAL          :: Rnh4o2
-   AED_REAL          :: Rnh4no2
+   ! FIX 2026-08-29: these three namelist rates had no default initialiser,
+   ! unlike every neighbour, so if omitted from &aed_nitrogen they were used
+   ! undefined. Default them to zero_ (no reaction) like the other rates.
+   AED_REAL          :: Rno2o2        = zero_
+   AED_REAL          :: Rnh4o2        = zero_
+   AED_REAL          :: Rnh4no2       = zero_
    AED_REAL          :: theta_nitrif  = 1.0
    AED_REAL          :: theta_denit   = 1.0
    AED_REAL          :: Fsed_amm      = zero_
@@ -198,7 +201,9 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    CHARACTER(len=64) :: Fsed_n2o_variable=''
    CHARACTER(len=64) :: Fsed_no2_variable=''
 
-   LOGICAL           :: simExposed
+   ! FIX 2026-08-29: no default initialiser, yet this local is read directly at
+   ! ~L365 and was copied over data%simExposed. Default it to .false.
+   LOGICAL           :: simExposed       = .false.
    INTEGER           :: dry_model        = 0
    AED_REAL          :: theta_sed_dry    = one_
    AED_REAL          :: Fsed_n2o_dry     = zero_
@@ -239,12 +244,18 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    !---------------------------------------------------------------------------+
    ! Read the namelist
    read(namlst,nml=aed_nitrogen,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist for &aed_nitrogen'
+   IF (status /= 0) ERROR STOP 'Error reading namelist for &aed_nitrogen'
 
-   IF(Ranammox>1e-10) STOP 'Ranammox is now deprecated; please replace with kanammox.'
+   IF(Ranammox>1e-10) ERROR STOP 'Ranammox is now deprecated; please replace with kanammox.'
 
    !# Update configuration flags after options read in
+   ! FIX 2026-08-29: simExposed is a &aed_nitrogen namelist option, so honour it
+   ! here (the store block below used to re-apply it AFTER the dry_model>0
+   ! derivation and so silently undid it). dry_model>0 still forces it on, and
+   ! the local is synced back because it is also read directly at ~L365.
+   data%simExposed = simExposed
    IF (dry_model>0)  data%simExposed = .true.
+   simExposed = data%simExposed
 
    !---------------------------------------------------------------------------+
    ! Store config options and parameter values in module main data structure
@@ -298,7 +309,11 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%f_dindep_nox     = MIN(MAX(zero_,f_dindep_nox),one_)
 
    data%dry_model        = dry_model
-   data%simExposed       = simExposed
+   ! FIX 2026-08-29: "data%simExposed = simExposed" used to sit here and
+   ! clobbered the value derived above (set .false. at ~L237, then .true. at
+   ! ~L247 when dry_model>0) with the uninitialised local `simExposed`, which
+   ! has no default and is not in the namelist. Assignment removed; the derived
+   ! value now survives.
    data%theta_sed_dry    = theta_sed_dry
    data%Fsed_n2o_dry     = Fsed_n2o_dry/secs_per_day
 
@@ -320,7 +335,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
        print *,'          ... found'
       ELSE
         PRINT *,'  ERROR advanced nitrogen redox set (simN2O) but no oxygen target variable is set'
-        STOP
+        ERROR STOP 1
       ENDIF
 
       data%id_n2o = aed_define_variable('n2o','mmol N/m3','nitrous oxide',     &
@@ -931,9 +946,16 @@ FUNCTION NitrfpHFunction(pH) RESULT(limitation)
 
    ! pH is greater than the upper bound of the optimum region
    IF(pH > NITpHOptMax) THEN
+     ! FIX 2026-08-29: the normalising denominator was (NITpHOptMax)^2. The
+     ! numerator evaluates to (NITpHOptMax-NITpHTolMax)^2 at pH=NITpHOptMax, so
+     ! the correct denominator is (NITpHOptMax-NITpHTolMax)^2 - that makes the
+     ! curve equal exactly 1.0 at the top of the optimum band and 0.0 at the
+     ! tolerance limit. With OptMax=7.9/TolMax=9.0 the old form dropped
+     ! discontinuously from 1.0 to 1.21/62.41 = 0.0194 the instant pH exceeded
+     ! 7.9. The low-pH branch below is already normalised this way.
      limitation = (-pH*pH+2.0*NITpHOptMax*pH -                                 &
                   2.0*NITpHOptMax*NITpHTolMax+NITpHTolMax*NITpHTolMax)/        &
-                                         ((NITpHOptMax)*(NITpHOptMax))
+                       ((NITpHOptMax-NITpHTolMax)*(NITpHOptMax-NITpHTolMax))
    ENDIF
 
    ! pH is less than the lower bound of optimum region (NITpHOptMin)
