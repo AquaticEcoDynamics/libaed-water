@@ -157,7 +157,7 @@ SUBROUTINE aed_define_totals(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_totals,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_totals'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_totals'
 
    data%outputLight = outputLight
 
@@ -170,8 +170,12 @@ SUBROUTINE aed_define_totals(data, namlst)
    DO i=1,100 ; IF (toc_vars(i) .EQ. '' ) THEN ; num_toc = i-1 ; EXIT ; ENDIF ; ENDDO
    DO i=1,100 ; IF (tss_vars(i) .EQ. '' ) THEN ; num_tss = i-1 ; EXIT ; ENDIF ; ENDDO
    DO i=1,100 ; IF (turb_vars(i).EQ. '' ) THEN ; num_turb= i-1 ; EXIT ; ENDIF ; ENDDO
-   DO i=1,100 ; IF (tfe_vars(i) .EQ. '' ) THEN ; num_tfe = i-1 ; EXIT ; ENDIF ; ENDDO
-   DO i=1,100 ; IF (tal_vars(i) .EQ. '' ) THEN ; num_tal = i-1 ; EXIT ; ENDIF ; ENDDO
+   ! FIX 2026-08-29: tfe_vars and tal_vars are declared with 10 elements (~L135
+   ! and ~L137), not 100 like the other lists. Looping to 100 read up to 90
+   ! elements past the end of each array whenever the first 10 slots were all
+   ! filled. Bound each loop by the array's own size.
+   DO i=1,SIZE(tfe_vars) ; IF (tfe_vars(i) .EQ. '' ) THEN ; num_tfe = i-1 ; EXIT ; ENDIF ; ENDDO
+   DO i=1,SIZE(tal_vars) ; IF (tal_vars(i) .EQ. '' ) THEN ; num_tal = i-1 ; EXIT ; ENDIF ; ENDDO
 
    ALLOCATE(data%id_dep_tn(num_tn))     ; ALLOCATE(data%tn_varscale(num_tn))
    ALLOCATE(data%id_dep_tkn(num_tkn))   ; ALLOCATE(data%tkn_varscale(num_tkn))
