@@ -529,12 +529,17 @@ SUBROUTINE copy_name(sym, name)
    CHARACTER(len=*),INTENT(out) :: name
 !
 !LOCALS
-   INTEGER i
+   INTEGER i, n
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   name = t_strs(sym%length)
-   DO i=1,sym%length
+   !# 2026-07 fix: was `name = t_strs(sym%length)`, an out-of-bounds read - t_strs is
+   !# declared (0:32) but sym%length comes from a 2048-byte line buffer, so any CSV
+   !# field or header longer than 32 chars indexed past the end. Blanking is exactly
+   !# equivalent (Fortran blank-pads a character assignment) and needs no subscript.
+   name = ''
+   n = MIN(sym%length, LEN(name))   !# see extract_double: name is the caller's buffer,
+   DO i=1,n                         !# previously written past its end for long symbols.
       name(i:i) = sym%sym(i)
    ENDDO
 END SUBROUTINE copy_name
@@ -646,10 +651,16 @@ INTEGER FUNCTION aed_rcsv_open(fname, ncols)
       ENDIF
    ENDDO
    IF ( unit == 0 ) THEN
+      !# 2026-07 fix: end_parse() DEALLOCATEs aedr, but control then fell through to
+      !# `aedr%n_cols = ncols` below - a write through a freed pointer. It also returned
+      !# unit == 0, which is not the -1 error code callers test for. Fail explicitly.
       res = end_parse(aedr)
-   ELSE
-      ncols = scan_rcsv_file(aedr)
+      print*, "aed_rcsv_open: no free CSV reader slots (max 10) for '",TRIM(fname),"'"
+      aed_rcsv_open = -1
+      RETURN
    ENDIF
+
+   ncols = scan_rcsv_file(aedr)
 
 ! print*,"file ", fname, " had ", ncols, " cols"
    aedr%n_cols = ncols
@@ -689,10 +700,15 @@ INTEGER FUNCTION aed_csv_read_header(fname, names, ncols)
       ENDIF
    ENDDO
    IF ( unit == 0 ) THEN
+      !# 2026-07 fix: see aed_rcsv_open - end_parse() DEALLOCATEs aedr and control fell
+      !# through to `aedr%n_cols = ncols`, a write through a freed pointer.
       res = end_parse(aedr)
-   ELSE
-      ncols = scan_csv_header(aedr, names)
+      print*, "aed_csv_read_header: no free CSV reader slots (max 10) for '",TRIM(fname),"'"
+      aed_csv_read_header = -1
+      RETURN
    ENDIF
+
+   ncols = scan_csv_header(aedr, names)
 
    aedr%n_cols = ncols
    aed_csv_read_header = unit
