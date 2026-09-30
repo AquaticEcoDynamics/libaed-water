@@ -238,7 +238,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
    read(namlst,nml=aed_carbon,iostat=status)
    IF (status /= 0) THEN
       print *,'Error reading namelist for &aed_carbon'
-      STOP
+      ERROR STOP 1
    ENDIF
 
    !# Update configuration flags after options read in
