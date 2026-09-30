@@ -212,7 +212,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_oxygen,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_oxygen'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_oxygen'
 
    ! Store parameter values in the modules own derived type
    ! NB: all rates must be provided in values per day,
@@ -331,7 +331,12 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
     IF (data%id_atm_oxy_exch>0) _DIAG_VAR_S_(data%id_atm_oxy_exch) = oxy_atm_flux * secs_per_day
-    IF (data%id_oxy_sat>0)      _DIAG_VAR_(data%id_oxy_sat) =  Coxy_air
+    ! FIX 2026-08-29: this line used to write Coxy_air (the saturation
+    ! CONCENTRATION, mmol O2/m3) into id_oxy_sat, which is registered at ~L243
+    ! as 'dissolved oxygen saturation' in '%'. aed_calculate_oxygen (~L376)
+    ! writes the correct percentage (oxy/coxy_sat)*100. Depending on call order
+    ! the surface cell could be reported as a concentration in a % field.
+    ! Removed - the percentage form is the only writer now.
 
    ! Also store oxygen flux across the atm/water interface as a diagnostic (mmmol/m2/day)
     IF (data%id_atm_oxy_exch3d>0) &
