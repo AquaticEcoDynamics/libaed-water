@@ -336,7 +336,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_organic_matter,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_organic_matter'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_organic_matter'
 
    IF( extra_diag )   diag_level = 10           ! legacy use of extra_diag
 
@@ -518,7 +518,11 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      IF (data%use_fe3) THEN
        data%id_fe = aed_locate_variable(dom_miner_fe3_reactant_var)
      ELSE
-       simFeReduction = 0
+       ! FIX 2026-08-29: this assigned the LOCAL namelist variable, but
+       ! data%simFeReduction was already copied from it above (~L406), so the
+       ! auto-disable had no effect and aed_calculate_om still entered the
+       ! Fe-reduction branch with an unset data%id_fe. Set the stored flag.
+       data%simFeReduction = 0
      ENDIF
    ELSE
      data%use_fe3 = .FALSE.
@@ -528,7 +532,9 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      IF (data%use_so4) THEN
        data%id_so4 = aed_locate_variable(dom_miner_so4_reactant_var)
      ELSE
-       simSO4Reduction = 0
+       ! FIX 2026-08-29: as above - the local was cleared, not the stored copy
+       ! data%simSO4Reduction, so the auto-disable never took effect.
+       data%simSO4Reduction = 0
      ENDIF
    ELSE
      data%use_so4 = .FALSE.
@@ -538,7 +544,9 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      IF (data%use_ch4) THEN
        data%id_ch4 = aed_locate_variable(dom_miner_ch4_reactant_var)
      ELSE
-       simMethanogenesis = 0
+       ! FIX 2026-08-29: as above - the local was cleared, not the stored copy
+       ! data%simMethanogenesis, so the auto-disable never took effect.
+       data%simMethanogenesis = 0
      ENDIF
    ELSE
      data%use_ch4 = .FALSE.
@@ -602,10 +610,23 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
 
 
    !-- resuspension link variable
+   !# 2026-09-08: zero id_sedomfr HERE, before the registration, now that the blanket zeroing
+   !# further down no longer touches it. The derived type declares it with no default initialiser,
+   !# so without this it would hold garbage on every path that does not register it.
+   data%id_sedomfr = 0
    IF ( resuspension>0 .AND. .NOT.resus_link .EQ. '' ) THEN
       data%id_l_resus  = aed_locate_sheet_variable(TRIM(resus_link)) ! ('TRC_resus')
       IF ( resuspension>1 ) THEN
-        data%id_sedomfr  = aed_define_sheet_diag_variable('om_sed_frac','w/w',  'Sediment OM fraction')
+        !# 2026-09-08: refuse resuspension=2 rather than run it silently wrong. The diagnostic
+        !# 'om_sed_frac' registered here is NEVER WRITTEN anywhere in the tree - a whole-repo search
+        !# finds only this line - so even with the index bug fixed, sedomfr would read back as 0 and
+        !# every resuspension flux (poc/pon/pop) would be identically zero while appearing enabled.
+        !# Re-enable this mode only once something actually supplies the sediment OM fraction.
+        print *,'ERROR: aed_organic_matter resuspension=2 requires a source for om_sed_frac,'
+        print *,'       which nothing in this build writes. Use resuspension=1 with sedimentOMfrac.'
+        !# 2026-09-08: STOP 1, not bare STOP - a bare STOP exits with status 0 and a fatal
+        !# configuration error then looks like a clean run.
+        STOP 1
       ENDIF
    ELSE
       data%id_l_resus = 0
