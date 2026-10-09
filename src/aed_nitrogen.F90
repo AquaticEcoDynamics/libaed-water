@@ -51,7 +51,7 @@ MODULE aed_nitrogen
 ! Nitrogen module contains equations for nitrification and denitrification
 !------------------------------------------------------------------------------+
    USE aed_core
-   USE aed_util,  ONLY: aed_gas_piston_velocity, aed_n2o_sat
+   USE aed_util,  ONLY: aed_gas_piston_velocity, aed_n2o_sat, aed_gas_exchange
 
    IMPLICIT NONE
 
@@ -63,7 +63,7 @@ MODULE aed_nitrogen
       !# Variable identifiers
       INTEGER  :: id_nox, id_amm, id_n2o, id_no2
       INTEGER  :: id_oxy, id_ph, id_temp, id_salt, id_denit_product
-      INTEGER  :: id_wind, id_E_depth, id_E_tau, id_E_dens, id_E_rain
+      INTEGER  :: id_wind, id_E_depth, id_E_tau, id_E_dens, id_E_rain, id_tstep
       INTEGER  :: id_Fsed_amm, id_Fsed_nit, id_Fsed_n2o, id_Fsed_no2
       INTEGER  :: id_nitrf, id_denit, id_n2op, id_anammox, id_dnra
       INTEGER  :: id_sed_amm, id_sed_nit, id_sed_n2o, id_sed_no2
@@ -391,6 +391,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    IF( simWetDeposition ) data%id_e_rain  = aed_locate_sheet_global('rain')
    IF( simN2O>0 )         data%id_wind    = aed_locate_sheet_global('wind_speed')
    IF( simN2O>0 )         data%id_e_depth = aed_locate_global('layer_ht')
+   IF( simN2O>0 )         data%id_tstep   = aed_locate_sheet_global('timestep')
    IF( simN2O>0 )         data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
   !IF( simN2O>0 )         data%id_E_tau   = aed_locate_global('taub')    ! tau to be converted to velocity
   !IF( simN2O>0 )         data%id_E_dens  = aed_locate_global('density') ! density needed for tau-vel
@@ -629,7 +630,9 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
 
      !-----------------------------------------------
      ! Get the N2O flux:    [ mmol/m2/s = m/s * mmol/m3 ]
-     n2o_atm_flux = kn2o_trans * (n2o - Cn2o_air) * f_pres
+     !# outgassing flux, relaxed exactly over the step (no overshoot)
+     n2o_atm_flux = -aed_gas_exchange(kn2o_trans*f_pres, Cn2o_air, n2o,          &
+                          _STATE_VAR_(data%id_E_depth), _STATE_VAR_S_(data%id_tstep))
 
      !-----------------------------------------------
      ! Set surface exchange value (mmmol/m2/s) for AED ODE solution.

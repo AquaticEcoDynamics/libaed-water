@@ -935,6 +935,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
        denitratation  = denitratation * doc_min_anaerobic/denitrification
        denitritation  = denitritation * doc_min_anaerobic/denitrification
        denitrousation = denitrousation * doc_min_anaerobic/denitrification
+       denitrification  = denitratation+denitritation+denitrousation
      ENDIF
      dnra                  =  denitritation * data%Kpart_denitrit/(data%Kpart_denitrit+no2)
      nitrous_denitritation =  denitritation * no2/(data%Kpart_denitrit+no2) * 0.5
@@ -968,7 +969,9 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    IF( data%simMethanogenesis>0 ) THEN
      !# Methanogenesis : anaerobic breakdown, after all other pathways
      methanogenesis = doc_min_anaerobic * fso4 * ffe * fnit
-     _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) - methanogenesis  ! stoich
+     !# methanogenesis PRODUCES methane: 2 CH2O -> CH4 + CO2, so half of the
+     !# organic C mineralised this way goes to CH4 and half to DIC (below)
+     IF ( data%use_ch4 ) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + 0.5*methanogenesis
    ENDIF
    doc_min_anaerobic = doc_min_anaerobic - methanogenesis
 
@@ -976,6 +979,9 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    ! Set temporal derivatives : PRODUCTS of mineralisation
    if (data%use_dic) THEN
       _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (doc_mineralisation)
+      !# the methane half of methanogenic mineralisation went to CH4, not DIC
+      IF ( data%simMethanogenesis>0 .AND. data%use_ch4 ) &
+         _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) - 0.5*methanogenesis
       IF ( data%simRPools ) _FLUX_VAR_(data%id_dic) =  &
                                     _FLUX_VAR_(data%id_dic) + photolysis*(1.-photo_fmin)
    ENDIF
