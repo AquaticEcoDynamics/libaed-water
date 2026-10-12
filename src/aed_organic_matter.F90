@@ -1177,6 +1177,11 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    _FLUX_VAR_(data%id_pop) = _FLUX_VAR_(data%id_pop) + Fsed_pop
 
    ! Get sedimentation flux (mmmol/m2/s) loss into the sediment, crossing the SWI
+   ! NOTE: Psed is an ESTIMATE (w * C of the bottom water) used for the sediment
+   ! pools and swi_* diagnostics. It is not removed from the water here: the
+   ! host's mobility routine (e.g. GLM doMobility) removes settled particles from
+   ! the water as an export onto the bed, computed independently, so the two are
+   ! not a balanced water-sediment flux.
    IF (data%use_Psed_link_poc) THEN
      !-- linked variable requires populating
      Psed_poc = data%w_pom * max(zero_,poc)
