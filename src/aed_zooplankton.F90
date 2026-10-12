@@ -94,6 +94,8 @@ MODULE aed_zooplankton
 
 ! MODULE GLOBALS
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+                                             !     except diagnostics required by
+                                             !     state calculations/coupling
                                               ! 1 = basic diagnostic outputs
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
@@ -324,6 +326,8 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    LOGICAL  :: simZoopFeedback = .TRUE.
 ! %% From Module Globals
 !  INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
+!                                             !     except diagnostics required by
+!                                             !     state calculations/coupling
 !                                             ! 1 = basic diagnostic outputs
 !                                             ! 2 = flux rates, and supporitng
 !                                             ! 3 = other metrics
@@ -408,9 +412,14 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    ENDIF
 
    ! Register diagnostic variables
-   data%id_grz  = aed_define_diag_variable('grz','mmolC/m**3/d', 'net zooplankton grazing')
-   data%id_resp = aed_define_diag_variable('resp','mmolC/m**3/d','net zooplankton respiration')
-   data%id_mort = aed_define_diag_variable('mort','mmolC/m**3/d','net zooplankton mortality')
+   data%id_grz  = 0
+   data%id_resp = 0
+   data%id_mort = 0
+   IF (diag_level>0) THEN
+      data%id_grz  = aed_define_diag_variable('grz','mmolC/m**3/d', 'net zooplankton grazing')
+      data%id_resp = aed_define_diag_variable('resp','mmolC/m**3/d','net zooplankton respiration')
+      data%id_mort = aed_define_diag_variable('mort','mmolC/m**3/d','net zooplankton mortality')
+   ENDIF
 
    ! Register environmental dependencies
    data%id_tem = aed_locate_global('temperature')
@@ -464,9 +473,9 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
 
    DO zoop_i=1,data%num_zoops
       ! Export diagnostic variables
-      _DIAG_VAR_(data%id_grz)  = zero_
-      _DIAG_VAR_(data%id_resp) = zero_
-      _DIAG_VAR_(data%id_mort) = zero_
+      IF (data%id_grz>0)  _DIAG_VAR_(data%id_grz)  = zero_
+      IF (data%id_resp>0) _DIAG_VAR_(data%id_resp) = zero_
+      IF (data%id_mort>0) _DIAG_VAR_(data%id_mort) = zero_
 
       ! Retrieve this zooplankton group
       zoo = _STATE_VAR_(data%id_zoo(zoop_i))
@@ -708,15 +717,15 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
       ENDIF
 
       ! Export diagnostic variables
-      _DIAG_VAR_(data%id_grz)  = _DIAG_VAR_(data%id_grz)  + zoo*grazing
-      _DIAG_VAR_(data%id_resp) = _DIAG_VAR_(data%id_resp) + zoo*respiration
-      _DIAG_VAR_(data%id_mort) = _DIAG_VAR_(data%id_mort) + zoo*mortality
+      IF (data%id_grz>0)  _DIAG_VAR_(data%id_grz)  = _DIAG_VAR_(data%id_grz)  + zoo*grazing
+      IF (data%id_resp>0) _DIAG_VAR_(data%id_resp) = _DIAG_VAR_(data%id_resp) + zoo*respiration
+      IF (data%id_mort>0) _DIAG_VAR_(data%id_mort) = _DIAG_VAR_(data%id_mort) + zoo*mortality
    ENDDO
 
    ! Export diagnostic variables
-   _DIAG_VAR_(data%id_grz)  = _DIAG_VAR_(data%id_grz)  * secs_per_day
-   _DIAG_VAR_(data%id_resp) = _DIAG_VAR_(data%id_resp) * secs_per_day
-   _DIAG_VAR_(data%id_mort) = _DIAG_VAR_(data%id_mort) * secs_per_day
+   IF (data%id_grz>0)  _DIAG_VAR_(data%id_grz)  = _DIAG_VAR_(data%id_grz)  * secs_per_day
+   IF (data%id_resp>0) _DIAG_VAR_(data%id_resp) = _DIAG_VAR_(data%id_resp) * secs_per_day
+   IF (data%id_mort>0) _DIAG_VAR_(data%id_mort) = _DIAG_VAR_(data%id_mort) * secs_per_day
 END SUBROUTINE aed_calculate_zooplankton
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

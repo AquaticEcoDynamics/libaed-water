@@ -531,7 +531,6 @@ SUBROUTINE extend_allocated_variables(pcount)
    all_vars(a_vars+1:a_vars+count)%const = .false.
 
    a_vars = a_vars + count
-
 END SUBROUTINE extend_allocated_variables
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -747,8 +746,6 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(re
    ELSE
       all_vars(ret)%rezero = .TRUE.
    ENDIF
-
-
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -798,8 +795,6 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezer
    ELSE
       all_vars(ret)%rezero = .TRUE.
    ENDIF
-
-   ret = n_aed_vars
 END FUNCTION aed_define_sheet_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -826,7 +821,6 @@ FUNCTION aed_define_ptm_variable(name, units, longname, initial) RESULT(ptm_coun
 
    ptm_counter_ = ptm_counter + 1
    ptm_counter  = ptm_counter_
-
 END FUNCTION aed_define_ptm_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -79,9 +79,10 @@ MODULE aed_geochemistry
       LOGICAL  :: component_linked(MAX_GC_COMPONENTS),mineral_linked(MAX_GC_MINERALS)
       LOGICAL  :: simEq
       AED_REAL :: Riron_red, theta_iron_red, Kiron_red
-      AED_REAL :: Riron_aox, Riron_box, theta_iron_ox
+      AED_REAL :: Riron_aox, Riron_box, theta_iron_ox, Kiron_ox
       AED_REAL :: Rsulf_red, theta_sulf_red, Ksulf_red
       AED_REAL :: Rsulf_ox, theta_sulf_ox, Ksulf_ox
+      INTEGER  :: iron_ox_model
       AED_REAL :: speciation_dt
       AED_REAL :: Fsed_gch(MAX_GC_COMPONENTS)
       AED_REAL :: Ksed_gch_o2(MAX_GC_COMPONENTS)
@@ -93,6 +94,14 @@ MODULE aed_geochemistry
       INTEGER  :: MeAdsorptionModel(MAX_GC_COMPONENTS), resuspension
       LOGICAL  :: simMeAdsorption, ads_use_pH, ads_use_external_tss
       AED_REAL :: KMep(MAX_GC_COMPONENTS), Kadsratio(MAX_GC_COMPONENTS), Qmax(MAX_GC_COMPONENTS), theta_KMe, K_sal   ! Adsoprtion
+      AED_REAL :: w_gch_ads(MAX_GC_COMPONENTS)                                 ! Sorbed pool settling
+      LOGICAL  :: link_ads_vvel(MAX_GC_COMPONENTS)                             ! adopt sorbent particle vvel
+      INTEGER  :: id_compd_vvel                                                ! sorbent _vvel diagnostic
+      INTEGER  :: id_compd_frc(MAX_GC_COMPONENTS)                              ! sorbed fraction diagnostic
+      INTEGER  :: id_compd_set(MAX_GC_COMPONENTS)                              ! sorbed settling flux diagnostic
+      INTEGER  :: id_compd_srp(MAX_GC_COMPONENTS)                              ! kinetic sorption rate diagnostic
+      INTEGER  :: id_dz
+      AED_REAL :: Rsorp_gch(MAX_GC_COMPONENTS)                                 ! kinetic sorption rate (0 = equilibrium)
 
 
      CONTAINS
@@ -101,7 +110,7 @@ MODULE aed_geochemistry
          PROCEDURE :: calculate         => aed_calculate_geochemistry
          PROCEDURE :: calculate_benthic => aed_calculate_benthic_geochemistry
          PROCEDURE :: equilibrate       => aed_equilibrate_geochemistry
-!        PROCEDURE :: mobility          => aed_mobility_geochemistry
+         PROCEDURE :: mobility          => aed_mobility_geochemistry
 !        PROCEDURE :: light_extinction  => aed_light_extinction_geochemistry
          PROCEDURE :: inflow_update     => aed_inflow_update_geochemistry
 !        PROCEDURE :: delete            => aed_delete_geochemistry
@@ -143,17 +152,33 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    LOGICAL           :: simEq = .TRUE.
    AED_REAL          :: min
    AED_REAL          :: dis_initial(MAX_GC_COMPONENTS) = 0.0
-   AED_REAL          :: Fsed_gch(MAX_GC_COMPONENTS)
-   AED_REAL          :: Ksed_gch_o2(MAX_GC_COMPONENTS)
-   AED_REAL          :: Ksed_gch_pH(MAX_GC_COMPONENTS)
+   AED_REAL          :: Fsed_gch(MAX_GC_COMPONENTS) = 0.0
+   AED_REAL          :: Ksed_gch_o2(MAX_GC_COMPONENTS) = 0.0  ! 0 => no O2 effect on Fsed_gch
+   AED_REAL          :: Ksed_gch_pH(MAX_GC_COMPONENTS) = 0.0  ! 0 => no pH effect on Fsed_gch
    AED_REAL          :: min_initial(MAX_GC_MINERALS) = 0.0
    AED_REAL          :: w_gch(MAX_GC_MINERALS)
    AED_REAL          :: pH_initial = 7.5
    AED_REAL          :: pe_initial = 8.0
-   AED_REAL          :: Riron_red, theta_iron_red, Kiron_red
-   AED_REAL          :: Riron_aox, Riron_box, theta_iron_ox
-   AED_REAL          :: Rsulf_red, theta_sulf_red, Ksulf_red
-   AED_REAL          :: Rsulf_ox, theta_sulf_ox, Ksulf_ox
+   !-- Kinetic redox parameters. These are only referenced when the matching
+   !-- couple is active (see setupWCRedoxConfiguration), but they must still be
+   !-- initialised here: without a default an omitted namelist entry leaves the
+   !-- variable undefined rather than zero.
+   AED_REAL          :: Riron_red      = zero_  ! /day  FeIII -> FeII (biotic)
+   AED_REAL          :: theta_iron_red = one_   ! 1.0 => no T correction
+   AED_REAL          :: Kiron_red      = 100.0  ! mmol/m3 O2 inhibition of redn
+   AED_REAL          :: Riron_aox      = zero_  ! /day  abiotic FeII oxidation
+   AED_REAL          :: Riron_box      = zero_  ! /day  biotic  FeII oxidation
+   AED_REAL          :: theta_iron_ox  = one_   ! 1.0 => no T correction
+   AED_REAL          :: Kiron_ox       = 100.0  ! mmol/m3 O2 half-sat of oxidn
+   AED_REAL          :: Rsulf_red      = zero_  ! /day  SO4 -> H2S
+   AED_REAL          :: theta_sulf_red = one_   ! 1.0 => no T correction
+   AED_REAL          :: Ksulf_red      = 100.0  ! mmol/m3 O2 inhibition of redn
+   AED_REAL          :: Rsulf_ox       = zero_  ! /day  H2S -> SO4
+   AED_REAL          :: theta_sulf_ox  = one_   ! 1.0 => no T correction
+   AED_REAL          :: Ksulf_ox       = 100.0  ! mmol/m3 O2 half-sat of oxidn
+   !-- 0 = biotic only, pH independent (default, legacy behaviour)
+   !-- 1 = Singer-Stumm speciation based abiotic oxidation, plus the biotic term
+   INTEGER           :: iron_ox_model  = 0
    CHARACTER(len=64) :: geochem_file = ''
    CHARACTER(len=64) :: dis_components(MAX_GC_COMPONENTS) = ''
    CHARACTER(len=64) :: component_link(MAX_GC_COMPONENTS) = ''
@@ -166,13 +191,16 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    ! Adsorption
    LOGICAL           :: simMeAdsorption = .FALSE.
    LOGICAL           :: ads_use_external_tss = .FALSE.
-   INTEGER           :: MeAdsorptionModel(MAX_GC_MINERALS) = 0
+   INTEGER           :: MeAdsorptionModel(MAX_GC_COMPONENTS) = 0
    LOGICAL           :: ads_use_pH   = .FALSE.
    AED_REAL          :: KMep(MAX_GC_COMPONENTS) = 1.05
-   AED_REAL          :: theta_KMe   = 1.02
-   AED_REAL          :: K_sal        = 1000
+   AED_REAL          :: theta_KMe   = 1.0    ! 1.0 => no T correction of KMep
+   AED_REAL          :: K_sal       = zero_  ! 0   => no salinity correction of KMep
    AED_REAL          :: Kadsratio(MAX_GC_COMPONENTS)    = 1.05
    AED_REAL          :: Qmax(MAX_GC_COMPONENTS)         = 1.05
+   AED_REAL          :: w_gch_ads(MAX_GC_COMPONENTS)    = zero_  ! m/day; -ve = settling
+   AED_REAL          :: Rsorp_gch(MAX_GC_COMPONENTS)    = zero_  ! /day relaxation to sorption
+                                                                 ! equilibrium; 0 => instantaneous
    CHARACTER(len=64) :: sorption_target_variable=''
 
 ! %% From Module Globals
@@ -187,10 +215,12 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
 
    NAMELIST /aed_geochemistry/ speciation_dt, geochem_file,                    &
                     num_components, dis_components, component_link, Fsed_gch,  &
+                    Ksed_gch_o2, Ksed_gch_pH,                                  &
                     dis_initial, num_minerals, the_minerals, mineral_link,     &
                     w_gch, min_initial, pH_initial, speciesOutput, simEq,      &
                     Riron_red, theta_iron_red, Kiron_red,                      &
-                    Riron_aox, Riron_box, theta_iron_ox,                       &
+                    Riron_aox, Riron_box, theta_iron_ox, Kiron_ox,             &
+                    iron_ox_model,                                             &
                     Rsulf_red, theta_sulf_red, Ksulf_red,                      &
                     Rsulf_ox, theta_sulf_ox, Ksulf_ox,                         &
                     ph_link, inflow_pH_update, pco2_link, diag_level, &
@@ -199,9 +229,13 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                     sorption_target_variable, &
                     MeAdsorptionModel, &
                     KMep, &
+                    theta_KMe, &
+                    K_sal, &
                     ads_use_pH, &
                     Kadsratio, &
-                    Qmax
+                    Qmax, &
+                    w_gch_ads, &
+                    Rsorp_gch
 !-------------------------------------------------------------------------------
 !BEGIN
    print *,"        aed_geochemistry configuration"
@@ -217,6 +251,13 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    component_link(:) = ''
    data%component_linked(:) = .FALSE.
    data%mineral_linked(:) = .FALSE.
+   data%id_compd(:) = -1
+   data%link_ads_vvel(:) = .FALSE.
+   data%w_gch_ads(:) = zero_
+   data%id_compd_frc(:) = -1
+   data%id_compd_set(:) = -1
+   data%id_compd_srp(:) = -1
+   data%Rsorp_gch(:) = zero_
 
 ! Initialisation now done in declaration
 !  dis_initial = 0.0  ! default, overwritten by namelist
@@ -238,6 +279,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%Riron_red = Riron_red             ; data%Kiron_red= Kiron_red
    data%theta_iron_red= theta_iron_red    ; data%theta_iron_ox=theta_iron_ox
    data%Riron_aox=Riron_aox/ secs_per_day ; data%Riron_box=Riron_box/ secs_per_day
+   data%Kiron_ox = Kiron_ox               ; data%iron_ox_model = iron_ox_model
 
    data%Rsulf_red = Rsulf_red             ; data%Ksulf_red= Ksulf_red
    data%theta_sulf_red= theta_sulf_red    ; data%theta_sulf_ox=theta_sulf_ox
@@ -253,6 +295,9 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%MeAdsorptionModel = MeAdsorptionModel
    data%KMep = KMep
    data%ads_use_pH = ads_use_pH
+   data%ads_use_external_tss = ads_use_external_tss
+   data%theta_KMe = theta_KMe
+   data%K_sal = K_sal
    data%Kadsratio = Kadsratio
    data%Qmax = Qmax
 
@@ -277,6 +322,27 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%num_comp = nDissTransportables
    data%num_mins = nPartTransportables
 
+   !-- Report which kinetic redox couples the component set has activated. Each
+   !-- requires BOTH of its redox states to be configured components, and is
+   !-- otherwise skipped entirely - previously without saying so, which made a
+   !-- missing member look like a rate-constant problem.
+   print *,"        aed_geochemistry kinetic redox couples:"
+   CALL reportRedoxCouple("iron     (FeII/FeIII)", simIronRedox)
+   CALL reportRedoxCouple("sulfur   (H2S/SO4)   ", simSulfurRedox)
+   CALL reportRedoxCouple("mangan   (MnII/MnIV) ", simManganRedox)
+   CALL reportRedoxCouple("arsenic  (AsIII/AsV) ", simArsenicRedox)
+   CALL reportRedoxCouple("carbon   (CH4/CO3)   ", simCarbonRedox)
+   IF ( simIronRedox .AND. iron_ox_model == 1 ) THEN
+      print *,"          FeII oxidation: Singer-Stumm speciation (pH dependent)"
+      print *,"          WARNING! iron_ox_model=1 is not yet mass balance verified"
+   ELSEIF ( simIronRedox ) THEN
+      print *,"          FeII oxidation: biotic Monod only (pH INDEPENDENT)"
+   ENDIF
+   IF ( .NOT. (simIronRedox .OR. simSulfurRedox .OR. simManganRedox .OR.       &
+               simArsenicRedox .OR. simCarbonRedox) ) THEN
+      print *,"          none active: geochemistry is equilibrium-only"
+   ENDIF
+
    !----------------------------------------------------------------------------
    ! Initialise the module level geochemical values ready for the registration
 
@@ -287,6 +353,17 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    DO i=1,nDissTransportables
      data%DissComp(i) = dis_initial(i)
      data%Fsed_gch(i) = Fsed_gch(i) / secs_per_day
+     data%Ksed_gch_o2(i) = Ksed_gch_o2(i)
+     data%Ksed_gch_pH(i) = Ksed_gch_pH(i)
+     IF ( w_gch_ads(i) < -999. ) THEN
+        ! sentinel: adopt the sorbent particle's settling velocity (_vvel link)
+        data%link_ads_vvel(i) = .TRUE.
+        data%w_gch_ads(i) = zero_
+     ELSE
+        data%link_ads_vvel(i) = .FALSE.
+        data%w_gch_ads(i) = w_gch_ads(i) / secs_per_day
+     ENDIF
+     data%Rsorp_gch(i) = Rsorp_gch(i) / secs_per_day
    END DO
    component_link(num_components+1) = ph_link  ! Special pH var
    data%DissComp(num_components+1) = pH_initial
@@ -295,7 +372,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    data%PartComp = zero_
    DO i=1,num_minerals
      data%PartComp(i) = min_initial(i)
-     data%w_gch(i) = w_gch(i)
+     data%w_gch(i) = w_gch(i) / secs_per_day
    END DO
 
    CALL InitialiseGCProperties(data%DissComp, data%PartComp, 2)
@@ -321,13 +398,30 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
                                       TRIM(data%listDissTransVars(i))//'_ads', &
                                       'mmol/m**3','geochemistry',              &
                                       zero_,                                   &
-                                      minimum=min)
+                                      minimum=min,                             &
+                                      mobility=data%w_gch_ads(i))
+            IF ( diag_level>0 ) THEN
+               data%id_compd_frc(i) = aed_define_diag_variable(                &
+                                 TRIM(data%listDissTransVars(i))//'_ads_frc',  &
+                                 '-','sorbed fraction of total')
+               data%id_compd_set(i) = aed_define_diag_variable(                &
+                                 TRIM(data%listDissTransVars(i))//'_ads_set',  &
+                                 'mmol/m**3/d','sorbed pool settling flux')
+               IF ( Rsorp_gch(i) > zero_ )                                     &
+                  data%id_compd_srp(i) = aed_define_diag_variable(             &
+                                 TRIM(data%listDissTransVars(i))//'_ads_srp',  &
+                                 'mmol/m**3/d','kinetic sorption rate')
+            ENDIF
          ENDIF
 
       ELSE
          ! Register external state variable dependencies
          data%id_cdep(i) = aed_locate_variable( TRIM(component_link(i)) )
          data%component_linked(i) = .true.
+         IF ( simMeAdsorption .AND. MeAdsorptionModel(i)>0 )                   &
+            print *,'        WARNING: MeAdsorptionModel is set for linked ',   &
+                    'component ',TRIM(data%listDissTransVars(i)),              &
+                    ' - sorption of linked components is not supported'
       ENDIF
       IF( TRIM(data%listDissTransVars(i)) .EQ. 'FeII' ) data%id_feii = data%id_comp(i)
       IF( TRIM(data%listDissTransVars(i)) .EQ. 'FeIII') data%id_feiii= data%id_comp(i)
@@ -367,8 +461,31 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
      data%id_pH = aed_locate_variable(ph_link)
    ENDIF
 
-   IF ( simMeAdsorption )  &
-      data%id_tss = aed_locate_variable(sorption_target_variable)
+   data%id_compd_vvel = -1
+   IF ( simMeAdsorption ) THEN
+      IF ( ads_use_external_tss ) THEN
+         print *,'        Me adsorption is configured to use the host TSS'
+         data%id_tss = aed_locate_global('tss')
+         IF ( ANY(data%link_ads_vvel) ) THEN
+            print *,'  ERROR w_gch_ads vvel link requires an internal ',      &
+                    'sorption_target_variable, not external TSS'
+            STOP
+         ENDIF
+      ELSEIF ( sorption_target_variable .NE. '' ) THEN
+         print *,'        Me is adsorbing to ',TRIM(sorption_target_variable)
+         data%id_tss = aed_locate_variable(sorption_target_variable)
+         IF ( ANY(data%link_ads_vvel) ) THEN
+            print *,'        _ads pools adopt settling of ',                  &
+                    TRIM(sorption_target_variable)//'_vvel'
+            data%id_compd_vvel =                                              &
+                aed_locate_variable(TRIM(sorption_target_variable)//'_vvel')
+         ENDIF
+      ELSE
+         print *,'  ERROR Me adsorption is configured but no internal or ',   &
+                 'external sorption target is set'
+         STOP
+      ENDIF
+   ENDIF
 
    ! solution to get aed_carbon's pCO2 updated for atm exchange ...
    data%id_c_pco2 = aed_locate_variable(pco2_link)
@@ -384,13 +501,14 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    END DO
 
    data%id_noncon = aed_define_diag_variable( 'noncon_mh', &
-                         'niter', 'non-convergence status')
+                         '-', 'non-convergence flag (0=converged, 1=failed)')
 
    !----------------------------------------------------------------------------
 
    ! Register environmental dependencies
    data%id_temp = aed_locate_global( 'temperature' )
    data%id_sal = aed_locate_global( 'salinity' )
+   data%id_dz = aed_locate_global( 'layer_ht' )
 
    !----------------------------------------------------------------------------
 
@@ -479,6 +597,9 @@ SUBROUTINE aed_calculate_geochemistry(data,column,layer_idx)
 !LOCALS
    AED_REAL           :: reduction,oxidation
    AED_REAL           :: feii,feiii,h2s,so4,oxy,temp
+   AED_REAL           :: MeDis,MePar,sorption
+   INTEGER            :: i
+   AED_REAL,PARAMETER :: one_e_neg_ten = 1e-10
 !-------------------------------------------------------------------------------
 !BEGIN
 
@@ -502,6 +623,7 @@ SUBROUTINE aed_calculate_geochemistry(data,column,layer_idx)
        !-- Update FeII, O2, FeIII
        _FLUX_VAR_(data%id_feii) = _FLUX_VAR_(data%id_feii) + reduction - oxidation
 
+       !-- 4Fe++ + O2 + 4H+ -> 4Fe+++ + 2H2O : 1/4 mol O2 per mol Fe(II) oxidised
        _FLUX_VAR_(data%id_o_oxy) = _FLUX_VAR_(data%id_o_oxy) - oxidation *0.25
 
        _FLUX_VAR_(data%id_feiii) = _FLUX_VAR_(data%id_feiii) + oxidation - reduction
@@ -527,11 +649,43 @@ SUBROUTINE aed_calculate_geochemistry(data,column,layer_idx)
       !-- Update
       _FLUX_VAR_(data%id_h2s) = _FLUX_VAR_(data%id_h2s) + reduction - oxidation
 
-      _FLUX_VAR_(data%id_o_oxy) = _FLUX_VAR_(data%id_o_oxy) - oxidation * 0.25
+      !-- HS- + 2O2 -> SO4-- + H+ : 2 mol O2 consumed per mol S oxidised
+      _FLUX_VAR_(data%id_o_oxy) = _FLUX_VAR_(data%id_o_oxy) - oxidation * 2.0
 
       _FLUX_VAR_(data%id_so4) = _FLUX_VAR_(data%id_so4) + oxidation - reduction
 
    END IF
+
+   !-- 3. Sorption kinetics ----------------------------------------------------!
+   !   Components with Rsorp_gch>0 relax first-order toward the equilibrium
+   !   partition; components with Rsorp_gch=0 are re-partitioned instantly in
+   !   aed_equilibrate_geochemistry instead. NB with the Euler host solution
+   !   keep Rsorp_gch*dt <= 1 or the relaxation can overshoot.
+   IF (data%simMeAdsorption) THEN
+      DO i=1,data%num_comp
+         IF ( data%MeAdsorptionModel(i) == 0 ) CYCLE
+         IF ( data%component_linked(i) ) CYCLE
+         IF ( data%id_compd(i) <= 0 ) CYCLE
+         IF ( data%Rsorp_gch(i) <= zero_ ) CYCLE
+
+         CALL calcSorptionPartition(data,column,layer_idx,i,MeDis,MePar)
+
+         ! relax the dissolved pool toward its equilibrium value
+         ! (+ve = adsorbing, -ve = desorbing)
+         sorption = data%Rsorp_gch(i) *                                        &
+                            ( _STATE_VAR_(data%id_comp(i)) - MeDis )
+
+         _FLUX_VAR_(data%id_comp(i))  = _FLUX_VAR_(data%id_comp(i))  - sorption
+         _FLUX_VAR_(data%id_compd(i)) = _FLUX_VAR_(data%id_compd(i)) + sorption
+
+         IF ( data%id_compd_srp(i) > 0 ) &
+            _DIAG_VAR_(data%id_compd_srp(i)) = sorption * secs_per_day
+         IF ( data%id_compd_frc(i) > 0 ) &
+            _DIAG_VAR_(data%id_compd_frc(i)) = _STATE_VAR_(data%id_compd(i)) / &
+                   MAX( _STATE_VAR_(data%id_comp(i))                           &
+                       +_STATE_VAR_(data%id_compd(i)), one_e_neg_ten )
+      ENDDO
+   ENDIF
 
 END SUBROUTINE aed_calculate_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -622,7 +776,8 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
    AED_REAL,   DIMENSION(SIZE(data%PartComp))  :: partConcs
    ! Temporary variables
    INTEGER  :: i
-   AED_REAL :: pco2,nc, tss,MeDis,MePar,inDis,inPar, KMep,pH
+   AED_REAL :: pco2,nc, MeDis,MePar
+   AED_REAL,PARAMETER :: one_e_neg_ten = 1e-10
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -676,58 +831,84 @@ SUBROUTINE aed_equilibrate_geochemistry(data,column,layer_idx)
      _DIAG_VAR_(data%id_c_pco2) = pco2
      !_DIAG_VAR_(data%id_gcdiag(6)) = pco2
    ENDIF
- ! IF( returnGCDerivedVector("NONCON",nc) > 0) THEN
- !   _DIAG_VAR_(data%id_noncon) = nc
- !   _DIAG_VAR_(data%id_gcdiag(5)) = nc
- ! ENDIF
+   !-- Per-cell solver failure flag: 0 = accepted, 1 = rejected. Written only
+   !-- to the dedicated noncon_mh diagnostic; the id_gcdiag() index for NONCON
+   !-- is configuration dependent so it must not be hardwired here.
+   IF( returnGCDerivedVector("NONCON",nc) > 0 .AND. data%simEq ) THEN
+     _DIAG_VAR_(data%id_noncon) = nc
+   ENDIF
 
 
 
-   !Adsorption
+   !Adsorption - instantaneous equilibrium partitioning. Components with
+   !Rsorp_gch>0 are excluded here; they relax kinetically toward the same
+   !partition in aed_calculate_geochemistry.
    IF( data%simMeAdsorption ) THEN
-   ! Retrieve current environmental conditions for the cell.
-     tss = zero_
-     IF(data%id_tss>0) THEN
-       tss = _STATE_VAR_(data%id_tss) ! externally supplied total susp solids
-     END IF
-
      DO i=1,data%num_comp
         IF ( data%MeAdsorptionModel(i) ==0 ) CYCLE
+        IF ( data%component_linked(i) ) CYCLE   ! linked components have no _ads pool
+        IF ( data%id_compd(i) <= 0 ) CYCLE      ! no sorbed state was registered
+        IF ( data%Rsorp_gch(i) > zero_ ) CYCLE  ! kinetic: handled in calculate
 
-      inDis = _STATE_VAR_(data%id_comp(i))
-      inPar = _STATE_VAR_(data%id_compd(i))  ! no adsorped for linked component ,..!
+        CALL calcSorptionPartition(data,column,layer_idx,i,MeDis,MePar)
 
-      ! Adjust local sorption coefficients for temperature or salinity  (PO4AdsorptionModel = 1 only)
-      KMep = data%KMep(i) !* KMep_fT_fSal(data%theta_KMe, data%K_sal, salt, temp)
+        ! Set back to core variables
+        _STATE_VAR_(data%id_comp(i)) = MeDis
+        _STATE_VAR_(data%id_compd(i)) = MePar
 
-      ! Compute sorption
-      IF(data%ads_use_pH) THEN
-        pH = _STATE_VAR_(data%id_pH)
-
-        CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependencies
-                                  inDis+inPar,                          &
-                                  tss,                                 &
-                                  data%KMep(i),data%Kadsratio(i),data%Qmax(i),      &
-                                  MeDis,MePar,                       &  ! Returning variables
-                                  thepH=pH)
-
-      ELSE
-        CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),              &  ! Dependecies
-                                  inDis+inPar,                          &
-                                  tss,                                 &
-                                  data%KMep(i),data%Kadsratio(i),data%Qmax(i),      &
-                                  MeDis,MePar,                       &  ! Returning variables
-                                  temp_=temp,salt_=sal)
-      ENDIF
-
-      ! Set back to core variables
-      _STATE_VAR_(data%id_comp(i)) = MeDis
-      _STATE_VAR_(data%id_compd(i)) = MePar
-      !ENDIF
+        IF ( data%id_compd_frc(i) > 0 ) &
+           _DIAG_VAR_(data%id_compd_frc(i)) = MePar / MAX(MeDis+MePar, one_e_neg_ten)
      ENDDO
    ENDIF
 
 END SUBROUTINE aed_equilibrate_geochemistry
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_mobility_geochemistry(data,column,layer_idx,mobility)
+!-------------------------------------------------------------------------------
+! Set vertical movement of the sorbed (_ads) pools (+ve up; -ve down).
+! Components with link_ads_vvel adopt the sorbent particle's _vvel diagnostic;
+! others keep their constant w_gch_ads. Mineral mobilities are define-time
+! constants and are not touched here.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed_geochemistry_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx
+   AED_REAL,INTENT(inout) :: mobility(:)
+!
+!LOCALS
+   AED_REAL :: vvel, dz
+   INTEGER  :: i
+!-------------------------------------------------------------------------------
+!BEGIN
+   IF (.NOT. data%simMeAdsorption) RETURN
+
+   vvel = zero_
+   IF ( data%id_compd_vvel > 0 ) &
+      vvel = _DIAG_VAR_(data%id_compd_vvel) / secs_per_day
+
+   dz = _STATE_VAR_(data%id_dz)
+
+   DO i=1,data%num_comp
+      IF ( data%MeAdsorptionModel(i) == 0 ) CYCLE
+      IF ( data%component_linked(i) ) CYCLE
+      IF ( data%id_compd(i) <= 0 ) CYCLE
+
+      IF ( data%link_ads_vvel(i) ) THEN
+         mobility(data%id_compd(i)) = vvel
+      ELSE
+         mobility(data%id_compd(i)) = data%w_gch_ads(i)
+      ENDIF
+
+      IF ( data%id_compd_set(i) > 0 ) &
+         _DIAG_VAR_(data%id_compd_set(i)) = (mobility(data%id_compd(i))/dz)   &
+                          * _STATE_VAR_(data%id_compd(i)) * secs_per_day
+   ENDDO
+
+END SUBROUTINE aed_mobility_geochemistry
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -813,20 +994,37 @@ END SUBROUTINE aed_inflow_update_geochemistry
    kb = data%Riron_box
    kf = data%Riron_aox
 
-   status = returnGCDerivedVector("Fe+2      ", Fe_2)
-   IF(status/=1)Fe_2 = zero_
-   status = returnGCDerivedVector("FeOH+     ", FeOH)
-   IF(status/=1)FeOH = zero_
-   status = returnGCDerivedVector("Fe(OH)2   ", FeOH2)
-   IF(status/=1)FeOH2 = zero_
+   IF ( data%iron_ox_model == 1 ) THEN
+      !-- Singer-Stumm: abiotic Fe(II) oxidation is first order in O2 and is
+      !-- summed over the hydrolysis series, since FeOH+ and Fe(OH)2 oxidise
+      !-- orders of magnitude faster than Fe+2. The pH dependence is implicit,
+      !-- carried entirely by the speciation - which is why the rate falls by
+      !-- ~10^6 from pH 7 to pH 3 and keeps Fe(II) mobile in acid drainage.
+      !-- The biotic term kb is retained: it is what dominates at low pH.
+      !-- CAUTION: restored verbatim from the long commented out original and
+      !-- NOT yet mass balance verified. The speciation terms carry moles from
+      !-- allSpecies scaled by FEII_MolWeight*1e3, while the biotic term uses
+      !-- ironII straight from the state variable in mmol/m3 - confirm the two
+      !-- bases agree before trusting a calibration against Riron_aox.
+      status = returnGCDerivedVector("Fe+2      ", Fe_2)
+      IF(status/=1)Fe_2 = zero_
+      status = returnGCDerivedVector("FeOH+     ", FeOH)
+      IF(status/=1)FeOH = zero_
+      status = returnGCDerivedVector("Fe(OH)2   ", FeOH2)
+      IF(status/=1)FeOH2 = zero_
 
-   !   OxidRate = oxygen *  (                               &
-   !              kf*ko*Fe_2  *FEII_MolWeight*1e3  +        &
-   !              kf*k1*FeOH  *FEII_MolWeight*1e3  +        &
-   !              kf*k2*FeOH2 *FEII_MolWeight*1e3  +        &
-   !              kb*ironII ) * (data%theta_iron_ox**(temp-20.0))
-
-   OxidRate = kb*ironII * (data%theta_iron_ox**(temp-20.0)) * oxygen/(oxygen+100.)
+      OxidRate = oxygen *  (                                                   &
+                 kf*ko*Fe_2  *FEII_MolWeight*1e3  +                            &
+                 kf*k1*FeOH  *FEII_MolWeight*1e3  +                            &
+                 kf*k2*FeOH2 *FEII_MolWeight*1e3  +                            &
+                 kb*ironII ) * (data%theta_iron_ox**(temp-20.0))
+   ELSE
+      !-- Biotic only, Monod in O2. NB pH independent: Fe(II) oxidises at the
+      !-- same rate at pH 3 as at pH 7, which is not realistic for acid
+      !-- sulfate systems. Use iron_ox_model = 1 where that matters.
+      OxidRate = kb*ironII * (data%theta_iron_ox**(temp-20.0))                 &
+                           * oxygen/(data%Kiron_ox + oxygen)
+   ENDIF
 
  END FUNCTION calcIronOxidation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -913,6 +1111,56 @@ END SUBROUTINE aed_inflow_update_geochemistry
  END FUNCTION calcSulfurOxidation
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+
+!###############################################################################
+SUBROUTINE calcSorptionPartition(data,column,layer_idx,i,MeDis,MePar)
+!-------------------------------------------------------------------------------
+! Compute the equilibrium partition (dissolved vs sorbed) of component i for
+! the current cell conditions. This is the target state shared by both
+! sorption pathways: applied directly by aed_equilibrate_geochemistry
+! (instantaneous) or relaxed toward by aed_calculate_geochemistry (kinetic).
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CLASS (aed_geochemistry_data_t),INTENT(in) :: data
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_idx, i
+   AED_REAL,INTENT(out) :: MeDis, MePar
+!
+!LOCALS
+   AED_REAL :: temp, sal, tss, pH, KMep, inDis, inPar
+!-------------------------------------------------------------------------------
+!BEGIN
+   temp = _STATE_VAR_(data%id_temp)
+   sal  = _STATE_VAR_(data%id_sal)
+
+   tss = zero_
+   IF (data%id_tss>0) tss = _STATE_VAR_(data%id_tss)  ! sorbent (TSS or particle)
+
+   inDis = _STATE_VAR_(data%id_comp(i))
+   inPar = _STATE_VAR_(data%id_compd(i))
+
+   ! Adjust local sorption coefficient for temperature and salinity
+   ! (only used by MeAdsorptionModel = 1, the linear Kd model)
+   KMep = data%KMep(i) * KMe_fT_fSal(data%theta_KMe, data%K_sal, sal, temp)
+
+   IF (data%ads_use_pH) THEN
+      pH = _STATE_VAR_(data%id_pH)
+      CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),                  &
+                                   inDis+inPar, tss,                           &
+                                   KMep, data%Kadsratio(i), data%Qmax(i),      &
+                                   MeDis, MePar,                               &
+                                   thepH=pH)
+   ELSE
+      CALL MetalAdsorptionFraction(data%MeAdsorptionModel(i),                  &
+                                   inDis+inPar, tss,                           &
+                                   KMep, data%Kadsratio(i), data%Qmax(i),      &
+                                   MeDis, MePar,                               &
+                                   temp_=temp, salt_=sal)
+   ENDIF
+
+END SUBROUTINE calcSorptionPartition
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################
@@ -1004,6 +1252,62 @@ MePar = zero_
 END IF
 
 END SUBROUTINE MetalAdsorptionFraction
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION KMe_fT_fSal(theta_KMe, K_sal, sal, temp)
+!-------------------------------------------------------------------------------
+! Temperature / salinity sensitivity of the linear sorption coefficient,
+! following the P-adsorption form of Zhang and Huang 2011 (as in
+! aed_phosphorus::Kpo4p_fT_fSal): sorption increases with temperature and
+! decreases with salinity. Defaults (theta_KMe=1, K_sal=0) are neutral.
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: theta_KMe ! theta for T dependence; 1.0 => no effect
+   AED_REAL,INTENT(in) :: K_sal     ! half-saturation of salinity; 0 => no effect
+   AED_REAL,INTENT(in) :: sal
+   AED_REAL,INTENT(in) :: temp
+   AED_REAL,PARAMETER  :: Topt = 45.
+!
+!LOCALS
+   AED_REAL :: fT, fSal
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   fT = (theta_KMe**(temp-Topt))
+
+   IF(K_sal==zero_)THEN
+     fSal = one_
+   ELSE
+     fSal = K_sal/(K_sal+sal)
+   ENDIF
+
+   KMe_fT_fSal = fT * fSal
+
+END FUNCTION KMe_fT_fSal
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE reportRedoxCouple(label, active)
+!-------------------------------------------------------------------------------
+! Print whether one kinetic redox couple was activated by the component set
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   CHARACTER(len=*),INTENT(in) :: label
+   LOGICAL,INTENT(in)          :: active
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   !-- label is space padded by the caller for alignment, so do not TRIM it
+   IF ( active ) THEN
+      print *,"          ",label," : ACTIVE"
+   ELSE
+      print *,"          ",label," : off (both redox states not configured)"
+   ENDIF
+
+END SUBROUTINE reportRedoxCouple
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

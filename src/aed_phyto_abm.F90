@@ -42,11 +42,11 @@ MODULE aed_phyto_abm
    USE aed_core
    USE aed_util
    USE aed_bio_utils
-   USE prob_functions_mod
+!  USE prob_functions_mod
 
-   USE trait_functions
+!  USE trait_functions
    USE gmk
-   USE mGf90
+!  USE mGf90
 
    IMPLICIT NONE
 
@@ -365,6 +365,10 @@ INTEGER FUNCTION load_csv(dbase, pd, dbsize)
             CASE ('zeta_P')        ; pd(dcol)%zeta_P        = extract_double(values(ccol))
             CASE ('a1')            ; pd(dcol)%a1            = extract_double(values(ccol))
             CASE ('mort_prob')     ; pd(dcol)%mort_prob     = extract_double(values(ccol))
+                                     !# mort_prob is a per-day random-mortality rate (d-1), converted
+                                     !# to a per-call death probability at the point of use via the
+                                     !# host's actual timestep (see mort_prob_step in
+                                     !# aed_particle_bgc_phyto_abm) - NOT a raw per-call probability.
             CASE ('nx')            ; pd(dcol)%nx            = extract_double(values(ccol))
             CASE ('thetaNmax')     ; pd(dcol)%thetaNmax     = extract_double(values(ccol))
             CASE ('thetaPmax')     ; pd(dcol)%thetaPmax     = extract_double(values(ccol))
@@ -793,7 +797,10 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    !real    :: num = 5d9           ! Number of cells per superindividual
    data%ip_num = aed_define_ptm_variable('phy_num', 'number', 'number of cells/particle',initial = data%phytos(1)%n0) !5d12
 
-   !real :: Cdiv= 0.04d0           !cellular carbon content threshold for division (pmol/cell), can be used as a proxy for size and can be converted to ESD; Phytoplankton half-saturation constant, minimal N:C and maximal N:C ratios are allometric functions of this parameter
+   !real :: Cdiv= 0.04d0           !cellular carbon content threshold for division (pmol/cell), can
+                                   !be used as a proxy for size and can be converted to ESD; Phytoplankton
+                                   !half-saturation constant, minimal N:C and maximal N:C ratios are
+                                   !allometric functions of this parameter
                                    !This trait will vary with mutation
    data%ip_Cdiv = aed_define_ptm_variable('phy_cdiv', 'pmol/cell', 'cellular carbon content threshold for division',initial = data%phytos(1)%Cdiv) ! 0.04d0
 
@@ -952,6 +959,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_dep   = aed_locate_sheet_global('col_depth')
    data%id_I0    = aed_locate_sheet_global('par_sf')
    data%id_yday  = aed_locate_sheet_global('yearday')
+   data%id_timestep = aed_locate_sheet_global('timestep')
 
 END SUBROUTINE aed_define_phyto_abm
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1682,7 +1690,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    AED_REAL, ALLOCATABLE :: oxy_flux(:)   ! per-group
    AED_REAL :: decay, area, thickness
 
-   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation, D0, D1, par, no3, nh4, frp, pw, mu, pw20, mu20
+   AED_REAL :: Mu_max, WaterTemperature, Light, Depth, Kd, N_Limitation, P_Limitation
+   AED_REAL :: D0, D1, par, no3, nh4, frp, pw, mu, pw20, mu20
    AED_REAL :: f_T, Iz, f_I, Respiration, Mu_net
 
    AED_REAL, PARAMETER :: buoyancy_age = 86400.
@@ -1758,22 +1767,27 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
    real    :: FZoo(NZOO) = 0.   !The total amount of palatable prey (in Nitrogen)
                              !for each zooplankton size class
    real    :: phyV = 0.   !Phytoplankton cell volume
-   real    :: RES     = 0. !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
-   real    :: RES_NO3     = 0. !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
-   real    :: RES_NH4     = 0. !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
-   real    :: RES_P   = 0.  !ML not sure why this is included here because respiration is already accounted for in dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES     = 0. !ML not sure why this is included here because respiration is already accounted for in
+                            !   dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES_NO3     = 0. !ML not sure why this is included here because respiration is already accounted for
+                            !   in dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES_NH4     = 0. !ML not sure why this is included here because respiration is already accounted for
+                            !   in dN of GMK function, but keeping for posterity, always 0 for now
+   real    :: RES_P   = 0.  !ML not sure why this is included here because respiration is already accounted for in
+                            !   dN of GMK function, but keeping for posterity, always 0 for now
    real    :: EGES  = 0.
    real    :: gbar  = 0.
    real    :: INGES(NZOO) = 0.
    real    :: Zmort = 0.
-   real    :: Gmatrix(NZOO,NZOO) = 0.d0     !Grazer biomass specific grazing rate matrix
-   real,    allocatable :: BN(:)            !The amount of nitrogen in each super-individual
-   real,    allocatable :: BP(:)            !The amount of phosphorus in each super-individual
-   real,    allocatable :: BC(:)            !The amount of carbon in each super-individual
-   real,    allocatable :: Pmatrix(:,:)     !Phytoplankton mortality rates by each zooplankton size class for each superindividual
+   real    :: Gmatrix(NZOO,NZOO) = 0.d0  !Grazer biomass specific grazing rate matrix
+   real,    allocatable :: BN(:)         !The amount of nitrogen in each super-individual
+   real,    allocatable :: BP(:)         !The amount of phosphorus in each super-individual
+   real,    allocatable :: BC(:)         !The amount of carbon in each super-individual
+   real,    allocatable :: Pmatrix(:,:)  !Phytoplankton mortality rates by each zooplankton size class for each superindividual
    real,    parameter   :: eta    = -1.d0*6.6  !Prey refuge parameter for nitrogen
-   real,    parameter   :: A_g    = 21.9   !Intercept of the allometric equation of maximal zooplankton grazing rate (Ward et al. 2012)
-   real,    parameter   :: B_g    = -0.16  !Slope of the allometric equation of maximal zooplankton grazing rate (Ward et al. 2012)
+   real,    parameter   :: A_g    = 21.9 !Intercept of the allometric equation of maximal zooplankton grazing rate
+                                         !  (Ward et al. 2012)
+   real,    parameter   :: B_g    = -0.16 !Slope of the allometric equation of maximal zooplankton grazing rate (Ward et al. 2012)
    real,    parameter   :: mz_g   = 0.d0  !Power of zooplankton mortality following Ward et al. (2013)
    real   :: Nt_min = 0.0 !Minimal amount nitrogen of each super-individual (number of cells * N content per cell)
    real   :: P_min = 0.0 !Minimal amount phosphorus of each super-individual (number of cells * P content per cell)
@@ -1921,18 +1935,19 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       BP(:) = 0d0
 
       ! calculate the amount of nitrogen and total abundances (cells/m3) in each super-individual
-      DO m = 1, N_  
+      DO m = 1, N_
 
          i = index_(m)
 
-         !The amount of N in the super-individual m                                    ML: looks like pmol to mmol conversion then to m3
+         !The amount of N in the super-individual m                                ML: looks like pmol to mmol conversion then to m3
          BN(m) = p(i)%ptm_state(data%ip_n) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BN is only used in zooplankton module
 
          !The amount of C in the super-individual m
          BC(m) = p(i)%ptm_state(data%ip_c) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BC is used to calculate fitness
 
-         !The amount of P in the super-individual m                                    ML: looks like pmol to mmol conversion then to m3
-         BP(m) = p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz   ! ML BP is not currently used but including here for symmetry in case we add zoops later
+         !The amount of P in the super-individual m                                ML: looks like pmol to mmol conversion then to m3
+         BP(m) = p(i)%ptm_state(data%ip_p) * p(i)%ptm_state(data%ip_num) * 1d-9 / Hz
+                               ! ML BP is not currently used but including here for symmetry in case we add zoops later
 
          !Count the number of cells in each layer, per group
          Abun_by_group(p(i)%ptm_istat(GRP)) = Abun_by_group(p(i)%ptm_istat(GRP)) + p(i)%ptm_state(data%ip_num)
@@ -2424,7 +2439,9 @@ IF (N_ > 0) THEN
                case(iTopt)
                    oldtt(1) = p(i)%ptm_state(data%ip_Topt)
                case(iSize)
-                   oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv)) !ML I could understand CDiv being logged to avoid too-big changes in division threshold but why logged below?
+                   oldtt(1) = log(p(i)%ptm_state(data%ip_Cdiv))
+                             !ML I could understand CDiv being logged to avoid too-big changes
+                             !   in division threshold but why logged below?
                case(ialphaChl)
                    oldtt(1) = p(i)%ptm_state(data%ip_LnalphaChl)
                case DEFAULT

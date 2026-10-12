@@ -127,6 +127,13 @@ MODULE aed_gcsolver
  DOUBLETYPE, PARAMETER :: gc_zero =  0.0_GCHP
  DOUBLETYPE, PARAMETER :: gc_one  =  1.0_GCHP
  DOUBLETYPE, PARAMETER :: minLogActivity = -30.0
+ !-- Smallest mineral (pure phase) mole amount that counts as "present".
+ !-- Tests against exact zero leave a phase that has dissolved to exhaustion
+ !-- holding float dust (~1e-36), which then reads as present: it blocks the
+ !-- convergence test and makes the f0 = delta/moles step limiter explode to
+ !-- ~1e35, annihilating the Newton step for every component.  cf PHREEQC's
+ !-- MIN_TOTAL (Phreeqc.cpp:494, = 1e-25) used the same way in model.cpp.
+ DOUBLETYPE, PARAMETER :: gc_mintotal = 1.0e-25_GCHP
 
  !-- Module Variables
  DOUBLETYPE, DIMENSION(:,:), ALLOCATABLE :: inequalityArray
@@ -605,8 +612,13 @@ CONTAINS
      !WQ(cellIndex,DICHM(:)) = REAL(dissConcs, r_wq)
      !WQ(cellIndex,PICHM(:)) = REAL(partConcs, r_wq)
 
-     !-- Charge Balance Condition
-     dissConcs(chargeBalCol) = hydrogenIon%Value
+     !-- Charge Balance Condition (mmol/m3 in the water-column path, to match
+     !-- the registered units; raw moles otherwise as per history)
+     IF(concMode == MMOLPERM3) THEN
+       dissConcs(chargeBalCol) = hydrogenIon%Value * REAL(1e6,GCHP)
+     ELSE
+       dissConcs(chargeBalCol) = hydrogenIon%Value
+     END IF
 
 
      !-- 4. Now update derived variable arrays
@@ -710,7 +722,11 @@ CONTAINS
      CALL setComponentTotalConc(dissConcs,partConcs,allComponents,concMode)
 
      ionStrength%Total = initialIonicStrength(allComponents)
-     hydrogenIon%Total = dissConcs(chargeBalCol)
+     IF(concMode == MMOLPERM3) THEN
+       hydrogenIon%Total = dissConcs(chargeBalCol) / REAL(1e6,GCHP)
+     ELSE
+       hydrogenIon%Total = dissConcs(chargeBalCol)
+     END IF
 
      CALL updateLogK(allSpecies,allComponents,cellTemp)
 
@@ -1002,7 +1018,7 @@ CONTAINS
          !-- Pure phase
          IF(components(cList(componentIndex))%CompType == PUREPHASE) THEN
            !-- May be no moles and undersaturated:
-           IF(components(cList(componentIndex))%ppData%moles <= gc_zero .AND.  &
+           IF(components(cList(componentIndex))%ppData%moles <= gc_mintotal .AND. &
               components(cList(componentIndex))%Total -                        &
               components(cList(componentIndex))%Value > 1e-8 ) THEN
 
@@ -1044,7 +1060,7 @@ CONTAINS
 
           ineqCntr = ineqCntr + 1
 
-          IF(components(cList(componentIndex))%ppData%moles <= gc_zero) THEN
+          IF(components(cList(componentIndex))%ppData%moles <= gc_mintotal) THEN
             !-- del = -1 will ensure the solution can only precipitate
             deltaConc(nEQLeqs+ineqCntr) = -gc_one
           ELSE
@@ -1057,7 +1073,7 @@ CONTAINS
           !-- No moles and undersaturated
           IF (components(cList(componentIndex))%Total -                        &
               components(cList(componentIndex))%Value > 1e-8 .AND.             &
-              components(cList(componentIndex))%ppData%moles <= gc_zero) THEN
+              components(cList(componentIndex))%ppData%moles <= gc_mintotal) THEN
 
             inequalityArray(nOPTEqs+nEQLeqs+ineqCntr,residColumn) = gc_zero
             res((components(cList(componentIndex))%eqIndex))      = gc_zero
@@ -1139,7 +1155,7 @@ CONTAINS
      IF(nPPEqs > 0) THEN
          DO componentIndex = 1,nComps2Process
            IF(components(cList(componentIndex))%CompType==PUREPHASE) THEN
-             IF(components(cList(componentIndex))%ppData%moles <= gc_zero .AND.&
+             IF(components(cList(componentIndex))%ppData%moles <= gc_mintotal .AND. &
                 components(cList(componentIndex))%Total -  &
                   components(cList(componentIndex))%Value > 1e-8 ) THEN
 
@@ -1250,7 +1266,12 @@ CONTAINS
    failed = .FALSE.
 
    IF(nItern == ITMAX) THEN
-     PRINT *,'Non-convergence by ITMAX: ',nItern
+     !-- These reports are diagnostic only: the great majority of entries are
+     !-- pure phases that are tolerated a few lines below and never set failed.
+     !-- Printed unconditionally they swamp the run log (462 MB in one case),
+     !-- so gate them on verbosity.  cf PHREEQC, which gates the equivalent
+     !-- messages on debug_model.
+     IF (verbosity > 0) PRINT *,'Non-convergence by ITMAX: ',nItern
 
 !     CALL outputComponentData(components)
 
@@ -1258,15 +1279,19 @@ CONTAINS
        IF(ABS(inequalityArray(components(componentIndex)%eqIndex,residColumn))>&
                                                              convTolerance) THEN
 
-         print *,'Component Type & Name: ',                                    &
+         IF (verbosity > 0) THEN
+           print *,'Component Type & Name: ',                                  &
                                 components(cList(componentIndex))%CompType,    &
                 components(cList(componentIndex))%CompName
+         END IF
 
          IF(components(cList(componentIndex))%CompType == PUREPHASE)  THEN
 !           print *,' PurePhase non-convergence after ',nItern,' steps'
-         print *,' ->PP: ',  componentIndex,   cList(componentIndex),                  &
+           IF (verbosity > 0) THEN
+             print *,' ->PP: ',  componentIndex,   cList(componentIndex),      &
                 components(cList(componentIndex))%ppdata%moles,&
                 inequalityArray(components(componentIndex)%eqIndex,residColumn)
+           END IF
 
            IF(components(cList(componentIndex))%ppdata%moles < 1e-20) THEN
 !             print *,'  # moles <1e-20, so proceeding'
@@ -1670,8 +1695,19 @@ SUBROUTINE UpdateUnknownsWithdX(deltaConc,comps,cList)                        !
        cIndex = cList(componentIndex)
        IF(comps(cIndex)%CompType == PUREPHASE) THEN
 
+         !-- Clamp runaway deltas before they are used in the f0 ratio below.
+         !-- Without this a wild delta divided by a near-zero mole amount makes
+         !-- factor astronomically large, and factor scales down the step for
+         !-- EVERY component (see below), stalling the whole solve.
+         !-- cf PHREEQC model.cpp:2993-2999.
+         IF (deltaConc(componentIndex) < -1.0e8) THEN
+           deltaConc(componentIndex) = -10.0
+         ELSE IF (deltaConc(componentIndex) > 1.0e8) THEN
+           deltaConc(componentIndex) =  10.0
+         END IF
+
          !-- Check for over-dissolution
-         IF (comps(cIndex)%ppData%moles > gc_zero .AND.                        &
+         IF (comps(cIndex)%ppData%moles > gc_mintotal .AND.                    &
                     deltaConc(componentIndex) > comps(cIndex)%ppData%moles) THEN
 
            f0 = deltaConc(componentIndex) / comps(cIndex)%ppData%moles
@@ -1686,13 +1722,16 @@ SUBROUTINE UpdateUnknownsWithdX(deltaConc,comps,cList)                        !
 
          !-- Check for over-dissolution
          ELSE IF ( deltaConc(componentIndex) > gc_zero .AND.                   &
-                                    comps(cIndex)%ppData%moles <= gc_zero ) THEN
+                                comps(cIndex)%ppData%moles <= gc_mintotal ) THEN
            IF(verbosity > 5 ) THEN
               print *,'Dissolving mineral with 0 mass:',                       &
                  comps(cIndex)%CompName, deltaConc(componentIndex),            &
                  comps(cIndex)%ppData%moles
            END IF
            deltaConc(componentIndex) = gc_zero
+           !-- Phase is exhausted: clear the dust so it cannot re-enter the
+           !-- "present" branches on a later iteration.
+           comps(cIndex)%ppData%moles = gc_zero
 
          !-- Check over precipitation
      ELSE IF ( deltaConc(componentIndex) < gc_zero  .AND.                  &
@@ -1865,6 +1904,13 @@ SUBROUTINE UpdateUnknownsWithdX(deltaConc,comps,cList)                        !
 
        comps(cIndex)%ppData%moles = comps(cIndex)%ppData%moles -               &
                                                        deltaConc(componentIndex)
+
+       !-- A phase that has dissolved to exhaustion lands on float dust rather
+       !-- than exactly zero (values ~1e-36 observed).  Left in place that dust
+       !-- reads as "mineral present" everywhere above, which both blocks the
+       !-- convergence test and explodes the f0 step limiter.  Snap it out.
+       IF (comps(cIndex)%ppData%moles < gc_mintotal)                           &
+                                        comps(cIndex)%ppData%moles = gc_zero
 
 
      ! Ionic Strength
@@ -2791,9 +2837,18 @@ END SUBROUTINE UpdateUnknownsWithdX
      !-----------------------------------------------------------
      IF(components(componentIndex)%CompType == PUREPHASE) THEN
 
-       !-- Number of pure-phase moles
+       !-- Number of pure-phase moles. For the water-column path (MMOLPERM3)
+       !-- the WQ array holds minerals in mmol/m3, matching their registered
+       !-- units, so convert to moles as for MOLEBLNCE. Other concModes (CANDI)
+       !-- keep the historical raw-moles convention.
+       IF(concMode == MMOLPERM3) THEN
+         conversion = REAL(1e6,GCHP)
+       ELSE
+         conversion = REAL(1.0,GCHP)
+       END IF
        components(componentIndex)%ppData%moles = MAX(REAL(0.0,KIND=GCHP),      &
-                              particleConcs(components(componentIndex)%wqIndex))
+                              particleConcs(components(componentIndex)%wqIndex) &
+                              / conversion)
 
        !-- Natural Log of log K is the target saturation value
        components(componentIndex)%Total =                                      &
@@ -2909,8 +2964,13 @@ END SUBROUTINE UpdateUnknownsWithdX
 
        !-- Particulate chemistry array
        IF(components(componentIndex)%CompType == PUREPHASE) THEN
+         IF(concMode == MMOLPERM3) THEN
+           conversion = REAL(1e6,GCHP)     ! moles -> mmol/m3 (registered units)
+         ELSE
+           conversion = REAL(1.0,GCHP)     ! CANDI paths: historical raw moles
+         END IF
          particleConcs(components(componentIndex)%wqIndex) =                   &
-                                         components(componentIndex)%ppData%moles
+                          components(componentIndex)%ppData%moles * conversion
 
        !-- Normal dissolved component
        ELSE IF(components(componentIndex)%CompType == MOLEBLNCE) THEN
@@ -3285,6 +3345,12 @@ END SUBROUTINE UpdateUnknownsWithdX
     !-- Local
     INTEGER  :: nComp, cIndex
 
+    !-- NB each search below must scan the whole component list: use CYCLE, not
+    !-- EXIT. A couple is only detected if both members are found, so leaving
+    !-- the loop early on either member makes detection depend on the order the
+    !-- components happen to appear in dis_components - e.g. SO4 listed before
+    !-- H2S silently left simSulfurRedox .FALSE. with both configured.
+
     nComp = SIZE(comps)
 
     !--------------------------------------------------
@@ -3303,7 +3369,7 @@ END SUBROUTINE UpdateUnknownsWithdX
       IF( TRIM(comps(cIndex)%EltName) == "FEIII" .OR. &
           TRIM(comps(cIndex)%EltName) == "FeIII" ) THEN
            FEIII = comps(cIndex)%wqIndex
-           EXIT
+           CYCLE
       END IF
 
     END DO
@@ -3320,6 +3386,7 @@ END SUBROUTINE UpdateUnknownsWithdX
     !--------------------------------------------------
     !-- Next search for MANGANESE redox couple
     MNII  = -999
+    MNIV  = -999
     MNVII = -999
     DO cIndex = 1, nComp
 
@@ -3335,7 +3402,7 @@ END SUBROUTINE UpdateUnknownsWithdX
           TRIM(comps(cIndex)%EltName) == "MnIV" ) THEN
 
            MNIV = comps(cIndex)%wqIndex
-           EXIT
+           CYCLE
       END IF
 
       !-- Search for MnVII
@@ -3343,7 +3410,7 @@ END SUBROUTINE UpdateUnknownsWithdX
           TRIM(comps(cIndex)%EltName) == "MnVII" ) THEN
 
            MNVII = comps(cIndex)%wqIndex
-           EXIT
+           CYCLE
       END IF
 
     END DO
@@ -3370,7 +3437,7 @@ END SUBROUTINE UpdateUnknownsWithdX
       !-- Search for SO4
       IF( TRIM(comps(cIndex)%EltName) == "SO4" ) THEN
            SO4 = comps(cIndex)%wqIndex
-           EXIT
+           CYCLE
       END IF
 
     END DO
@@ -4441,6 +4508,16 @@ END SUBROUTINE COLVEC
       END DO
     END DO
 
+    !-- NB these must be populated in the same order as tmpNames was built
+    !-- above (aqueous species, NONCON, SI_PPn, pCO2), otherwise derivedNames(i)
+    !-- and derivedGCList(i) describe different quantities.
+    DO i = 1,nGCDerivedVars
+      IF(TRIM(tmpNames(i)) == "NONCON") THEN
+          derivedGCList(gcCntr) = -998
+          gcCntr = gcCntr + 1
+      END IF
+    END DO
+
     DO i = 1,nGCDerivedVars
       IF(TRIM(tmpNames(i)) == "SI_PP1") THEN
           derivedGCList(gcCntr) = -1
@@ -4456,13 +4533,6 @@ END SUBROUTINE COLVEC
           gcCntr = gcCntr + 1
       ELSE IF(TRIM(tmpNames(i)) == "SI_PP5") THEN
           derivedGCList(gcCntr) = -5
-          gcCntr = gcCntr + 1
-      END IF
-    END DO
-
-    DO i = 1,nGCDerivedVars
-      IF(TRIM(tmpNames(i)) == "NONCON") THEN
-          derivedGCList(gcCntr) = -998
           gcCntr = gcCntr + 1
       END IF
     END DO
@@ -4510,13 +4580,27 @@ END SUBROUTINE COLVEC
 
    derivedVector = -999.9
 
+   !-- pCO2 (-999) and NONCON (-998) are located by their sentinel in
+   !-- derivedGCList rather than by position: NONCON is only second-to-last
+   !-- when DIC is simulated, so the old positional lookup returned a
+   !-- neighbouring species' value in any configuration without pCO2.
    IF(TRIM(Name) == "pCO2") THEN
-     derivedVector = REAL(derivedGCVals(nGCDerivedVars))
-     status = 1
+     DO i = 1,nGCDerivedVars
+       IF(derivedGCList(i) == -999) THEN
+         derivedVector = REAL(derivedGCVals(i))
+         status = 1
+         EXIT
+       END IF
+     END DO
 
    ELSE IF(TRIM(Name) == "NONCON") THEN
-     derivedVector = REAL(derivedGCVals(nGCDerivedVars-1))
-     status = 1
+     DO i = 1,nGCDerivedVars
+       IF(derivedGCList(i) == -998) THEN
+         derivedVector = REAL(derivedGCVals(i))
+         status = 1
+         EXIT
+       END IF
+     END DO
 
    ELSE
      DO i = 1,nGCDerivedVars

@@ -61,6 +61,9 @@ MDBG_FFLAGS=""
 ifeq ($(OSTYPE),Darwin)
   SHARED=-dynamiclib -undefined dynamic_lookup
   so_ext=dylib
+else ifeq ($(OSTYPE),Msys)
+  SHARED=-shared -Wl,-soname,$(OUTLIB).dll
+  so_ext=dll
 else
   SHARED=-shared -Wl,-soname,$(OUTLIB).so.$(SOVERS)
   so_ext=so
@@ -82,31 +85,19 @@ else ifeq ($(F90),ifx)
   OMPFLAG=-qopenmp
   OPT_FFLAGS=-O3
   ifeq ($(OSTYPE),Msys)
-    FFLAGS=-fpp -warn=all -module=${moddir} -static-intel -mp1 -stand=f23 -warn=nounused
+    FFLAGS=-fpp -warn=all -module=${moddir} -static-intel -stand=f23 -warn=nounused
     ifeq ($(WITH_CHECKS),true)
       FFLAGS+=-check=all -check=noarg_temp_created
     endif
     FFLAGS+=-real-size=64
   else
-    FFLAGS=-fpp -warn all -module ${moddir} -static-intel -mp1 -stand f23 -warn nounused
+    FFLAGS=-fpp -warn all -module ${moddir} -static-intel -stand f23 -warn nounused
     ifeq ($(WITH_CHECKS),true)
       FFLAGS+=-check all -check noarg_temp_created
     endif
     FFLAGS+=-real-size 64
   endif
 else ifeq ($(F90),flang)
-  ifeq ($(OSTYPE),FreeBSD)
-    INCLUDES+=-I../ancillary/mod
-  endif
-  DEBUG_FFLAGS=-g
-  OMPFLAG=-fopenmp
-  OPT_FFLAGS=-O3
-  FFLAGS=-module ${moddir}
-  ifeq ($(WITH_CHECKS),true)
-    FFLAGS+=-Mbounds
-  endif
-  FFLAGS+=-r8
-else ifeq ($(F90),flang-new)
   ifeq ($(OSTYPE),FreeBSD)
     INCLUDES+=-I../ancillary/mod
   endif
@@ -138,8 +129,9 @@ else
 endif
 FFLAGS+=$(DEFINES) $(INCLUDES)
 
+FFLAGS+=-fPIC
 ifeq ($(EXTERNAL_LIBS),shared)
-  FFLAGS+=-fPIC
+# FFLAGS+=-fPIC
   TARGET = ${libdir}/$(OUTLIB).${so_ext}
 else
   FFLAGS+=-fPIC

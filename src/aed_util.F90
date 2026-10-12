@@ -1479,7 +1479,8 @@ END FUNCTION param_file_type
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 END MODULE aed_util
-
+#if 0
+!### It seems this module is not used anywhere
 !###############################################################################
 !#                                                                             #
 !# prob_functions_mod.F90                                                      #
@@ -1875,3 +1876,4 @@ double precision function randn(option)
   end function nor2par
 
 end module prob_functions_mod
+#endif

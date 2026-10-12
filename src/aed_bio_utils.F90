@@ -85,12 +85,22 @@ MODULE aed_bio_utils
       AED_REAL  :: resuspension, tau_0
       ! Growth form (benthic, water, surface)
       INTEGER  :: growth_form, slough_model
+      ! Physiology model selector and per-group sloughing parameters.
+      !   NOTE(2026-09-23): used by aed_macroalgae only. physiology_model
+      !   chooses the growth formulation for the group (0 = generic AED,
+      !   1 = CGM, 2 = GLCMv3); slough_rate/_stress/_burial hold the
+      !   per-group values resolved from the module-wide &aed_macroalgae
+      !   scalars and the optional *_p override arrays.
+      INTEGER  :: physiology_model
+      AED_REAL :: slough_rate, slough_stress, slough_burial
       ! Particle parameters
       INTEGER  :: simSplit
       AED_REAL :: X_cinit, X_ninit, X_pinit, X_chlinit, Cdiv, n0, Lnalphachl, mort_prob
       AED_REAL :: RC, RN, RP, RChl, zeta_N, zeta_P, a1
-      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
-      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
+      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a
+      AED_REAL :: QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
+      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta
+      AED_REAL :: phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
       ! mort_prob interpretation: 0 (default) = mort_prob is compared to a per-call
       ! random draw and the whole particle dies; 1 = mort_prob instead deterministically
@@ -131,8 +141,10 @@ MODULE aed_bio_utils
       INTEGER  :: simSplit
       AED_REAL :: X_cinit, X_ninit, X_pinit, X_chlinit, Cdiv, n0, Lnalphachl, mort_prob
       AED_REAL :: RC, RN, RP, RChl, zeta_N, zeta_P, a1
-      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
-      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
+      AED_REAL :: nx, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a
+      AED_REAL :: QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b
+      AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta
+      AED_REAL :: phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
       INTEGER  :: simMortNumDecay
    END TYPE phyto_param_t
