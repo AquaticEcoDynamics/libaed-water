@@ -42,7 +42,7 @@ ${libdir}/$(OUTLIB).a: ${objdir} ${moddir} ${libdir} ${OBJS}
 #	ar rv $@ ${OBJS}
 #	ranlib $@
 
-${objdir}/%.o: ${srcdir}/%.F90 ../libaed-water/${srcdir}/aed_core.F90 ../libaed-water/${incdir}/aed.h
+${objdir}/%.o: ${srcdir}/%.F90 ../libaed-water/${srcdir}/aed_core.F90 ../libaed-water/${incdir}/aed.h ../libaed-water/make_defs.inc ../libaed-water/make_rules.inc
 	$(F90) $(FFLAGS) -c $< -o $@
 
 ${objdir}:

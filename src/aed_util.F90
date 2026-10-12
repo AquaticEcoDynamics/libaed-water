@@ -47,7 +47,7 @@ MODULE aed_util
 !
    PUBLIC aed_real2str, aed_int2str, qsort, exp_integral
    PUBLIC water_viscosity
-   PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat
+   PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat, aed_gas_exchange
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC InitialTemp, SoilTemp
@@ -368,6 +368,50 @@ FUNCTION water_viscosity(temperature) RESULT(mu)
 END FUNCTION water_viscosity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+
+!###############################################################################
+PURE AED_REAL FUNCTION aed_gas_exchange(k, c_eq, c, h, dt, alpha) RESULT(flux)
+!-------------------------------------------------------------------------------
+! Air-water gas flux INTO the water (per m2 of surface per second) for a step
+! of length dt into a surface layer of thickness h.
+!
+! The exchange relaxes the dissolved gas towards equilibrium,
+!     dc/dt = k*alpha*(c_eq - c)/h ,
+! which is integrated exactly over the step, so the flux can never carry the
+! layer past equilibrium (an explicit k*(c_eq - c) can when k*dt/h > 1, e.g.
+! strong wind over a thin surface layer). For small k*alpha*dt/h it reduces to
+! the usual k*(c_eq - c).
+!
+! c, c_eq : dissolved gas and its equilibrium concentration
+! alpha   : fraction of the transported pool that is the dissolved gas, i.e.
+!           d(c)/d(pool): 1 for O2, CH4, N2O; CO2/DIC when the flux changes DIC
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   AED_REAL,INTENT(in) :: k, c_eq, c, h, dt
+   AED_REAL,INTENT(in),OPTIONAL :: alpha
+!
+!LOCALS
+   AED_REAL :: a, x
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   a = one_
+   IF ( PRESENT(alpha) ) a = MIN(MAX(alpha, 1.0e-6), one_)
+
+   IF ( h <= zero_ .OR. dt <= zero_ ) THEN
+      flux = k * (c_eq - c)
+      RETURN
+   ENDIF
+
+   x = k * a * dt / h
+   IF ( x < 1.0e-6 ) THEN
+      flux = k * (c_eq - c)
+   ELSE
+      flux = (c_eq - c) * (h / (a * dt)) * (one_ - EXP(-x))
+   ENDIF
+END FUNCTION aed_gas_exchange
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 !###############################################################################

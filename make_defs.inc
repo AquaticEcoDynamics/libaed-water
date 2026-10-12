@@ -134,7 +134,7 @@ ifeq ($(EXTERNAL_LIBS),shared)
 # FFLAGS+=-fPIC
   TARGET = ${libdir}/$(OUTLIB).${so_ext}
 else
-# FFLAGS+=-fPIE
+  FFLAGS+=-fPIC
   TARGET = ${libdir}/$(OUTLIB).a
 endif
 

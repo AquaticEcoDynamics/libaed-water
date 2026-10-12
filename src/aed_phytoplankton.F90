@@ -84,7 +84,7 @@ MODULE aed_phytoplankton
       INTEGER :: id_Siexctarget,id_Simorttarget,id_Siupttarget
       INTEGER :: id_DOupttarget, id_l_resus, id_Psed_phy
       INTEGER :: id_par, id_I_0, id_extc, id_sedzone
-      INTEGER :: id_tem, id_sal, id_dz, id_dens
+      INTEGER :: id_tem, id_sal, id_dz, id_dens, id_tstep
       INTEGER :: id_GPP, id_NCP, id_PPR, id_NPR, id_dPAR
       INTEGER :: id_TPHY,id_chl, id_TIN, id_TIP
       INTEGER :: id_MPB, id_d_MPB, id_d_BPP, id_d_BCP, id_d_res, id_swi_c, id_swi_n, id_swi_p
@@ -706,6 +706,16 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    data%do_Nuptake = .false.
    IF (data%nnup>0) data%do_Nuptake=.true.
    IF (data%do_Nuptake) THEN
+     !# n1 must be NO3 (ino3) and n2 NH4 (inh4): no3up/nh4up, the NH4 preference
+     !# (phyto_pN) and the uptake split all assume this order
+     IF ( INDEX(n1_uptake_target_variable,'_amm') > 0 .OR.                     &
+          INDEX(n2_uptake_target_variable,'_nit') > 0 ) THEN
+        print *,'STOP: aed_phytoplankton n1/n2_uptake_target_variable are switched'
+        print *,'      n1 (NO3) = "',TRIM(n1_uptake_target_variable),'"'
+        print *,'      n2 (NH4) = "',TRIM(n2_uptake_target_variable),'"'
+        print *,'      expected n1 = NIT_nit, n2 = NIT_amm'
+        STOP
+     ENDIF
    ! IF (data%nnup>0) THEN ; data%id_Nupttarget(1) = aed_locate_variable( n1_uptake_target_variable); ino3=1 ; ENDIF
    ! IF (data%nnup>1) THEN ; data%id_Nupttarget(2) = aed_locate_variable( n2_uptake_target_variable); inh4=2 ; ENDIF
    ! IF (data%nnup>2) THEN ; data%id_Nupttarget(3) = aed_locate_variable( n3_uptake_target_variable); idon=3 ; ENDIF
@@ -787,6 +797,7 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    !-- Register environmental dependencies
    data%id_sedzone = aed_locate_sheet_global('sed_zone')
    data%id_I_0     = aed_locate_sheet_global('par_sf')
+   data%id_tstep   = aed_locate_sheet_global('timestep')   ! uptake/loss limits use the real step
    data%id_tem     = aed_locate_global('temperature')
    data%id_sal     = aed_locate_global('salinity')
    data%id_extc    = aed_locate_global('extc_coef')
@@ -823,12 +834,22 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    AED_REAL :: siuptake(data%num_phytos), siexcretion(data%num_phytos), simortality(data%num_phytos)
    AED_REAL :: fT, fNit, fPho, fSil, fI, fXl, fSal, PNf
    AED_REAL :: upTot,net_cuptake
+   AED_REAL :: cuptake0(data%num_phytos), nuptake0(data%num_phytos,1:4)
+   AED_REAL :: puptake0(data%num_phytos,1:2), siuptake0(data%num_phytos)
+   AED_REAL :: g, s, losses
+   AED_REAL :: dtl   ! time over which a limited flux may act: at least the model step
 
    INTEGER  :: phy_i,c
    AED_REAL :: flux, available
 
 !------------------------------------------------------------------------------+
 !BEGIN
+   ! Uptake and loss limits must hold over the whole integration step, so use
+   ! the real step (zerolimitfudgefactor only if it is longer). With a limit time
+   ! shorter than the step (the old 0.9*3600 default with dt = 3600 s) a "limited"
+   ! flux could still overdraw a pool, which repair_state then refilled (mass gain).
+   dtl = MAX(dtlim, _STATE_VAR_S_(data%id_tstep))
+
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_tem)      ! local temperature
    salinity = _STATE_VAR_(data%id_sal)  ! local salinity
@@ -1051,35 +1072,38 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
    ! cup   - c available
    ! rsiup - Si available
 
+   !# keep the uncapped uptakes so growth can be scaled to match any cap below
+   cuptake0 = cuptake ; nuptake0 = nuptake ; puptake0 = puptake ; siuptake0 = siuptake
+
    IF (data%do_Puptake) THEN
-      upTot = sum(puptake(:,1))*dtlim
-      IF ( abs(upTot) > 1.e-10 .and. upTot >= pup ) THEN
+      upTot = sum(puptake(:,1))*dtl
+      IF ( abs(upTot) > 1.e-10 .and. -upTot >= pup ) THEN
          DO phy_i=1,data%num_phytos
-            puptake(phy_i,1) = (pup*0.99/dtlim) * (puptake(phy_i,1)/upTot)
+            puptake(phy_i,1) = -(pup*0.99) * (puptake(phy_i,1)/upTot)
          ENDDO
       ENDIF
    ENDIF
 
    IF (data%do_Nuptake) THEN
-      upTot = sum(nuptake(:,1))*dtlim
-      IF ( abs(upTot) > 1.e-10 .and. upTot >= no3up ) THEN
+      upTot = sum(nuptake(:,1))*dtl
+      IF ( abs(upTot) > 1.e-10 .and. -upTot >= no3up ) THEN
          DO phy_i=1,data%num_phytos
-            nuptake(phy_i,1) = (no3up*0.99/dtlim) * (nuptake(phy_i,1)/upTot)
+            nuptake(phy_i,1) = -(no3up*0.99) * (nuptake(phy_i,1)/upTot)
          ENDDO
       ENDIF
 
-      upTot = sum(nuptake(:,2))*dtlim
-      IF ( abs(upTot) > 1.e-10 .and. upTot >= nh4up ) THEN
+      upTot = sum(nuptake(:,2))*dtl
+      IF ( abs(upTot) > 1.e-10 .and. -upTot >= nh4up ) THEN
          DO phy_i=1,data%num_phytos
-            nuptake(phy_i,2) = (nh4up*0.99/dtlim) * (nuptake(phy_i,2)/upTot)
+            nuptake(phy_i,2) = -(nh4up*0.99) * (nuptake(phy_i,2)/upTot)
          ENDDO
       ENDIF
    ENDIF
    IF (data%do_Cuptake) THEN
-      upTot = sum(cuptake)*dtlim
-      IF ( abs(upTot) > 1.e-10 .and. upTot >= cup ) THEN
+      upTot = sum(cuptake)*dtl
+      IF ( abs(upTot) > 1.e-10 .and. -upTot >= cup ) THEN
          DO phy_i=1,data%num_phytos
-            cuptake(phy_i) = (cup*0.99/dtlim) * (cuptake(phy_i)/upTot)
+            cuptake(phy_i) = -(cup*0.99) * (cuptake(phy_i)/upTot)
          ENDDO
       ENDIF
    ENDIF
@@ -1087,13 +1111,62 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
 !     !
 !  ENDIF
    IF (data%do_Siuptake) THEN
-      upTot = sum(siuptake)*dtlim
-      IF ( abs(upTot) > 1.e-10 .and. upTot >= rsiup ) THEN
+      upTot = sum(siuptake)*dtl
+      IF ( abs(upTot) > 1.e-10 .and. -upTot >= rsiup ) THEN
          DO phy_i=1,data%num_phytos
-            siuptake(phy_i) = (rsiup*0.99/dtlim) * (siuptake(phy_i)/upTot)
+            siuptake(phy_i) = -(rsiup*0.99) * (siuptake(phy_i)/upTot)
          ENDDO
       ENDIF
    ENDIF
+
+   !---------------------------------------------------------------------------+
+   ! Keep growth and losses consistent with the limited fluxes, so that what
+   ! leaves one pool is exactly what enters another.
+   DO phy_i=1,data%num_phytos
+      !# Growth. Phyto C, and N/P/Si when held at fixed stoichiometry, are
+      !# implied by growth, so a capped uptake must cap growth by the same
+      !# fraction, otherwise the group gains mass that was never taken up.
+      !# Groups with dynamic IN/IP keep their capped N/P uptake as is.
+      g = one_
+      IF ( cuptake0(phy_i) < zero_ ) g = MIN(g, cuptake(phy_i)/cuptake0(phy_i))
+      IF ( data%phytos(phy_i)%simINDynamics == 0 ) THEN
+         DO c = 1,2
+            IF ( nuptake0(phy_i,c) < zero_ ) g = MIN(g, nuptake(phy_i,c)/nuptake0(phy_i,c))
+         ENDDO
+      ENDIF
+      IF ( data%phytos(phy_i)%simIPDynamics == 0 ) THEN
+         IF ( puptake0(phy_i,1) < zero_ ) g = MIN(g, puptake(phy_i,1)/puptake0(phy_i,1))
+      ENDIF
+      IF ( siuptake0(phy_i) < zero_ ) g = MIN(g, siuptake(phy_i)/siuptake0(phy_i))
+      IF ( g < one_ ) THEN
+         primprod(phy_i) = primprod(phy_i) * g
+         cuptake(phy_i)  = cuptake0(phy_i) * g
+         IF ( data%phytos(phy_i)%simINDynamics == 0 ) nuptake(phy_i,:) = nuptake0(phy_i,:) * g
+         IF ( data%phytos(phy_i)%simIPDynamics == 0 ) puptake(phy_i,:) = puptake0(phy_i,:) * g
+         siuptake(phy_i) = siuptake0(phy_i) * g
+      ENDIF
+
+      !# Losses. Respiration + exudation may not draw the group below p0.
+      !# Scale the losses themselves (not just the net phyto flux) so that
+      !# the C/N/P/Si released to DIC/DOM/POM/nutrients shrink with them.
+      phy = _STATE_VAR_(data%id_p(phy_i))
+      losses = (respiration(phy_i) + exudation(phy_i)) * phy
+      available = MAX(zero_, phy - data%phytos(phy_i)%p0)
+      flux = primprod(phy_i) * phy - losses
+      IF ( losses > zero_ .AND. -flux*dtl > available ) THEN
+         s = (primprod(phy_i) * phy + 0.99*available/dtl) / losses
+         respiration(phy_i) = respiration(phy_i) * s
+         exudation(phy_i)   = exudation(phy_i) * s
+         cexcretion(phy_i)  = cexcretion(phy_i) * s
+         cmortality(phy_i)  = cmortality(phy_i) * s
+         nexcretion(phy_i)  = nexcretion(phy_i) * s
+         nmortality(phy_i)  = nmortality(phy_i) * s
+         pexcretion(phy_i)  = pexcretion(phy_i) * s
+         pmortality(phy_i)  = pmortality(phy_i) * s
+         siexcretion(phy_i) = siexcretion(phy_i) * s
+         simortality(phy_i) = simortality(phy_i) * s
+      ENDIF
+   ENDDO
 
    DO phy_i=1,data%num_phytos
      IF ( diag_level >= 10 ) THEN
@@ -1129,7 +1202,7 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
       phy = _STATE_VAR_(data%id_p(phy_i))
       flux = (primprod(phy_i) - respiration(phy_i) - exudation(phy_i)) * phy
       available = MAX(zero_, phy - data%phytos(phy_i)%p0)
-      IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
+      IF ( -flux*dtl > available  ) flux = -0.99*available/dtl
       _FLUX_VAR_(data%id_p(phy_i)) = _FLUX_VAR_(data%id_p(phy_i)) + (flux)
 
       !------------------------------------------------------------------------+
@@ -1140,7 +1213,15 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          INi = _STATE_VAR_(data%id_in(phy_i))
          flux = (-sum(nuptake(phy_i,:)) - nexcretion(phy_i) - nmortality(phy_i))
          available = MAX(zero_, INi - data%phytos(phy_i)%X_nmin*phy)
-         IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
+         losses = nexcretion(phy_i) + nmortality(phy_i)
+         IF ( losses > zero_ .AND. -flux*dtl > available ) THEN
+            !# the internal pool may not fall below X_nmin: scale the N releases
+            !# (not just the net flux) so DON/PON receive what the cells lose
+            s = (-sum(nuptake(phy_i,:)) + 0.99*available/dtl) / losses
+            nexcretion(phy_i) = nexcretion(phy_i) * s
+            nmortality(phy_i) = nmortality(phy_i) * s
+            flux = (-sum(nuptake(phy_i,:)) - nexcretion(phy_i) - nmortality(phy_i))
+         ENDIF
          _FLUX_VAR_(data%id_in(phy_i)) = _FLUX_VAR_(data%id_in(phy_i)) + (flux)
       ELSE
          ! Assumed constant IN
@@ -1155,7 +1236,15 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          IPi = _STATE_VAR_(data%id_ip(phy_i))
          flux = (-sum(puptake(phy_i,:)) - pexcretion(phy_i) - pmortality(phy_i))
          available = MAX(zero_, IPi - data%phytos(phy_i)%X_pmin*phy)
-         IF ( -flux*dtlim > available  ) flux = -0.99*available/dtlim
+         losses = pexcretion(phy_i) + pmortality(phy_i)
+         IF ( losses > zero_ .AND. -flux*dtl > available ) THEN
+            !# the internal pool may not fall below X_pmin: scale the P releases
+            !# (not just the net flux) so DOP/POP receive what the cells lose
+            s = (-sum(puptake(phy_i,:)) + 0.99*available/dtl) / losses
+            pexcretion(phy_i) = pexcretion(phy_i) * s
+            pmortality(phy_i) = pmortality(phy_i) * s
+            flux = (-sum(puptake(phy_i,:)) - pexcretion(phy_i) - pmortality(phy_i))
+         ENDIF
          _FLUX_VAR_(data%id_ip(phy_i)) = _FLUX_VAR_(data%id_ip(phy_i)) + (flux)
       ELSE
          ! Assumed constant IP

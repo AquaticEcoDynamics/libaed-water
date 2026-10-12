@@ -467,6 +467,7 @@ SUBROUTINE aed_calculate_methane(data,column,layer_idx)
       dic = _STATE_VAR_(data%id_ch4_oxid_target)
       ! Retrieve current (local) state variable values.
       ch4 = _STATE_VAR_(data%id_ch4)    ! CH4
+      temp = _STATE_VAR_(data%id_temp)  ! local temperature
 
       !# Retrieve current dependent state variable values.
       IF (data%use_oxy) THEN
@@ -661,6 +662,7 @@ SUBROUTINE aed_calculate_benthic_methane(data,column,layer_idx)
    ch4_flux = 0.
    fsed_ch4_ebb = 0.
    ebb_flux = 0.
+   ch4_ebb = 0.
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature

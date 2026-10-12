@@ -311,7 +311,7 @@ Module gmk
 
 use params
 
-!This module provides several functions calculating phytoplankton physiological
+!This module provides several functions calculating phytoplankton physiological 
 !rates as a function of environmental conditions (e.g., temperature) and traits
 implicit none
 
@@ -321,13 +321,7 @@ public :: GMK98_Ind_TempSizeLight
 
 CONTAINS
 
-SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl,       &
-                     Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_,      &
-                     RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, thetaNmax,        &
-                     thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, &
-                     QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol,  &
-                     a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi,      &
-                     T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, Topt_, Cdiv, alphaChl_, dC, dN, dNO3, dNH4, dP, dChl, ESD_, RC, RN, RP, RChl, zeta_N, zeta_P, a1, mu0, nx, simNFixation, thetaNmax, thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi, T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_, rhoChl_L)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -363,6 +357,7 @@ real, intent(in)   :: zeta_P != 3.0d0   Cost of biosynthesis [mol C mol P-1] ML 
 real, intent(in)   :: a1     != 0.d0    Allometric exponent between mumax and alphaChl
 real, intent(in)   :: mu0    !=  5.00   Maximal growth rate normalized to 15 C (d-1) ML pull this out to nml
 real, intent(in)   :: nx != 1.d0
+integer, intent(in) :: simNFixation ! 1 = N-fixing group (aed_phyto_pars.csv 'simNFixation'); bypasses DIN limitation on N uptake below
 real, intent(in)   :: thetaNmax != 3d0  ML pull this out to nml
 real, intent(in)   :: thetaPmax != 3d0  ML pull this out to nml
 
@@ -419,6 +414,11 @@ real, intent(in)   :: a_
 real, intent(in)   :: b_
 real, intent(in)   :: v_
 
+! Per-particle carryover of rhoChl from the end of the last daylight period, used during dark
+! hours below - see the long comment by the (removed) local rhoChl_L declaration for why this
+! must be owned by the caller (one value per particle) rather than by this subroutine.
+real, intent(inout) :: rhoChl_L        !Phyto C production devoted to Chl synthesis at last sunset [mg Chl mmol C-1]
+
 real, intent(out) :: dN               !Changes in the cellular nitrogen content [pmol N cell-1 d-1]
 real, intent(out) :: dNO3             !Changes in the cellular nitrogen content from NO3 [pmol N cell-1 d-1]
 real, intent(out) :: dNH4             !Changes in the cellular nitrogen content from NH4 [pmol N cell-1 d-1]
@@ -444,7 +444,15 @@ real              :: SI     = 0.      !Light limitation index [fpar]
 real              :: PCmax  = 0.      !Maximal photosynthesis rate (regulated by QN and QP) [d-1]
 real              :: PC     = 0.      !Carbon specific rate of photosynthesis [d-1]
 real              :: rhoChl = 0.      !Phyto C production devoted to Chl synthesis [mg Chl mmol C-1]
-real              :: rhoChl_L = 0.    !Phyto C production devoted to Chl synthesis at last sunset [mg Chl mmol C-1]
+! rhoChl_L ("value at the last sunset") must persist from this call to the NEXT dark-hours
+! call - but it is per-PARTICLE state, not something this subroutine may own itself: a bare
+! local variable with an initializer like `= 0.` is implicitly SAVE'd by Fortran, which would
+! make it ONE value shared by every call (every particle, every species) rather than each
+! particle's own carryover. That was a real bug once multiple phyto groups shared a column:
+! whichever particle happened to be processed last before dark would silently overwrite every
+! other particle's (including other species') nighttime Chl dynamics. Now passed in/out by the
+! caller instead, backed by each particle's own ptm_state slot (data%ip_rhochl in
+! aed_phyto_abm.F90) - see the intent(inout) dummy argument declared with the other arguments.
 real              :: Ik     = 0.      !Saturation parameter for the PI curve [W m-2 s-1]
 real              :: A      = 0.      !Photoinhibition, following Nikolau et al. (2016)
 
@@ -452,6 +460,11 @@ real              :: RcT    = 0.d0    !Temperature dependent C-based respiration
 real              :: RNT    = 0.d0    !Temperature dependent N-based respiration rate [d-1]
 real              :: RPT    = 0.d0    !Temperature dependent P-based respiration rate [d-1]
 real              :: RChlT  = 0.d0    !Temperature dependent Chl-based respiration rate [d-1]
+! temp_Topt(...) and respiration(...) are each exactly linear in their rate argument
+! (mumax0 / r_s respectively) - see the shared-factor comments at their call sites
+! below - so muT/RcT/RNT/RPT/RChlT below share one temp_Topt evaluation and one
+! respiration evaluation instead of five and four respectively.
+real              :: temp_scale, resp_scale
 
 ! Maximal specific N uptake as a function of temp. under resource (nutrient and light) replete conditions [mol N mol C-1 d-1]:
 real              :: Vcref  = 0.
@@ -465,6 +478,7 @@ real              :: KN     = 0.      !Half-saturation constant for N [uM]
 real              :: pN_   = 0.       !Preference factor for uptake of NH4 over NO3
 real              :: KPho     = 0.    !Half-saturation constant for P [uM]
 real              :: CDiv1 = 0.       !CDiv value with ug C per cell ML I don't see that this is used
+integer, save     :: dbg_call_count = 0  !DBG_GROWTH: sampling counter, temporary diagnostic
 !End of declaration
 
 if (C .le. 0d0) then
@@ -532,7 +546,14 @@ muT = mu0 * exp(a1 * (alphaChl_ - .1)) !0.1 is the average alphaChl value
 !Temperature dependent maximal growth rate at 1 ug C cell-1
 !ML from Chen 2022; this function calls JOHNSON, TK, and alloscale functions;
 !corresponds to eq.10 in PIBM manuscript
-muT = temp_Topt(Temp, muT, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+! temp_Topt(tC, mumax0, Topt_, Ea0, Ed0, Ei, beta, phi, T_std) is EXACTLY LINEAR in
+! mumax0: mumax = mumax0*exp(TK(Topt_,T_std)*Ei) inside temp_Topt, and JOHNSON's
+! result is mumax times a shape term that never touches mumax0. RC/RN/RP/RChl below
+! are each passed through temp_Topt with the SAME Topt_/Ea0/Ed0/Ei/beta/phi/T_std as
+! muT here, so the same scale factor applies to all five - evaluate it once (call
+! with rate=1) instead of five times (each of which is 3x alloscale + 1x JOHNSON).
+temp_scale = temp_Topt(Temp, 1.0, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
+muT = temp_scale * muT
 
 !Apply the size-scaling relationship following Wirtz (2011)
 !ML eq. 13 in PIBM manuscript; eq. 14 in Wirtz; coefficients drawn from Wirtz
@@ -545,25 +566,31 @@ Vcref  = muT * QNmax
 Vcrefp = muT * QPmax
 
 !Assume the same temperature dependence of respiration as on photosynthetic rate (long-term adaptation; Barton et al. 2020):
+! respiration(ESD, r_s, b_rho, V_s) is likewise exactly linear in r_s (y = r_s * a
+! shape term built from ESD/b_rho/V_s alone), and RC/RN/RP/RChl below all share the
+! same ESD_/b_rho/V_s - so the same one-shared-factor trick applies a second time.
+resp_scale = respiration(ESD_, 1.0, b_rho, V_s)
+
 !ML these two lines correspond to third term on right-hand side (RHS) of eq. 1 in PIBM paper
-RcT   = temp_Topt(Temp, RC,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RcT   = respiration(ESD_, RcT, b_rho, V_s)
+RcT   = RC * temp_scale * resp_scale
 
 !ML these two lines correspond to second term on RHS of eq. 2 in PIBM paper
-RNT   = temp_Topt(Temp, RN,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RNT   = respiration(ESD_, RNT, b_rho, V_s)
+RNT   = RN * temp_scale * resp_scale
 
 !ML these two lines newly added to GLM-AED-ABM to have P mirror N
-RPT   = temp_Topt(Temp, RP,   Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RPT   = respiration(ESD_, RPT, b_rho, V_s)
+RPT   = RP * temp_scale * resp_scale
 
 !ML these two lines correspond to second term on RHS of eq. 3 in PIBM paper
-RChlT = temp_Topt(Temp, RChl, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
-RChlT = respiration(ESD_, RChlT, b_rho, V_s)
+RChlT = RChl * temp_scale * resp_scale
 
 !Nutrient limitation [nd]:
-Lno3 = (QN - QNmin) / dQN
-Lfrp = (QP - QPmin) / dQP
+! Capped at 1: this is a quota-space fraction that is exactly 1 by construction when
+! Q = Qmax, but Q is STATE and can transiently overshoot Qmax while C falls quickly
+! (respiration draining C faster than the quota adjusts). Left uncapped, L>1 inflates
+! PCmax above muT (superlinear growth) and inflates Ik below - and silently masks the
+! overshoot in diagnostics rather than reporting it. The <=0 test below is unaffected.
+Lno3 = min((QN - QNmin) / dQN, 1d0)
+Lfrp = min((QP - QPmin) / dQP, 1d0)
 
 if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then !if QN or QP is already at minimum, no photosynthesis occurs
    PC = 0d0
@@ -607,19 +634,36 @@ if (PAR <= 0d0) then
    rhochl   = rhoChl_L
 else
    !ML corresponds to eq. 9 in PIBM ms
-   rhochl   = min(thetaNmax, thetaPmax) * PC / alphachl_ / theta / PAR ! ML this is now regulated by both P and N
+   ! rhochl   = min(thetaNmax, thetaPmax) * PC / alphachl_ / theta / PAR ! ML this is now regulated by both P and N
+   rhochl   = thetaNmax * PC / alphachl_ / theta/ PAR ! only depends on thetaNmax - SCB change
    rhoChl_L = rhochl
 endif
 
 !DIN uptake rate by phytoplankton [mol N mol C-1 d-1]:
 !ML corresponds to eq. 8 in PIBM ms
-VCN = Vcref * (DIN - DIN_min)/ (DIN + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
+if (simNFixation /= 0) then
+  VCN = Vcref * ((QNmax - QN) / dQN)**nx  !N fixer: not DIN-limited, so no DIN/(DIN+KN) factor
+else
+  VCN = Vcref * (DIN - DIN_min)/ (DIN + KN) * ((QNmax - QN) / dQN)**nx  !Vcref already temperature dependent
+endif
 VCN = max(VCN, 0d0)
 
 !FRP uptake rate by phytoplankton [mol P mol C-1 d-1]:
 !ML newly added for GLM-AED-ABM
 VCP = Vcrefp * (FRP - FRP_min)/ (FRP + KPho) * ((QPmax - QP) / dQP)**nx  !Vcrefp already temperature dependent
 VCP = max(VCP, 0d0)
+
+dbg_call_count = dbg_call_count + 1
+! SCB removing prints to standard output
+! if (mod(dbg_call_count, 20000) == 0) then
+!    write(*,'(A,I10,18(A,ES13.5),A,I2)') ' DBG_GROWTH call=', dbg_call_count, &
+!       ' Temp=', Temp, ' PAR=', PAR, ' C=', C, ' DIN=', DIN, ' muT=', muT, ' PC=', PC, &
+!       ' VCN=', VCN, ' dN=', N*(VCN/QN - RNT), ' zetaN_VCN=', zeta_N*VCN, &
+!       ' VCP=', VCP, ' zetaP_VCP=', zeta_P*VCP, ' RcT=', RcT, &
+!       ' netC_d-1=', (PC - zeta_N*VCN - zeta_P*VCP - RcT), &
+!       ' QN=', QN, ' QNmin=', QNmin, ' QNmax=', QNmax, ' QP=', QP, ' QPmin=', QPmin, &
+!       ' simNFix=', simNFixation
+! endif
 
 !Changes of cellular carbon [d-1]:
 !ML corresponds to eq. 1 in PIBM ms
@@ -631,9 +675,14 @@ dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT)
 dN = N * (VCN/QN - RNT)
 
 !ML add phyto_pN function call here
-pN_ = phyto_pN(NH4, NO3, KN)
-dNH4 = dN * pN_
-dNO3 = dN * (1.- pN_)
+if (simNFixation /= 0) then
+  dNH4 = 0.0
+  dNO3 = 0.0
+else
+  pN_ = phyto_pN(NH4, NO3, KN)
+  dNH4 = dN * pN_
+  dNO3 = dN * (1.- pN_)
+endif
 
 !Changes of cellular phosphorus [pmol P cell-1 d-1]:
 !ML newly added for GLM-AED-ABM
@@ -641,7 +690,8 @@ dP = P * (VCP/QP - RPT)
 
 !Changes of cellular Chl [d-1]:
 !ML corresponds to eq. 3 in PIBM ms
-dChl = Chl * (rhochl*min(VCN, VCP) / theta - RChlT)
+! dChl = Chl * (rhochl*min(VCN, VCP) / theta - RChlT)
+dChl = Chl * (rhochl*VCN / theta - RChlT) ! SCB equation edit
 
 return
 END subroutine GMK98_Ind_TempSizeLight
