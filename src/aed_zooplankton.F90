@@ -222,7 +222,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
        CASE (NML_TYPE)
            print*,"nml format parameter file is deprecated. Please update to CSV format"
            open(NEWUNIT=tfil,file=dbase, status='OLD',iostat=status)
-           IF (status /= 0) STOP 'Error opening zoop_params namelist file'
+           IF (status /= 0) ERROR STOP 'Error opening zoop_params namelist file'
            read(tfil,nml=zoop_params,iostat=status)
            close(tfil)
            dbsize = 0
@@ -233,7 +233,7 @@ SUBROUTINE aed_zooplankton_load_params(data, dbase, count, list)
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
-    IF (status /= 0) STOP 'Error reading namelist zoop_params'
+    IF (status /= 0) ERROR STOP 'Error reading namelist zoop_params'
 
     data%num_zoops = 0
     allocate(data%zoops(count))
@@ -344,7 +344,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_zooplankton,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_zooplankton'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_zooplankton'
 
     data%num_zoops = 0
     data%simZoopFeedback = simZoopFeedback
@@ -471,12 +471,16 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
    IF (data%simPPexcr)  pop = _STATE_VAR_(data%id_Pmorttarget)
    IF (data%simPCexcr)  poc = _STATE_VAR_(data%id_Cmorttarget)
 
-   DO zoop_i=1,data%num_zoops
-      ! Export diagnostic variables
-      IF (data%id_grz>0)  _DIAG_VAR_(data%id_grz)  = zero_
-      IF (data%id_resp>0) _DIAG_VAR_(data%id_resp) = zero_
-      IF (data%id_mort>0) _DIAG_VAR_(data%id_mort) = zero_
+   ! FIX 2026-08-29: the community-total diagnostics were being reset to zero
+   ! INSIDE the per-group loop, so the accumulation at the end of each pass
+   ! (lines ~720) was wiped by the next group and only the LAST group was
+   ! reported. They are now zeroed once, before the loop, so the reported
+   ! value is the true sum over all zooplankton groups.
+   IF (data%id_grz>0)  _DIAG_VAR_(data%id_grz)  = zero_
+   IF (data%id_resp>0) _DIAG_VAR_(data%id_resp) = zero_
+   IF (data%id_mort>0) _DIAG_VAR_(data%id_mort) = zero_
 
+   DO zoop_i=1,data%num_zoops
       ! Retrieve this zooplankton group
       zoo = _STATE_VAR_(data%id_zoo(zoop_i))
       ! Retrieve prey groups
@@ -494,9 +498,13 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
        fGrazing_Limitation = fPrey_Limitation(data%zoops,zoop_i,Ctotal_prey)
 
       ! Get the temperature function
+      ! FIX 2026-08-29: theta_grz_zoo was passed here, but aed_bio_temp_function
+      ! (called at init) solved the aTn/bTn/kTn curve coefficients using
+      ! theta_resp_zoo. Evaluating the curve with a different theta than the one
+      ! it was fitted with gives an inconsistent f(T). Pass theta_resp_zoo.
        f_T = fTemp_function(1, data%zoops(zoop_i)%Tmax_zoo,       &
                                data%zoops(zoop_i)%Tstd_zoo,       &
-                               data%zoops(zoop_i)%theta_grz_zoo,  &
+                               data%zoops(zoop_i)%theta_resp_zoo, &
                                data%zoops(zoop_i)%aTn,            &
                                data%zoops(zoop_i)%bTn,            &
                                data%zoops(zoop_i)%kTn, temp)
@@ -569,8 +577,13 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
             phy_i = phy_i + 1
             phy_INcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i))
             phy_IPcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i))
-            grazing_n = grazing_n + grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i) /14.0
-            grazing_p = grazing_p + grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i) /31.0
+            ! FIX 2026-08-29: the /14.0 and /31.0 were mass-to-mole conversions,
+            ! but <phy>_IN / <phy>_IP are registered in aed_phytoplankton.F90 as
+            ! 'mmol N/m3' and 'mmol P/m3' already (see ~L428 and ~L451). The
+            ! matching prey removal below (~L690) applies no divisor, so the
+            ! uptake was 14x/31x smaller than the loss - a nutrient sink.
+            grazing_n = grazing_n + grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i)
+            grazing_p = grazing_p + grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i)
          ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:15).EQ.'aed_zooplankton') THEN
             grazing_n = grazing_n + grazing_prey(prey_i) * data%zoops(zoop_i)%INC_zoo
             grazing_p = grazing_p + grazing_prey(prey_i) * data%zoops(zoop_i)%IPC_zoo
@@ -663,8 +676,13 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
 
       ! Zooplankton production / losses in mmolC/s
 
+      ! FIX 2026-08-29: this re-evaluated the ORIGINAL growth expression instead
+      ! of using delta_C. delta_C is corrected above (delta_C = delta_C-doc_excr)
+      ! when N or P limitation forces DOC excretion; re-deriving it here meant
+      ! the doc_excr added to the DOC pool below was created from nothing,
+      ! breaking carbon mass conservation. Use the corrected delta_C.
       _FLUX_VAR_(data%id_zoo(zoop_i)) = _FLUX_VAR_(data%id_zoo(zoop_i))        &
-                +  ((data%zoops(zoop_i)%fassim_zoo * grazing - respiration - mortality)*zoo)
+                +  delta_C
 
       IF( data%simZoopFeedback ) THEN
          ! Now take food grazed by zooplankton from food pools in mmolC/s
