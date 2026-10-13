@@ -65,7 +65,7 @@ MODULE aed_nitrogen
       INTEGER  :: id_oxy, id_ph, id_temp, id_salt, id_denit_product
       INTEGER  :: id_wind, id_E_depth, id_E_tau, id_E_dens, id_E_rain, id_tstep
       INTEGER  :: id_Fsed_amm, id_Fsed_nit, id_Fsed_n2o, id_Fsed_no2
-      INTEGER  :: id_nitrf, id_denit, id_n2op, id_anammox, id_dnra
+      INTEGER  :: id_nitrf, id_denit, id_n2op, id_anammox, id_dnra, id_n2ocons
       INTEGER  :: id_sed_amm, id_sed_nit, id_sed_n2o, id_sed_no2
       INTEGER  :: id_atm_n2o, id_atm_dep
       INTEGER  :: id_cell_vel
@@ -375,7 +375,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
   data%id_sed_amm = 0 ; data%id_sed_nit = 0 ; data%id_sed_n2o = 0 ; data%id_sed_no2 = 0
   data%id_nitrf   = 0 ; data%id_denit   = 0 ; data%id_n2op    = 0 ; data%id_anammox = 0
-  data%id_dnra    = 0 ; data%id_atm_n2o = 0 ; data%id_atm_dep = 0
+  data%id_dnra    = 0 ; data%id_atm_n2o = 0 ; data%id_atm_dep = 0 ; data%id_n2ocons = 0
 
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
@@ -390,6 +390,9 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
     data%id_anammox = aed_define_diag_variable('anammox','mmol N/m3/d','anammox rate')
     data%id_dnra    = aed_define_diag_variable('dnra','mmol N/m3/d','dnra rate')
     IF( simN2O>0 )data%id_n2op    = aed_define_diag_variable('n2oprod','mmol N/m3/d','n2o prod rate')
+    !# N2O reduced to N2 (simN2O = 1; with simN2O = 2 this step is aed_organic_matter's OGM_n2o_denit)
+    IF( simN2O==1 .AND. diag_level>9 ) &
+       data%id_n2ocons = aed_define_diag_variable('n2ocons','mmol N/m3/d','n2o consumption to N2 rate')
 
     IF( simN2O>0 ) THEN
      data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux', surf=.TRUE.)
@@ -479,7 +482,9 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
      nitratation        = data%Rno2o2 * no2*oxy
      ammonium_oxidation = data%Rnh4o2 * amm*oxy
      nitritation        = data%Rnh4o2 * amm*oxy * oxy/(data%Kpart_ammox+oxy)
-     nitrousation       = data%Rnh4o2 * amm*oxy * data%Kpart_ammox/(data%Kpart_ammox+oxy) * 0.5
+     !# N2O is in mmol N: the NH4-N not oxidised to NO2 all ends in N2O (2 NH4 -> N2O),
+     !# so no factor 0.5 here (it discarded half of that N, and O2 is charged per N)
+     nitrousation       = data%Rnh4o2 * amm*oxy * data%Kpart_ammox/(data%Kpart_ammox+oxy)
      deammonification   = data%Rnh4no2* no2*amm * data%Kin_deamm/(data%Kin_deamm+oxy)
 
     !IF( data%simNitrfpH ) nitrousation = nitrousation * NitrfpHFunction(pH)  ! Ask Dan
@@ -537,7 +542,9 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
        denit_n2o_prod = 0.5 * denitrification    !* Xnc
        denit_n2o_cons = data%Rn2o * n2o * exp(-oxy/Kn2oc)
        nit_n2o_prod   = zero_
-       IF(oxy>Knev) nit_n2o_prod = ((aa/oxy)+bb)*nitrification
+       !# the N2O yield of nitrification (Nevison) is part of the oxidised NH4-N, so it is
+       !# taken from the nitrate produced below; the fit is negative above O2 = -aa/bb
+       IF(oxy>Knev) nit_n2o_prod = MAX(zero_, ((aa/oxy)+bb)*nitrification)
        !IF(oxy>Knev) nit_n2o_prod = ((aa/oxy)+bb)*remin*Xnc
      ENDIF
 
@@ -561,6 +568,8 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
      _FLUX_VAR_(data%id_nox) = _FLUX_VAR_(data%id_nox) &
                              + nitrification - denitrification - (1.32/2.32)*anammox - dnra
      IF( data%simN2O==1 ) &
+       _FLUX_VAR_(data%id_nox) = _FLUX_VAR_(data%id_nox) - nit_n2o_prod
+     IF( data%simN2O==1 ) &
        _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o)  &
                              +  (denit_n2o_prod - denit_n2o_cons + nit_n2o_prod)
 
@@ -576,6 +585,7 @@ SUBROUTINE aed_calculate_nitrogen(data,column,layer_idx)
      IF (data%id_dnra>0)    _DIAG_VAR_(data%id_dnra)    = dnra * secs_per_day
      IF( data%simN2O==1 ) THEN
        IF (data%id_n2op>0) _DIAG_VAR_(data%id_n2op) = (denit_n2o_prod + nit_n2o_prod) * secs_per_day
+       IF (data%id_n2ocons>0) _DIAG_VAR_(data%id_n2ocons) = denit_n2o_cons * secs_per_day
      ENDIF
 
    ENDIF

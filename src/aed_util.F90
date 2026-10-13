@@ -1047,8 +1047,10 @@ SUBROUTINE PO4AdsorptionFraction(PO4AdsorptionModel, &
      IF(PO4par > PO4tot) PO4par = PO4tot
      IF(PO4par < zero_) PO4par = zero_
 
-     !! Now set dissolved portion
-     !PO4dis = PO4tot - PO4par
+     !# Now set dissolved portion. The partition must conserve the total: without
+     !# this, a clipped PO4par left PO4dis = EPC0, creating or destroying P (and
+     !# outside the fit's range EPC0 is unbounded).
+     PO4dis = PO4tot - PO4par
 
    ELSE
      !-----------------------------------------------------

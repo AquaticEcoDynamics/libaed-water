@@ -97,7 +97,7 @@ MODULE aed_organic_matter
       INTEGER  :: id_swi_poc,    id_swi_doc,     id_swi_poc_r
       INTEGER  :: id_docr_miner, id_donr_miner,  id_dopr_miner,  id_cpom_bdown
       INTEGER  :: id_sed_toc,    id_sed_ton,     id_sed_top,     id_sedomfr
-      INTEGER  :: id_l_resus,    id_denit,       id_anaerobic
+      INTEGER  :: id_l_resus,    id_denit,       id_anaerobic, id_denitrous
       INTEGER  :: id_pom_vvel,   id_cpom_vvel
       INTEGER  :: id_bod,        id_cdom
       INTEGER  :: id_photolysis, id_floc
@@ -512,6 +512,10 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
        IF (data%use_no2) data%id_no2 = aed_locate_variable(dom_miner_no2_reactant_var)
        data%use_n2o = dom_miner_n2o_reactant_var .NE. ''
        IF (data%use_n2o) data%id_n2o = aed_locate_variable(dom_miner_n2o_reactant_var)
+       !# the complex pathway writes NO3, NO2, N2O and NH4 fluxes: all must be linked
+       IF ( .NOT. (data%use_nit .AND. data%use_no2 .AND. data%use_n2o .AND. don_miner_product_variable .NE. '') ) &
+          STOP 'aed_organic_matter: simDenitrification = 2 needs dom_miner_nit_reactant_var, '// &
+               'dom_miner_no2_reactant_var, dom_miner_n2o_reactant_var and don_miner_product_variable'
    ENDIF
    IF( simFeReduction==1 ) THEN
      data%use_fe3 = dom_miner_fe3_reactant_var .NE. ''
@@ -646,7 +650,7 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
    data%id_swi_don    = 0 ; data%id_swi_pop    = 0 ; data%id_swi_dop    = 0
    data%id_poc_miner  = 0 ; data%id_doc_miner  = 0 ; data%id_pon_miner  = 0
    data%id_don_miner  = 0 ; data%id_pop_miner  = 0 ; data%id_dop_miner  = 0
-   data%id_denit      = 0 ; data%id_bod        = 0 ; data%id_photolysis = 0
+   data%id_denit      = 0 ; data%id_bod        = 0 ; data%id_photolysis = 0 ; data%id_denitrous = 0
    data%id_docr_miner = 0 ; data%id_donr_miner = 0 ; data%id_dopr_miner = 0
    data%id_cpom_bdown = 0 ; data%id_cdom       = 0 ; data%id_floc       = 0
    data%id_sed_toc    = 0 ; data%id_sed_ton    = 0 ; data%id_sed_top    = 0
@@ -677,6 +681,8 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
      data%id_dop_miner= aed_define_diag_variable(      'dop_min'  ,'mmol P/m3/d','DOP mineralisation')
      data%id_anaerobic= aed_define_diag_variable('doc_anaerobic'  ,'mmol C/m3/d','anaerobic metabolism')
      data%id_denit    = aed_define_diag_variable(    'doc_denit'  ,'mmol C/m3/d','denitrification')
+     IF (simDenitrification==2) &
+        data%id_denitrous = aed_define_diag_variable('n2o_denit','mmol N/m3/d','N2O reduced to N2 (denitrousation)')
 
      IF (simRPools) THEN
         data%id_docr_miner = aed_define_diag_variable('docr_min'  ,'mmol C/m3/d','DOCR mineralisation')
@@ -959,13 +965,16 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
        denitrification  = denitratation+denitritation+denitrousation
      ENDIF
      dnra                  =  denitritation * data%Kpart_denitrit/(data%Kpart_denitrit+no2)
-     nitrous_denitritation =  denitritation * no2/(data%Kpart_denitrit+no2) * 0.5
+     !# NO2 -> N2O conserves N (N2O is in mmol N): no factor 0.5, which discarded half
+     nitrous_denitritation =  denitritation * no2/(data%Kpart_denitrit+no2)
      ammonium_release      = (denitratation + denitritation + denitrousation) * MIN(don/MAX(doc,1e-2),one_) ! data%X_nc
 
      _FLUX_VAR_(data%id_nit) = _FLUX_VAR_(data%id_nit) - denitratation
      _FLUX_VAR_(data%id_no2) = _FLUX_VAR_(data%id_no2) + denitratation - denitritation
      _FLUX_VAR_(data%id_n2o) = _FLUX_VAR_(data%id_n2o) + nitrous_denitritation - denitrousation
-     _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + dnra + ammonium_release
+     !# DON mineralisation releases its NH4 below, as in the other modes;
+     !# ammonium_release (an estimate of the same N) is no longer added on top
+     _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + dnra
 
      fnit = data%K_nit/(data%K_nit+(nit+no2))
    ENDIF
@@ -1008,8 +1017,7 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
    ENDIF
    IF (data%use_amm) THEN
       ! NH4 released by DON mineralisation (if complex N model, this is also related to ammonium_release)
-      IF( data%simDenitrification==0 .OR. data%simDenitrification==1 ) &
-        _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
+      _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
       !IF( data%simDenitrification==2 ) & !MH needs balacing with Denit fraction , see aammonium_release above
       !  _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + (don_mineralisation)
       IF ( data%simRPools )  &
@@ -1068,8 +1076,10 @@ SUBROUTINE aed_calculate_organic_matter(data,column,layer_idx)
      ! Anaerobic OM mineralisation
      _DIAG_VAR_(data%id_denit)     = denitrification*secs_per_day
      _DIAG_VAR_(data%id_anaerobic) = doc_min_anaerobic*secs_per_day
-     IF ( data%simDenitrification>1 ) &
-          _DIAG_VAR_(data%id_denit) = denitratation + denitritation + denitrousation
+     IF ( data%simDenitrification>1 ) THEN
+        _DIAG_VAR_(data%id_denit) = (denitratation + denitritation + denitrousation)*secs_per_day
+        IF (data%id_denitrous>0) _DIAG_VAR_(data%id_denitrous) = denitrousation*secs_per_day
+     ENDIF
    ENDIF
 
 END SUBROUTINE aed_calculate_organic_matter
