@@ -104,6 +104,7 @@ MODULE aed_phyto_abm
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
       INTEGER :: id_lvol
+      INTEGER :: id_timestep   ! host step length (seconds): declared on master, missing on v3.0.1
 
       ! Phytoplankton parameters
       INTEGER  :: num_phytos
