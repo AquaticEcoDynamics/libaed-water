@@ -367,10 +367,10 @@ SUBROUTINE ProcessSpeciesRecord(inpLine,i,oneSpecies)
 
    startLocn = SCAN(speciesRec,REACTION_START_CH)
    !!$ EXPAND
-   IF (startLocn == 0) STOP "ProcessSpeciesRecord:  no chem. reaction start symbol."
+   IF (startLocn == 0) ERROR STOP "ProcessSpeciesRecord:  no chem. reaction start symbol."
    endLocn   = SCAN(speciesRec,REACTION_END_CH)
    !!$  EXPAND
-   IF (endLocn == 0) STOP "ProcessSpeciesRecord:  no chem. reaction end symbol."
+   IF (endLocn == 0) ERROR STOP "ProcessSpeciesRecord:  no chem. reaction end symbol."
 
    ! -- Only pass the string of chars between "[" and "]" inclusive; i.e., the
    ! -- chemical reaction string:
@@ -482,10 +482,10 @@ SUBROUTINE ProcessPhaseRecord(inpLine,i,onePhase)
 
    startLocn = SCAN(phaseRec,REACTION_START_CH)
    !!$ EXPAND
-   IF (startLocn == 0) STOP "ProcessPhaseRecord:  no chem. reaction start symbol."
+   IF (startLocn == 0) ERROR STOP "ProcessPhaseRecord:  no chem. reaction start symbol."
    endLocn   = SCAN(phaseRec,REACTION_END_CH)
    !!$  EXPAND
-   IF (endLocn == 0) STOP "ProcessPhaseRecord:  no chem. reaction end symbol."
+   IF (endLocn == 0) ERROR STOP "ProcessPhaseRecord:  no chem. reaction end symbol."
 
    ! -- Only pass the string of chars between "[" and "]" inclusive; i.e.,
    ! -- th chemical reaction string:
@@ -566,7 +566,7 @@ SUBROUTINE ParseChemReaction(chemName,chemReaction,stoichCoeffs_V)
       WRITE(*,'(1X,3X,"reactionStr = ''",A,"''")') reactionStr
       WRITE(*,'(1X,3X,"char read = ",A)') TRIM(ch)
       WRITE(*,'(1X,3X,"Expected a sign or alphanumeric character.")')
-      STOP "ParseChemReaction:  syntax error in reactionStr"
+      ERROR STOP "ParseChemReaction:  syntax error in reactionStr"
    ENDIF
 
    !-------------------------------
@@ -591,7 +591,7 @@ SUBROUTINE ParseChemReaction(chemName,chemReaction,stoichCoeffs_V)
 !        ENDDO
          WRITE(*,'(1X,3X,"Expected one of the following:  ",A)')              &
                                            TRIM(theFollowSet)
-         STOP "ParseChemReaction:  syntax error in reactionStr"
+         ERROR STOP "ParseChemReaction:  syntax error in reactionStr"
       ENDIF
 
       ! -- Remember the sign in front of the stoichiometric coeff.:
@@ -682,7 +682,7 @@ SUBROUTINE ExtractChargeAndChemName(compName,chemName,charge)
       WRITE(*,'(1X,A,":  chem component name must start with a letter &
                                                    &or digit")')
       WRITE(*,'(1X,3X,"chem. name = ''",A,"''")') TRIM(compName)
-      STOP "ExtractChargeAndChemName:  chem comp. must start with alphanum char"
+      ERROR STOP "ExtractChargeAndChemName:  chem comp. must start with alphanum char"
    ENDIF
 
    isChemNameChar = .TRUE.
@@ -710,7 +710,7 @@ SUBROUTINE ExtractChargeAndChemName(compName,chemName,charge)
       ELSE
          WRITE(*,'(1X,3X,"comp. name = ''",A,"''")') TRIM(compName)
          WRITE(*,'(1X,3X,"End character of chem. comp. name = ''",A,"''")') ch
-         STOP "ExtractChargeAndChemName:  illegal character at end of chem. comp. name"
+         ERROR STOP "ExtractChargeAndChemName:  illegal character at end of chem. comp. name"
       ENDIF
    ELSE
       READ(compName(i: ),*,IOSTAT=ioStatus) charge  !read the charge
@@ -718,14 +718,14 @@ SUBROUTINE ExtractChargeAndChemName(compName,chemName,charge)
          WRITE(*,'(1X,A,":  error on read of charge from compName")')
          WRITE(*,'(1X,3X,"compName = ",A)') TRIM(compName)
          WRITE(*,'(1X,"compName(",I0,":",I0,") = ''",A,"''")') i, len, compName(i:len)
-         STOP "ExtractChargeAndChemName:  error on read of charge from compName"
+         ERROR STOP "ExtractChargeAndChemName:  error on read of charge from compName"
       ENDIF
    ENDIF
 
    READ(compName(1:nameEndLocn),*,IOSTAT=ioStatus) chemName   !read the chemical name
    IF (ioStatus /= 0) THEN
       WRITE(*,'(1X,A,":  error reading chemical name from component name")')
-      STOP "ExtractChargeAndChemName:  error reading chemName from compName"
+      ERROR STOP "ExtractChargeAndChemName:  error reading chemName from compName"
    ENDIF
 END SUBROUTINE ExtractChargeAndChemName
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -807,14 +807,14 @@ SUBROUTINE AddComp(component)
    IF (compList%Last >= MAX_NUM_COMPS) THEN
       WRITE(*,'(1X,A,":  chem components data store is full.")')
       WRITE(*,'(1X,3X,"maximum number allowed = ",I0)') MAX_NUM_COMPS
-      STOP "AddComp:  data store for chem components is full."
+      ERROR STOP "AddComp:  data store for chem components is full."
    !ELSE IF (Locn_Comp(component%CompName,COMP_NAME) /= NOT_FOUND) THEN
    ELSE IF (Locn_Comp(component%CompName) /= NOT_FOUND) THEN
       WRITE(*,'(1X,A,":  component named ''",A,"'' already in components &
                            &data store.")') TRIM(component%CompName)
       WRITE(*,'(1X,3X,"Check that you have not multiply defined this component")')
       WRITE(*,'(1X,3X,"in your chemical data input file.")')
-      STOP "AddComp:  component to add is already in data store."
+      ERROR STOP "AddComp:  component to add is already in data store."
    ENDIF
 
    compList%Last                  = compList%Last + 1  !increment
@@ -854,18 +854,18 @@ SUBROUTINE AddPhase(phase)
    IF (phaseList%Last >= MAX_NUM_PHASES) THEN
       WRITE(*,'(1X,A,":  chem pure phase data store is full.")')
       WRITE(*,'(1X,3X,"maximum number allowed = ",I0)') MAX_NUM_PHASES
-      STOP "AddPhase:  data store for chem  is full."
+      ERROR STOP "AddPhase:  data store for chem  is full."
    ELSE IF (FoundPhaseName(phase%EltName)) THEN
       WRITE(*,'(1X,A,":  phase named ''",A,"'' already in  &
                                &data store.")') TRIM(phase%EltName)
       WRITE(*,'(1X,3X,"Check that you have not multiply defined this phase")')
       WRITE(*,'(1X,3X,"in your chemical data input file.")')
-      STOP "AddPhase:  phase to add is already in data store."
+      ERROR STOP "AddPhase:  phase to add is already in data store."
    ELSE IF (NumOfComps() < 0) THEN
       WRITE(*,'(1X,A,":  programming error: the PhaseStore module &
                                             &variable ''phaseList%Last''")')
       WRITE(*,'(1X,3X,"is negative.")')
-      STOP "AddPhase:  phaseList%Last < 0"
+      ERROR STOP "AddPhase:  phaseList%Last < 0"
    ENDIF
 
 
@@ -924,19 +924,19 @@ SUBROUTINE AddSpecies(species)
       WRITE(*,'(1X,A,":  chem species data store is full.")')
       WRITE(*,'(1X,3X,"maximum number allowed = ",I0)')          &
                                                      MAX_NUM_SPECIES
-      STOP "AddSpecies:  data store for chem  is full."
+      ERROR STOP "AddSpecies:  data store for chem  is full."
    ELSE IF (FoundSpeciesName(species%Name)) THEN
       WRITE(*,'(1X,A,":  species named ''",A,"'' already in  &
                                &data store.")') TRIM(species%Name)
       WRITE(*,'(1X,3X,"Check that you have not multiply defined &
                                                             &this species")')
       WRITE(*,'(1X,3X,"in your chemical data input file.")')
-      STOP "AddSpecies:  species to add is already in data store."
+      ERROR STOP "AddSpecies:  species to add is already in data store."
    ELSE IF (NumOfComps() < 0) THEN
       WRITE(*,'(1X,A,":  programming error: the ComponentsStore &
                                     &module variable ''speciesList%Last''")')
       WRITE(*,'(1X,3X,"is negative.")')
-      STOP "AddSpecies:  speciesList%Last < 0"
+      ERROR STOP "AddSpecies:  speciesList%Last < 0"
    ENDIF
 
    speciesList%Last = speciesList%Last + 1
@@ -1004,7 +1004,7 @@ SUBROUTINE Expect(inpLine,expectedToken,token)
       WRITE(*,'(1X,3X,"expected token = ",A)') TRIM(expectedToken)
       WRITE(*,'(1X,3X,"    token read = ",A)') TRIM(symbol)
 
-      STOP "Expect: expected token /= actual token read"
+      ERROR STOP "Expect: expected token /= actual token read"
    ENDIF
 
    IF (PRESENT(token)) token = symbol
@@ -1113,7 +1113,7 @@ SUBROUTINE ReadChemComp(reactionStr,compName,coeff,charge)
       ENDIF
       !!$WRITE(*,'(1X,3X,"      compName = ''",A,"''")')  TRIM(compName)
       WRITE(*,'(1X,3X,"character read = ''",A,"''")') ch
-      STOP "ReadChemComp:  leading character of chemical component name &
+      ERROR STOP "ReadChemComp:  leading character of chemical component name &
                                                       &must be a letter."
    ENDIF
 
@@ -1142,11 +1142,11 @@ SUBROUTINE ReadDataTrailingChemReaction(inpString,logKat25,deltaH,settlingVel)
    IF (PRESENT(settlingVel)) THEN
       settlingVel = VOID
       READ(inpString,*,IOSTAT=status) logKat25, deltaH, settlingVel
-      IF (status /= 0) STOP "ReadDataTrailingChemReaction:  error on &
+      IF (status /= 0) ERROR STOP "ReadDataTrailingChemReaction:  error on &
                                  &read of logKat25, deltaH and settlingVel"
    ELSE
       READ(inpString,*,IOSTAT=status) logKat25, deltaH
-      IF (status /= 0) STOP "ReadDataTrailingChemReaction:  error on &
+      IF (status /= 0) ERROR STOP "ReadDataTrailingChemReaction:  error on &
                                               &read of logKat25 and deltaH"
    ENDIF
 END SUBROUTINE ReadDataTrailingChemReaction
@@ -1208,11 +1208,11 @@ INTEGER FUNCTION LastLocnOfField(line,startLocn)
    IF (strLen < startLocn) THEN
       WRITE(*,'(1X,3X,A,":  given start location > string length")')
       WRITE(*,'(1X,3X,2X,"strLen = ",I0,3X,"startLocn = ",I0)') strLen, startLocn
-      STOP "LastLocnOfField:  start locn > str len"
+      ERROR STOP "LastLocnOfField:  start locn > str len"
    ELSE IF (startLocn <= 0) THEN
       WRITE(*,'(1X,3X,A,":  given start location <= 0")')
       WRITE(*,'(1X,3X,2X,"startLocn = ",I0)') startLocn
-      STOP "LastLocnOfField:  start locn <= 0"
+      ERROR STOP "LastLocnOfField:  start locn <= 0"
    ENDIF
 
    i = startLocn
@@ -1313,7 +1313,7 @@ SUBROUTINE DetermineStoichCoeff(compName,coeff,startChemName)
 
    ! -- Check leading character:
    IF (.NOT. IsAlphaNumeric(chemStr(1:1))) THEN
-      STOP "DetermineStoichCoeff:  alpha-numeric character expected."
+      ERROR STOP "DetermineStoichCoeff:  alpha-numeric character expected."
    ENDIF
 
    !-------
@@ -1602,7 +1602,7 @@ INTEGER FUNCTION Locn_Comp(name)!,key_type)
       WRITE(*,'(1X, A,":  programming error. Search key name &
                                      &type is unrecognized.")')
       WRITE(*,'(1X,3X,"key_type = ",I0)')  key_type
-      STOP "Locn_Comp:  search key name type is unrecognized."
+      ERROR STOP "Locn_Comp:  search key name type is unrecognized."
    ENDIF
 #endif
 

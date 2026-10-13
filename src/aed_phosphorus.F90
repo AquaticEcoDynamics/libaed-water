@@ -184,7 +184,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_phosphorus,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist for &aed_phosphorus'
+   IF (status /= 0) ERROR STOP 'Error reading namelist for &aed_phosphorus'
 
    ! Store parameter values in the module level data object
    ! NB: all rates must be provided in values per day,
@@ -244,7 +244,7 @@ SUBROUTINE aed_define_phosphorus(data, namlst)
           ENDIF
        ELSE
           PRINT *,'  ERROR PO4 adsorption is configured but no internal or external target variable is set'
-          STOP
+          ERROR STOP 1
        ENDIF
      ENDIF
 

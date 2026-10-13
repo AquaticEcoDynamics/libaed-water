@@ -161,7 +161,7 @@ SUBROUTINE aed_define_tracer(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_tracer,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist aed_tracer'
+   IF (status /= 0) ERROR STOP 'ERROR reading namelist aed_tracer'
 
    ! Store parameter values in our own derived type
    data%num_tracers = num_tracers
@@ -214,7 +214,7 @@ SUBROUTINE aed_define_tracer(data, namlst)
          data%id_l_bot = aed_locate_sheet_variable(macrophyte_link_var)
          IF ( data%id_l_bot .LE. 0 ) THEN
             print *, "Macrophyte Link Variable ", TRIM(macrophyte_link_var), " is not defined."
-            STOP
+            ERROR STOP 1
          ENDIF
       ELSE
          data%id_l_bot = 0

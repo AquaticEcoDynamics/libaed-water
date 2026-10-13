@@ -169,7 +169,7 @@ SUBROUTINE aed_define_habitat_water(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_habitat_water,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist aed_habitat_water'
+   IF (status /= 0) ERROR STOP 'ERROR reading namelist aed_habitat_water'
 
    ! Update module level switches
    data%num_habitats = 0

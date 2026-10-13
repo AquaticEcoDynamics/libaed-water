@@ -134,7 +134,7 @@ SUBROUTINE aed_define_silica(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_silica,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist for &aed_silica'
+   IF (status /= 0) ERROR STOP 'Error reading namelist for &aed_silica'
 
    ! Store parameter values in our own derived type
    ! NB: all rates must be provided in values per day,
