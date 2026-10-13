@@ -46,13 +46,13 @@ ${objdir}/%.o: ${srcdir}/%.F90 ../libaed-water/${srcdir}/aed_core.F90 ../libaed-
 	$(F90) $(FFLAGS) -c $< -o $@
 
 ${objdir}:
-	@mkdir ${objdir}
+	@mkdir -p ${objdir}
 
 ${moddir}:
-	@mkdir ${moddir}
+	@mkdir -p ${moddir}
 
 ${libdir}:
-	@mkdir ${libdir}
+	@mkdir -p ${libdir}
 
 clean: ${objdir}
 	@touch ${objdir}/1.o 1.i90
