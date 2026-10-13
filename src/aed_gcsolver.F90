@@ -1548,7 +1548,7 @@ CONTAINS
 
    IF(eqCounter /= nComps2Process) THEN
      print *,'Problem setting eqIndex for Speciation:',eqCounter,nComps2Process
-     STOP
+     ERROR STOP 1
    END IF
  END SUBROUTINE seteqIndiciesforSpeciation
 !------------------------------------------------------------------------------!
@@ -1645,7 +1645,7 @@ CONTAINS
    IF(eqCounter /= nComps2Process .OR. (listCounter-1) /= nComps2Process) THEN
      PRINT *,'Problem setting eqIndex for Batch Rxn:',                         &
               eqCounter,nComps2Process,listCounter-1
-     STOP
+     ERROR STOP 1
    END IF
  END SUBROUTINE SeteqIndiciesforBatchRxn
 !------------------------------------------------------------------------------!
@@ -2013,7 +2013,7 @@ SUBROUTINE UpdateUnknownsWithdX(deltaConc,comps,cList)                        !
 
        IF (Waq < 1e-10) THEN
          print *, 'Mass of water is less than 1e-10 kilogram, STOPPING'
-         STOP
+         ERROR STOP 1
        END IF
 
      END IF
@@ -2343,7 +2343,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        IF(rowCounter /= comps(rowCompIndex)%eqIndex) THEN
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter,' eqIndex:',comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2431,7 +2431,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        IF(rowCounter /= comps(rowCompIndex)%eqIndex) THEN
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter,' eqIndex:',comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2505,7 +2505,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        IF(rowCounter /= comps(rowCompIndex)%eqIndex) THEN
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter,' eqIndex:',comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2582,7 +2582,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        IF(rowCounter /= comps(rowCompIndex)%eqIndex) THEN
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter,' eqIndex:',comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2646,7 +2646,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        IF(rowCounter /= comps(rowCompIndex)%eqIndex) THEN
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter, ' eqIndex:',comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2706,7 +2706,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        IF(rowCounter /= comps(rowCompIndex)%eqIndex) THEN
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter,' eqIndex:',comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2779,7 +2779,7 @@ END SUBROUTINE UpdateUnknownsWithdX
          print *,'rowCounter /= comps(rowCompIndex)%eqIndex'
          print *,'rowCounter:',rowCounter, ' eqIndex:',                        &
                                               comps(rowCompIndex)%eqIndex
-         STOP
+         ERROR STOP 1
        END IF
 
        rowCounter = rowCounter + 1
@@ -2799,7 +2799,7 @@ END SUBROUTINE UpdateUnknownsWithdX
        print *,'-> ',rowCompIndex,jacobian(rowCompIndex,:)
      END DO
 
-     STOP
+     ERROR STOP 1
    END IF
 
 
@@ -3086,7 +3086,7 @@ END SUBROUTINE UpdateUnknownsWithdX
    IF(Index == 0) THEN
      print *,' Error in: ', THIS_PROC
      print *,' DICHM column = ', Index
-     STOP
+     ERROR STOP 1
    END IF
 
  END FUNCTION GetDissChemIndex                                                   !
@@ -3112,7 +3112,7 @@ END SUBROUTINE UpdateUnknownsWithdX
    IF(Index == 0) THEN
      print *,'Error in: ', THIS_PROC
      print *,'PICHM column = ', Index
-     STOP
+     ERROR STOP 1
    END IF
 
  END FUNCTION GetPartChemIndex                                                   !
@@ -3323,7 +3323,7 @@ END SUBROUTINE UpdateUnknownsWithdX
              WRITE(*,'(1X,4X,"is not associated with its component")')
              WRITE(*,'(/,1X,2X,"Check it has not been requested twice in the con file")')
              WRITE(*,'(1X,2X,"STOPPING")')
-             STOP
+             ERROR STOP 1
            END IF
          END IF
        END IF

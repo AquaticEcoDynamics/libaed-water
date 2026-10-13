@@ -143,7 +143,7 @@ SUBROUTINE aed_define_dummy(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_dummy,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_dummy'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_dummy'
 
    DO i=1,100 ; IF (dm_vars(i)  .EQ. '' ) THEN  ; num_v  = i-1  ; EXIT ; ENDIF ; ENDDO
    DO i=1,100 ; IF (dm_dvars(i) .EQ. '' ) THEN  ; num_dv = i-1  ; EXIT ; ENDIF ; ENDDO

@@ -207,7 +207,7 @@ SUBROUTINE aed_define_pesticides(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_pesticides,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_pesticides'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_pesticides'
 
    IF ( extra_diag ) diag_level = 10
 
@@ -402,7 +402,7 @@ SUBROUTINE aed_pesticides_load_params(data, dbase, count, list)
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
-    IF (status /= 0) STOP 'Error reading namelist pesticide_data'
+    IF (status /= 0) ERROR STOP 'Error reading namelist pesticide_data'
 
     data%num_pesticides = 0
     ALLOCATE(data%pesticides(count))

@@ -310,7 +310,7 @@ SUBROUTINE load_sed_zone_data(data,namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_sed_const2d,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist for &aed_sed_const2d'
+   IF (status /= 0) ERROR STOP 'ERROR reading namelist for &aed_sed_const2d'
 
    data%n_zones = n_zones
    IF(n_zones>0) THEN
@@ -491,7 +491,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_sedflux,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist for &aed_sedflux'
+   IF (status /= 0) ERROR STOP 'ERROR reading namelist for &aed_sedflux'
 
    CALL str_tolower(sedflux_model)
 
@@ -500,7 +500,7 @@ SUBROUTINE aed_define_sedflux(data, namlst)
       data%sed_modl = SED_CONSTANT
 
       read(namlst,nml=aed_sed_constant,iostat=status)
-      IF (status /= 0) STOP 'ERROR reading namelist for &aed_sed_constant'
+      IF (status /= 0) ERROR STOP 'ERROR reading namelist for &aed_sed_constant'
 
       ! Store parameter values in our own derived type
       !   NB: all rates must be provided in values per day

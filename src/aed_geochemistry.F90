@@ -271,7 +271,7 @@ SUBROUTINE aed_define_geochemistry(data, namlst)
    !----------------------------------------------------------------------------
    ! Read the namelist
    read(namlst,nml=aed_geochemistry,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_geochemistry'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_geochemistry'
 
    data%simEq = simEq
    data%speciation_dt = speciation_dt  ! Note this is now managed in FV_AED or GLM_AED
