@@ -66,6 +66,7 @@ MODULE aed_common
    PUBLIC aed_calculate, aed_calculate_surface, aed_calculate_benthic
 !  PUBLIC aed_calculate_benthic_zone
    PUBLIC aed_calculate_riparian, aed_calculate_dry, aed_calculate_column
+   PUBLIC aed_calculate_column_model
    PUBLIC aed_light_extinction, aed_light_shading
    PUBLIC aed_equilibrate, aed_mobility, aed_rain_loss
    PUBLIC aed_bio_drag, aed_inflow_update
@@ -204,7 +205,7 @@ SUBROUTINE aed_define_model(modeldef, namlst)
       last_model => model
    ELSE
       print *,'*** Unknown module ', TRIM(modelname)
-      STOP
+      ERROR STOP 1
    ENDIF
 END SUBROUTINE aed_define_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -468,6 +469,29 @@ SUBROUTINE aed_calculate_column(column, layer_map)
       model => model%next
    ENDDO
 END SUBROUTINE aed_calculate_column
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_calculate_column_model(modelname, column, layer_map)
+!-------------------------------------------------------------------------------
+   CHARACTER(*),INTENT(in) :: modelname
+   TYPE (aed_column_t),INTENT(inout) :: column(:)
+   INTEGER,INTENT(in) :: layer_map(:)
+!
+!LOCALS
+   CLASS (aed_model_data_t),POINTER :: model
+!-------------------------------------------------------------------------------
+   model => model_list
+   DO WHILE (ASSOCIATED(model))
+      IF (TRIM(model%aed_model_name) == TRIM(modelname)) THEN
+         PTRACE("aed_calculate_column_model->",trim(model%aed_model_name))
+         CALL model%calculate_column(column, layer_map)
+         RETURN
+      ENDIF
+      model => model%next
+   ENDDO
+END SUBROUTINE aed_calculate_column_model
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 

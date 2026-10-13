@@ -184,7 +184,7 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_noncohesive,iostat=status)
-   IF (status /= 0) STOP 'ERROR reading namelist aed_noncohesive'
+   IF (status /= 0) ERROR STOP 'ERROR reading namelist aed_noncohesive'
 
    ! Store parameter values in our own derived type
    data%num_ss = num_ss
@@ -274,7 +274,11 @@ SUBROUTINE aed_define_noncohesive(data, namlst)
    IF (diag_level > 0) data%id_set    =  aed_define_diag_variable('set','g/m3/d','total sedimentation flux')
    IF (diag_level > 0) data%id_ss_swi = &
                      aed_define_sheet_diag_variable('swi','g/m2/d','net flux across the sediment-water interface')
-   IF (diag_level > 0) data%id_swi_dz =  aed_define_sheet_diag_variable('swi_dz','m/d','cum. swi position change')
+   !# 2026-09-10: defined as the HOST-STEP MEAN interface movement rate. The units always said
+   !# m/d and the description said 'cum.'; they contradicted each other, and the value scaled
+   !# 1:2:4:8 with split_factor because each sub-step's rate was summed unweighted.
+   IF (diag_level > 0) data%id_swi_dz =  aed_define_sheet_diag_variable('swi_dz','m/d', &
+                                'host-step mean sediment-water interface movement rate')
    IF ( resuspension > 0 ) THEN
       IF (diag_level > 0) data%id_resus = aed_define_sheet_diag_variable('resus','g/m2/s','resuspension rate')
       IF (diag_level > 0) data%id_d_taub = aed_define_sheet_diag_variable('d_taub','N/m2','taub diagnostic')
@@ -437,13 +441,29 @@ SUBROUTINE aed_calculate_benthic_noncohesive(data,column,layer_idx)
 
 
       ! Log the flux across the sediment-water interface, cumulating over groups
+      ! FIX 2026-08-29: set_flux is ss*vvel (see aed_mobility_noncohesive), i.e.
+      ! it is ALREADY signed negative when the class is settling out of the water
+      ! column. Writing "- set_flux" therefore made settling add to the bed with
+      ! the same effective sign as resuspension, even though the two cross the
+      ! interface in opposite directions. The net source to the water column is
+      ! (ss_flux + resus_flux + set_flux); the flux into the bed is its negative.
       IF (data%id_ss_swi > 0) _DIAG_VAR_S_(data%id_ss_swi) = &
-                              _DIAG_VAR_S_(data%id_ss_swi) - (ss_flux + resus_flux - set_flux) * secs_per_day
+                              _DIAG_VAR_S_(data%id_ss_swi) - (ss_flux + resus_flux + set_flux) * secs_per_day
 
-      ! Keep track of the cumulative deviation in SWI position due to
-      ! resuspension of this particle class
+      ! Keep track of the cumulative deviation in SWI position for this class
+      ! FIX 2026-08-29: same sign correction as above. This is now the ONLY
+      ! accumulation into id_swi_dz - aed_mobility_noncohesive (~L565) used to
+      ! add the settling term a second time, with the opposite sign and without
+      ! the secs_per_day scaling, and once per layer rather than once at the bed.
+      !# 2026-09-10: weighted by dt_sub/dt_host so the sum over a host step's sub-steps is
+      !# the time-weighted MEAN rate, not split_factor times it. Measured before this on the
+      !# GLM path with two classes: exactly 1:2:4:8 at splits 1/2/4/8, at every record.
+      !# The sum across classes (this loop over i) is intended and unchanged; the sheet
+      !# diagnostic is zeroed once per host step by both hosts, so this is a mean over the
+      !# step. aed_substep_frac is 1.0 whenever split_factor is 1, so such runs are unchanged.
       IF (data%id_swi_dz > 0) _DIAG_VAR_S_(data%id_swi_dz) = _DIAG_VAR_S_(data%id_swi_dz) - &
-                      ((resus_flux+ss_flux-set_flux) / ((1.-data%sed_porosity) * (data%rho_ss(i)*1e3)) * secs_per_day)
+                      ((resus_flux+ss_flux+set_flux) / ((1.-data%sed_porosity) * (data%rho_ss(i)*1e3)) * secs_per_day) &
+                      * aed_substep_frac
 
       IF ( data%simSedimentMass ) THEN
         ! Remove/add sediment fluxes value from the sediment vars
@@ -562,8 +582,11 @@ SUBROUTINE aed_mobility_noncohesive(data,column,layer_idx,mobility)
       _DIAG_VAR_(data%id_ss_set(i)) = ss * vvel * secs_per_day
       IF (data%id_set > 0) _DIAG_VAR_(data%id_set) = _DIAG_VAR_(data%id_set) + ss * vvel * secs_per_day
 
-      IF (data%id_swi_dz > 0) _DIAG_VAR_S_(data%id_swi_dz) = _DIAG_VAR_S_(data%id_swi_dz) - (vvel*ss) &
-                       / ((1.-data%sed_porosity) * (data%rho_ss(i)*1e3))
+      ! FIX 2026-08-29: the second, duplicate accumulation into id_swi_dz used to
+      ! sit here. It double-counted the settling term already handled in
+      ! aed_calculate_benthic_noncohesive (~L445), with the opposite sign, in
+      ! per-second rather than per-day units, and once for EVERY layer in the
+      ! column even though id_swi_dz is a sheet (bed) diagnostic. Removed.
 
 !      IF ( data%simSedimentMass ) THEN
 !        ! Remove/add sediment fluxes value from the sediment vars

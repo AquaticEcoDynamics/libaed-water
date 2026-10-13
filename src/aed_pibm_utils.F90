@@ -38,7 +38,14 @@ implicit NONE
 real, parameter   :: pi= 3.1415926535 !ML not pulling this to nml because it's a constant
 
 integer, parameter :: NTrait = 3
-real :: nu(NTrait) = [1d-12, 1d-12, 1d-12] !Probability per generation per cell
+!# 2026-07 FIX: was 1d-12. The mutation gate is `nu_ = num * nu(m)`, and with
+!# n0 = 100 cells/particle that gave nu_ ~ 1e-10 per division - an expected ~1e-5
+!# mutation events across an entire 5.5-year run. The whole trait-evolution
+!# machinery (srand_mtGaus, Cholesky, multigauss) was correct but UNREACHABLE, so
+!# the model had no adaptation despite being framed as an IBM. At 1d-5 and
+!# num = 100 the per-division probability is 1e-3, giving order-10 events over a
+!# 60-day run - rare enough to be mutation, frequent enough to exist.
+real :: nu(NTrait) = [1d-5, 1d-5, 1d-5]   !Probability per generation per cell
 real :: sigma(NTrait) = [0.1, 0.1, 0.1]    !Standard deviation of mutation of the three traits
 
 integer, parameter :: NInit = 8            ! Number of traits + initial conditions with variability
@@ -160,7 +167,7 @@ real,   intent(in)   :: tC, mumax, Ea, Ed, Topt_, T_std
 !real,   parameter   :: Tref = 15D0 ! ML reference temperature; in theory maybe this could be changed
 real                         :: Eh, x, theta, b
 
-if (Ed .le. 0d0) stop "Ed must be greater than zero!"
+if (Ed .le. 0d0) ERROR STOP "Ed must be greater than zero!"
 Eh = Ed+Ea
 x    = TK(TC, T_std)
 theta = TK(Topt_, T_std)
@@ -327,7 +334,8 @@ SUBROUTINE GMK98_Ind_TempSizeLight(Temp, PAR, DIN, NO3, NH4, FRP, C, N, P, Chl, 
                      thetaPmax, QNmin_a, QNmin_b, QNmax_a, QNmax_b, QPmin_a, QPmin_b, &
                      QPmax_a, QPmax_b, KN_a, KN_b, KPho_a, KPho_b, a_c2vol, b_c2vol,  &
                      a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta, phi,      &
-                     T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_)
+                     T_std, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_,       &
+                     simSi, Si_amb, Si_0, K_Si, beta_inh)
 !-------------------------------------------------------------------------------
 USE Trait_functions, only : temp_Topt, PHY_C2Vol, Ainf, Pmax_size, respiration, phyto_pN
 !USE params,          only : thetaNmax, mu0, rhoChl_L, QNmin_a, QNmin_b
@@ -441,6 +449,28 @@ real              :: VCP    = 0.      !FRP uptake rate by phytoplankton [mol P m
 real              :: Lno3   = 0.      !Nutrient limitation [pmol N m-3]
 real              :: Lfrp   = 0.      !Nutrient limitation [pmol P m-3]
 real              :: SI     = 0.      !Light limitation index [fpar]
+!# 2026-07 (S3): diatom silica limitation. simSi<=0 leaves behaviour unchanged.
+integer, intent(in), optional :: simSi   !# optional (2026-10-01): absent = 0, behaviour unchanged, so callers
+                                         !# that predate the silica limit (upstream aed_phyto_abm) still compile
+real,    intent(in), optional :: Si_amb, Si_0, K_Si
+!# 2026-08: OPTIONAL empirical photoinhibition, Platt et al. (1980), default 0 = OFF.
+!#
+!# This curve is NOT un-inhibited: Ainf() below is a Han (2002) PSU damage-repair model
+!# whose quadratic term K*Tau*Sigma^2*I^2 genuinely closes reaction centres (A falls to
+!# ~0.43 at 1500 W/m2). But with the FCR parameters the damage term only overtakes the
+!# linear term near ~2300 W/m2, so within a lake's actual light range (<= ~450 W/m2) the
+!# response saturates without ever declining.
+!#
+!# Ranjbar et al. (2024) Eq 5, LL = I/(I + e + u*I^2) with e = 114.25 umol/m2/s and
+!# u = 2.19e-4, PEAKS at sqrt(e/u) = 722 umol/m2/s ~ 158 W/m2 and declines above it -
+!# comfortably inside the FCR range. beta_inh exists to reproduce that net decline if
+!# wanted, without discarding GMK98's variable stoichiometry and dynamic chlorophyll.
+!# Leave at 0 unless a net decline is intended; it is deliberately additive to, not a
+!# replacement for, the mechanistic Han term.
+real,    intent(in), optional :: beta_inh   !# optional: absent = 0 = no photoinhibition
+integer :: l_simSi
+real    :: l_Si_amb, l_Si_0, l_K_Si, l_beta_inh
+real              :: fSi = 1.
 real              :: PCmax  = 0.      !Maximal photosynthesis rate (regulated by QN and QP) [d-1]
 real              :: PC     = 0.      !Carbon specific rate of photosynthesis [d-1]
 real              :: rhoChl = 0.      !Phyto C production devoted to Chl synthesis [mg Chl mmol C-1]
@@ -562,8 +592,12 @@ RChlT = temp_Topt(Temp, RChl, Topt_, Ea0, Ed0, Ei, beta, phi, T_std)
 RChlT = respiration(ESD_, RChlT, b_rho, V_s)
 
 !Nutrient limitation [nd]:
-Lno3 = (QN - QNmin) / dQN
-Lfrp = (QP - QPmin) / dQP
+!# 2026-08-19: capped at 1. L is a quota-space fraction and is 1 by construction when
+!# Q = Qmax, but Q is state and can transiently overshoot Qmax while C is falling fast.
+!# Uncapped, L>1 inflates PCmax above muT (superlinear growth) and inflates Ik, and it
+!# masks the overshoot in diagnostics. The <=0 test below is unaffected.
+Lno3 = min((QN - QNmin) / dQN, 1d0)
+Lfrp = min((QP - QPmin) / dQP, 1d0)
 
 if (Lno3 .le. 0d0 .or. Lfrp .le. 0d0) then !if QN or QP is already at minimum, no photosynthesis occurs
    PC = 0d0
@@ -571,7 +605,21 @@ else
    !Maximal photosynthesis rate (regulated by temperature, QN, and QP) [d-1]:
    !ML corresponds to eq. 5 in PIBM ms;
    !the min() was added to account for both N and P limitation in GLM-AED-ABM
-   PCmax = muT * min(Lno3,Lfrp)
+   !# optional-argument defaults (absent = feature off)
+   l_simSi = 0;      IF (PRESENT(simSi))    l_simSi = simSi
+   l_Si_amb = 0.;    IF (PRESENT(Si_amb))   l_Si_amb = Si_amb
+   l_Si_0 = 0.;      IF (PRESENT(Si_0))     l_Si_0 = Si_0
+   l_K_Si = 1.;      IF (PRESENT(K_Si))     l_K_Si = K_Si
+   l_beta_inh = 0.;  IF (PRESENT(beta_inh)) l_beta_inh = beta_inh
+   !# 2026-07 (S3): diatoms REQUIRE silica; without it a spring bloom has no
+   !# termination mechanism other than N/P. Monod with an explicit threshold Si_0
+   !# below which uptake ceases. Gated on simSi so other groups are untouched.
+   IF (l_simSi > 0) THEN
+      fSi = max(0., (l_Si_amb - l_Si_0) / max(l_Si_amb - l_Si_0 + l_K_Si, 1d-10))
+      PCmax = muT * min(Lno3, Lfrp, fSi)
+   ELSE
+      PCmax = muT * min(Lno3,Lfrp)
+   ENDIF
 
    !Light saturation parameter [W m-2 d-1]:
    !ML to go into eq. 4 in PIBM ms
@@ -597,6 +645,11 @@ else
       SI = 1.d0 - exp(SI)
    endif
 
+   !# Optional Platt et al. (1980) net photoinhibition. beta_inh = 0 leaves SI bit-identical,
+   !# so this doubles as the control for any recalibration. See the note beside its
+   !# declaration for why the existing Han term does not produce a decline in lake light.
+   if (l_beta_inh > 0.d0) SI = SI * exp(-l_beta_inh * PAR / Ik)
+
    !Photosynthesis rate [d-1]:
    PC = PCmax * SI
 Endif
@@ -604,7 +657,18 @@ Endif
 !Define rhochl [g Chl mol C-1]: fraction of phytoplankton carbon production that is devoted to Chl synthesis.
 !If dark, assume that rhochl equaled the value calculated for the end of the preceding light period.
 if (PAR <= 0d0) then
-   rhochl   = rhoChl_L
+   !# 2026-07 FIX: was `rhochl = rhoChl_L`. rhoChl_L is declared with an initialiser
+   !# (`real :: rhoChl_L = 0.`), which in Fortran gives it implicit SAVE - so it is a
+   !# SINGLE GLOBAL SCALAR, not per-particle state. Every particle in every layer of
+   !# every group read back whatever the last ILLUMINATED particle anywhere in the
+   !# column had just written. Dark-period chlorophyll memory was therefore
+   !# cross-contaminated between unrelated individuals - which matters most for a
+   !# low-light metalimnetic population, i.e. exactly Planktothrix.
+   !# Chlorophyll synthesis requires photosynthate, so zero in darkness is
+   !# physiologically defensible and is strictly better than another cell's value.
+   !# PROPER FIX (deferred): carry rhochl as a per-particle state variable
+   !# (ip_rhochl) alongside ip_chl, and pass it in/out of this routine.
+   rhochl   = 0d0
 else
    !ML corresponds to eq. 9 in PIBM ms
    rhochl   = min(thetaNmax, thetaPmax) * PC / alphachl_ / theta / PAR ! ML this is now regulated by both P and N
@@ -626,7 +690,15 @@ VCP = max(VCP, 0d0)
 dC = C * (PC - zeta_N*VCN - zeta_P*VCP - RcT)
 
 !Changes of cellular nitrogen [pmol N cell-1 d-1]:
-!RNT has to be zero to avoid continuous decline of N per cell
+!# 2026-08-19: the previous note here read "RNT has to be zero to avoid continuous decline
+!# of N per cell". That is backwards and it cost this configuration the whole year. With
+!# RNT=0 (and RPT=0) dN is identically zero, so cellular N is FROZEN. As the cell respires
+!# carbon, QN=N/C climbs with nothing to bound it - measured at 3.7x QNmax by August. The
+!# uptake brake ((QNmax-QN)/dQN)**nx then pins VCN=VCP=0 permanently, and because dChl is
+!# gated on min(VCN,VCP) while RChlT degrades unconditionally, chlorophyll decays to zero
+!# with no route back. A nonzero RNT is the negative feedback that bounds the quota: when
+!# QN>QNmax, dN=-RNT*N pulls QN back down until uptake (and hence Chl synthesis) restarts.
+!# N released this way is returned to NO3/NH4 in the caller (mass conservative).
 !ML corresponds to eq. 2 in PIBM ms
 dN = N * (VCN/QN - RNT)
 
@@ -641,7 +713,20 @@ dP = P * (VCP/QP - RPT)
 
 !Changes of cellular Chl [d-1]:
 !ML corresponds to eq. 3 in PIBM ms
-dChl = Chl * (rhochl*min(VCN, VCP) / theta - RChlT)
+!# 2026-08-19 DIMENSIONAL FIX: was min(VCN, VCP). rhochl is thetaNmax*PC/(alphachl*theta*PAR),
+!# i.e. g Chl per mol N (Geider et al. 1998 eq. 3), so it must multiply a NITROGEN flux. VCN is
+!# mol N (mol C)-1 d-1 and VCP is mol P (mol C)-1 d-1; this file's quotas are exactly 10:1 N:P
+!# (QNmax 0.166 / QPmax 0.0166, QNmin 0.07 / QPmin 0.007), so VCP is ~10x numerically smaller
+!# than VCN whenever BOTH nutrients are replete. min() therefore selected P unconditionally -
+!# not because P was limiting but because P is a smaller number by construction - and starved
+!# Chl synthesis by that same factor of 10. Measured at FCR January conditions the synthesis/
+!# degradation ratio was 0.10; with the N flux it is 1.04, i.e. balanced. Chl:C consequently
+!# decayed monotonically from day 1 in every run, collapsing PC (which is proportional to
+!# Chl:C in light-limited water) until the population died.
+!# The original intent - let P limitation also throttle Chl - is preserved by converting VCP
+!# into N-equivalent units with the model's OWN maximum-quota ratio QNmax/QPmax, rather than
+!# comparing the two raw fluxes. When P is genuinely limiting VCP falls and still wins the min.
+dChl = Chl * (rhochl*min(VCN, VCP*(QNmax/max(QPmax,1d-12))) / theta - RChlT)
 
 return
 END subroutine GMK98_Ind_TempSizeLight

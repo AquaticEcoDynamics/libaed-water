@@ -63,7 +63,7 @@ MODULE aed_bio_particles
       INTEGER :: ip_ptm_c
       INTEGER :: id_d_oxy, id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop
-      INTEGER :: id_lht, id_larea, id_dep, id_tem
+      INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_extc
 
       AED_REAL :: vvel_new, vvel_old, decay_rate_new, decay_rate_old
       AED_REAL :: X_dwww, X_cdw, X_nc, X_pc, mass_limit
@@ -159,7 +159,7 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 
    ! Read the namelist
    read(namlst,nml=aed_bio_particles,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist aed_bio_particles'
+   IF (status /= 0) ERROR STOP 'Error reading namelist aed_bio_particles'
 
    print *,"        aed_bio_particles initialization"
 
@@ -240,6 +240,8 @@ SUBROUTINE aed_define_bio_particles(data, namlst)
 
    ! Environment variables
    data%id_tem = aed_locate_global('temperature')
+   data%id_par = aed_locate_global('par')
+   data%id_extc = aed_locate_global('extc_coef')
    data%id_lht = aed_locate_global('layer_ht')
    data%id_larea = aed_locate_global('layer_area')
    data%id_dep = aed_locate_sheet_global('col_depth')
@@ -272,47 +274,45 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
 !
 !-------------------------------------------------------------------------------
 !BEGIN
-   print *, 'Particle BGC Bio'
-
-   i = 1
+   n = MAX(0, ppid)
+   IF (n == 0) RETURN
 
    ! Check if we are in a new cell, to reset cumulative counters
-   IF (ppid == 0) THEN
-      _DIAG_VAR_(data%id_ptm_14) = zero_
-      _DIAG_VAR_(data%id_ptm_15) = zero_
-      _DIAG_VAR_(data%id_ptm_17) = zero_
-      _DIAG_VAR_(data%id_ptm_18) = zero_
-      _DIAG_VAR_(data%id_d_oxy) = zero_
-      _DIAG_VAR_(data%id_d_dc)  = zero_
-      _DIAG_VAR_(data%id_d_dn)  = zero_
-      _DIAG_VAR_(data%id_d_dp)  = zero_
+   _DIAG_VAR_(data%id_ptm_00) = n
+   _DIAG_VAR_(data%id_ptm_14) = zero_
+   _DIAG_VAR_(data%id_ptm_15) = zero_
+   _DIAG_VAR_(data%id_ptm_17) = zero_
+   _DIAG_VAR_(data%id_ptm_18) = zero_
+   _DIAG_VAR_(data%id_d_oxy) = zero_
+   _DIAG_VAR_(data%id_d_dc)  = zero_
+   _DIAG_VAR_(data%id_d_dn)  = zero_
+   _DIAG_VAR_(data%id_d_dp)  = zero_
 
-      IF( diag_level >= 10 ) THEN
-         _DIAG_VAR_(data%id_ptm_01) = zero_
-         _DIAG_VAR_(data%id_ptm_02) = zero_
-         _DIAG_VAR_(data%id_ptm_03) = zero_
-         _DIAG_VAR_(data%id_ptm_04) = zero_
-         _DIAG_VAR_(data%id_ptm_05) = zero_
-         _DIAG_VAR_(data%id_ptm_06) = zero_
-         _DIAG_VAR_(data%id_ptm_07) = zero_
-         _DIAG_VAR_(data%id_ptm_08) = zero_
-         _DIAG_VAR_(data%id_ptm_09) = zero_
-         _DIAG_VAR_(data%id_ptm_10) = zero_
-         _DIAG_VAR_(data%id_ptm_11) = zero_
-         _DIAG_VAR_(data%id_ptm_12) = zero_
-         _DIAG_VAR_(data%id_ptm_13) = zero_
-         _DIAG_VAR_(data%id_ptm_16) = zero_
-      ENDIF
+   IF( diag_level >= 10 ) THEN
+      _DIAG_VAR_(data%id_ptm_01) = zero_
+      _DIAG_VAR_(data%id_ptm_02) = zero_
+      _DIAG_VAR_(data%id_ptm_03) = zero_
+      _DIAG_VAR_(data%id_ptm_04) = zero_
+      _DIAG_VAR_(data%id_ptm_05) = zero_
+      _DIAG_VAR_(data%id_ptm_06) = zero_
+      _DIAG_VAR_(data%id_ptm_07) = zero_
+      _DIAG_VAR_(data%id_ptm_08) = zero_
+      _DIAG_VAR_(data%id_ptm_09) = zero_
+      _DIAG_VAR_(data%id_ptm_10) = zero_
+      _DIAG_VAR_(data%id_ptm_11) = zero_
+      _DIAG_VAR_(data%id_ptm_12) = zero_
+      _DIAG_VAR_(data%id_ptm_13) = zero_
+      _DIAG_VAR_(data%id_ptm_16) = zero_
    ENDIF
 
-   ! Increment the particle count for this cell and set to diagnostic
-   ppid = ppid + 1
-   _DIAG_VAR_(data%id_ptm_00) = ppid !,AED_REAL)   ! total number of particles within a cell
+   DO i = 1, n
 
    ! Temporary settings
    Mu_max=1.2  !maximum daily growth rate
-   Light=2000.  !surface irradiance
-   Kd=1.5  !light extinction coefficient
+   Light = zero_
+   IF (data%id_par > 0) Light = MAX(zero_, _STATE_VAR_(data%id_par))
+   Kd = zero_
+   IF (data%id_extc > 0) Kd = MAX(zero_, _STATE_VAR_(data%id_extc))
    N_Limitation=0.8  !limitation by N
    P_Limitation=0.8  !limitation by P
    D0= p(i)%ptm_env(DIAM) !10.  !initial size
@@ -321,7 +321,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    WaterTemperature= _STATE_VAR_(data%id_tem) !22  !water temperature
    Depth     = _STATE_VAR_S_(data%id_dep) -  _PTM_ENV_(i,HGHT)  !cyanobacteria depth = water depth-cell height
    thickness = _STATE_VAR_(data%id_lht)
-   area      = 1000. !_STATE_VAR_(data%id_larea)
+   area      = _STATE_VAR_(data%id_larea)
 
    !print *,'cell depth & temp',Depth, WaterTemperature
 
@@ -333,7 +333,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    f_I = (0.219 * Iz) / (0.219 * Iz + 25. + 0.001 * (0.219 * Iz)**2.)  !light limitation term
    Respiration = 0.1 * 1.1**(WaterTemperature - 20.)  !respiration
    Mu_net = Mu_max * f_T * f_I * min(N_Limitation, P_Limitation) - Respiration    !net daily growth rate
-   D1 = D0 * 2.**(1. / (log10(2.) / Mu_net * 24.))  !predicted Dolichospermum size
+   D1 = D0 * EXP(Mu_net * DT / secs_per_day)  ! specific growth rate is per day
 
    !print *, ' D_0: ', D0 !disp(['D_0: ', num2str(D0), ' μm'])
    !print *, ' D_1: ', D1 !disp(['D_1: ', num2str(D1), ' μm'])
@@ -345,7 +345,10 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
    !print *, ' _PTM_VAR_: ', _PTM_VAR_(i,data%ip_ptm_c)
 
    ! Set interactions/fluxes with water properties
-   oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)  ! mmol C / m3/ s ! CHECK UNITS
+   oxy_flux = zero_
+   IF (area > zero_ .AND. thickness > zero_) THEN
+      oxy_flux = data%X_dwww * (1e3/12.) * (Mu_net/DT) * data%X_cdw / (area*thickness)
+   ENDIF
 
    _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) - oxy_flux
    _FLUX_VAR_(data%id_amm) = _FLUX_VAR_(data%id_amm) + oxy_flux * data%X_nc
@@ -414,6 +417,7 @@ SUBROUTINE aed_particle_bgc_bio_particles( data,column,layer_idx,ppid,p )
       _DIAG_VAR_(data%id_ptm113) = 0. !partcl(13)
       _DIAG_VAR_(data%id_ptm116) = 0. !partcl(16)
    ENDIF
+   END DO
 END SUBROUTINE aed_particle_bgc_bio_particles
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

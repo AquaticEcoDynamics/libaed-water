@@ -40,7 +40,7 @@ MODULE aed_core
 
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status
-   PUBLIC aed_get_var, aed_get_var_idx
+   PUBLIC aed_get_var, aed_get_var_idx, aed_find_variable
    PUBLIC aed_set_current_model, aed_set_prefix
    PUBLIC aed_is_const_var, aed_set_const_var
 
@@ -59,6 +59,40 @@ MODULE aed_core
    PUBLIC n_aed_models
 
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
+
+   !#---------------------------------------------------------------------------
+   !# 2026-07 (Task 4): the biological timestep seen by particle models, in DAYS.
+   !#
+   !# Particle BGC routines previously hardcoded dtdays = 1/24, which is correct ONLY
+   !# while dt = 3600 s AND split_factor = 1. aed_calculate_particles is called inside
+   !# the split_factor loop, so with split_factor = 2 the physiology silently advanced
+   !# at 2x real time. The host now sets this once per sub-step via the optional dt_days
+   !# argument to aed_calculate_particles, and particle models read it instead of
+   !# assuming an hour.
+   !#
+   !# Default 1/24 preserves the historical behaviour exactly when the host passes
+   !# nothing, so this is backward compatible.
+   AED_REAL :: aed_ptm_dt_days = 1.0 / 24.0
+   !# 2026-09-09: TRUE once the host has actually published a sub-step duration.
+   !# aed_ptm_dt_days carries a DEFAULT of 1/24 d, so a consumer that reads it without
+   !# checking cannot tell a real 300 s sub-step from the placeholder - and an accumulator
+   !# multiplying by an hour instead of five minutes is wrong by 12x with nothing to show
+   !# for it. Consumers that integrate over time must test this flag.
+   LOGICAL  :: aed_ptm_dt_days_set = .FALSE.
+   PUBLIC aed_ptm_dt_days, aed_ptm_dt_days_set
+   !# 2026-09-10: fraction of the HOST timestep the current sub-step represents,
+   !# dt_sub / dt_host. Set by the host where dt_eff is computed and reset to 1.0 straight
+   !# after its split loop, so nothing outside the loop can inherit a fraction.
+   !#
+   !# For a per-step diagnostic that should report a host-step MEAN rate - rather than a
+   !# sum that grows with split_factor - multiply each sub-step's contribution by this.
+   !# It is a separate value from aed_ptm_dt_days on purpose: that one is the PARTICLE
+   !# model's biological timestep with a 1/24 d default and is not published on every
+   !# path, so it cannot serve as a sub-step weight. Default 1.0 keeps any host that never
+   !# sets it, and every split_factor = 1 run, bit-identical.
+   AED_REAL :: aed_substep_frac = 1.0
+   PUBLIC aed_substep_frac
+   !#---------------------------------------------------------------------------
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_prefix_list_t
@@ -148,6 +182,7 @@ MODULE aed_core
 
    !#---------------------------------------------------------------------------
    TYPE :: aed_ptm_t
+      INTEGER :: ptm_group = 1
       INTEGER, DIMENSION(:),POINTER :: ptm_istat
       AED_REAL,DIMENSION(:),POINTER :: ptm_env
       AED_REAL,DIMENSION(:),POINTER :: ptm_state
@@ -810,6 +845,13 @@ FUNCTION aed_define_sheet_diag_variable(name, units, longname, surf, zavg, rezer
    ELSE
       all_vars(ret)%rezero = .TRUE.
    ENDIF
+
+   ! FIX 2026-08-29: "ret = n_aed_vars" used to sit here and overwrote the index
+   ! aed_create_variable already returned. That is only the same value when the
+   ! name was newly created; if the variable already existed (aed_find_variable
+   ! hit), aed_create_variable returns the EXISTING index while n_aed_vars is
+   ! the last-created one, so the caller got an id pointing at an unrelated
+   ! variable. aed_define_diag_variable (~L694) has no such line.
 END FUNCTION aed_define_sheet_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

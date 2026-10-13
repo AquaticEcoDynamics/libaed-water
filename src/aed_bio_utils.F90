@@ -102,6 +102,89 @@ MODULE aed_bio_utils
       AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta
       AED_REAL :: phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
+      !# 2026-07: see f_colony in phyto_param_t below. Effective hydrodynamic size
+      !# multiplier, applied to ESD in the Stokes settling term only.
+      AED_REAL :: f_colony
+      !# 2026-07 (S5): dark survival / dormancy. f_dorm = carbon fraction of Cdiv
+      !# below which a cell becomes dormant instead of continuing to starve;
+      !# r_dorm = maintenance respiration multiplier while dormant; I_germ =
+      !# PAR threshold for germination. See handoff S5.
+      AED_REAL :: f_dorm, r_dorm, I_germ
+      AED_REAL :: dorm_width   !# 2026-07 (S5b): width of the smooth dormancy ramp
+      !# Non-photochemical quenching. NPQ_max is percent reduction of effective
+      !# PAR at saturation; rates are per day; E_thresh is W/m2 after spectral
+      !# weighting.
+      AED_REAL :: NPQ_max, NPQ_k_on, NPQ_k_off, NPQ_E_thresh
+      !# 2026-08: NPQ_mode selects the quenching formulation.
+      !#   0 = legacy rate-based relaxation toward an equilibrium set by INSTANTANEOUS
+      !#       irradiance (k_on/k_off timescales ~5/20 min, so almost no memory).
+      !#   1 = Ranjbar et al. (2024) cumulative light DOSE, which is what makes this a
+      !#       light-HISTORY model: CL_t = max(I_t - PRR + CL_{t-1}, 0), and NPQ is
+      !#       integrated from CL rather than solved for instantaneous light.
+      !# NPQ_PRR is the photo-recovery rate in W/m2 (Ranjbar quote 800 umol/m2/s; divide
+      !# by WtouE = 4.57 because every PAR variable in this module is W/m2 - see the unit
+      !# note in aed_phyto_abm.F90). NPQ_alpha is their fitted scaling on d(NPQ)/dt.
+      INTEGER  :: NPQ_mode
+      AED_REAL :: NPQ_PRR, NPQ_alpha, NPQ_dtref_d
+      !# 2026-08: NPQ_apply separates WHERE quenching acts from WHICH equation computes it.
+      !#   0 = fluorescence diagnostic only. This is what Ranjbar et al. (2024) actually
+      !#       did: NPQ is an observation operator mapping biomass onto the phycocyanin
+      !#       signal a probe would read, and biomass itself is untouched.
+      !#   1 = additionally reduce the PAR handed to the growth engine, on the grounds
+      !#       that quenching physically diverts absorbed excitation away from
+      !#       photochemistry. More mechanistic, but beyond what the paper validated.
+      INTEGER  :: NPQ_apply
+      !# Platt et al. (1980) photoinhibition on the GMK98 P-I curve. 0 = OFF and is
+      !# bit-identical to the un-inhibited curve, so it doubles as the control.
+      AED_REAL :: beta_inh
+      !# Water Research 2022 colony aggregation/disaggregation. simColony 0 = static
+      !# f_colony (unchanged). colony_dD_dtref_h is the time unit of dD in their Eq 10,
+      !# which the paper does not state - see the handoff.
+      INTEGER  :: simColony
+      AED_REAL :: colony_dD_dtref_h, colony_d_max
+      !# 2026-08-19: de-ballasting (density DECREASE, shedding carbohydrate ballast to
+      !# regain buoyancy) was gated on r_dorm - the SAME rate that suppresses general
+      !# C/N/P/Chl maintenance loss while dormant. A particle that ballasts down and then
+      !# goes dormant at the bed needs a genuinely independent recovery rate: r_dorm tuned
+      !# low for general survival makes its one escape route correspondingly slow. Default
+      !# equals the ORIGINAL r_dorm value (0.15), a neutral starting point distinct from
+      !# whatever r_dorm is tuned to for maintenance loss. Appended at the END of the type
+      !# (not inserted mid-structure) after a mid-structure insertion produced unrelated
+      !# runtime corruption elsewhere (see handoff) - append-only is the safe pattern here.
+      AED_REAL :: r_deballast
+      !# 2026-08-19: I_Kb is the light scale of the BUOYANCY (carbohydrate ballasting)
+      !# response, and rho_max is a PER-GROUP density ceiling. Both exist because the
+      !# quantities they replace were global/shared and carried the wrong meaning for
+      !# gas-vacuolate cyanobacteria - see aed_phyto_abm.F90 for the measurements.
+      AED_REAL :: I_Kb, rho_max
+      !# 2026-08-21: rho_min is the PER-GROUP density FLOOR, the mirror of rho_max above.
+      !# Added because the global aed.nml min_rho = 985 was binding on both gas-vacuolate
+      !# groups - they sat at exactly 985.00 - which made real buoyancy regulation
+      !# impossible. Reynolds, Oliver & Walsby (1987) Table 2 gives Anabaena flos-aquae
+      !# (now Dolichospermum) 920-1030 and Oscillatoria rubescens (now Planktothrix
+      !# rubescens) 990-1065, so a single global floor cannot represent both.
+      !# <= 0 falls back to the global min_rho, exactly as rho_max does, so every group is
+      !# bit-identical until a value is set. Appended last to preserve type layout.
+      AED_REAL :: rho_min
+      !# 2026-08-22: Wallace & Hamilton lagged buoyancy regulation. Kromkamp & Walsby (1990)
+      !# and Visser et al. (1997) assume cell density responds to irradiance INSTANTLY; Wallace
+      !# & Hamilton, Limnol. Oceanogr. 44(2):273-281 (1999) measured a ~20 min physiological lag
+      !# while carbohydrate storage ramps up, and Wallace & Hamilton, J. Plankton Res.
+      !# 22(6):1127-1138 (2000) showed that a colony mixed through the light gradient faster
+      !# than that lag never fully ballasts and ends the mixing event MORE buoyant - the
+      !# mechanism behind persistent surface blooms.
+      !#   buoy_model  0 = legacy Webb c1*(1-exp(-I/I_Kb)) - c3   (default; bit-identical)
+      !#               1 = Wallace & Hamilton lagged model, integrated in glm_ptm.c
+      !# Rates are kg/m3/day and irradiance is W/m2, matching ip_par. Converted from the paper's
+      !# kg/m3/min and umol/m2/s with 1 W/m2 = 4.57 umol photons/m2/s; see
+      !# analysis/test_buoyancy_wh.py, which reproduces their Eq 7 and Figs 2-3 and asserts the
+      !# conversion. DO NOT take c1 from the 2000 paper: its 0.146 ug/g/s is exactly 100x low
+      !# (its c3 converts correctly, which is how the typo was identified).
+      !# Appended last to preserve type layout, as rho_min was.
+      INTEGER  :: buoy_model
+      AED_REAL :: c1_buoy, c2_buoy, c3_buoy, KI_buoy, tau_buoy, I_dark, tau_dose
+      !# k_resp: Visser et al. (1997) Eq 3 first-order ballast decay, /day. Appended last.
+      AED_REAL :: k_resp
    END TYPE phyto_data_t
 
 
@@ -139,6 +222,86 @@ MODULE aed_bio_utils
       AED_REAL :: a_c2vol, b_c2vol, a_pmax, rho, rho_star, b_rho, V_s, Ea0, Ed0, Ei, beta
       AED_REAL :: phi, Tau, Beta_Ainf, Kappa, Kd_Ainf, a_, b_, v_
       AED_REAL :: n_split
+      !# 2026-07: effective hydrodynamic size multiplier applied to ESD in the STOKES
+      !# settling term ONLY. Cell ESD (from a_c2vol/b_c2vol) correctly drives allometric
+      !# nutrient kinetics, but filamentous/colonial taxa sink and float as aggregates far
+      !# larger than one cell. Stokes velocity scales as ESD^2, so at the ~2 um cell scale
+      !# buoyancy is ~1200x weaker than turbulent mixing and no density regulation can
+      !# hold station (handoff 33-Z). Default 1.0 = unchanged behaviour.
+      AED_REAL :: f_colony
+      !# 2026-07 (S5): dark survival / dormancy. f_dorm = carbon fraction of Cdiv
+      !# below which a cell becomes dormant instead of continuing to starve;
+      !# r_dorm = maintenance respiration multiplier while dormant; I_germ =
+      !# PAR threshold for germination. See handoff S5.
+      AED_REAL :: f_dorm, r_dorm, I_germ
+      AED_REAL :: dorm_width   !# 2026-07 (S5b): width of the smooth dormancy ramp
+      !# Non-photochemical quenching. NPQ_max is percent reduction of effective
+      !# PAR at saturation; rates are per day; E_thresh is W/m2 after spectral
+      !# weighting.
+      AED_REAL :: NPQ_max, NPQ_k_on, NPQ_k_off, NPQ_E_thresh
+      !# 2026-08: see phyto_data_t above. 0 = legacy rate-based, 1 = Ranjbar cumulative
+      !# dose. NPQ_PRR in W/m2 (not umol/m2/s), NPQ_alpha dimensionless.
+      INTEGER  :: NPQ_mode
+      AED_REAL :: NPQ_PRR, NPQ_alpha, NPQ_dtref_d
+      !# 2026-08: NPQ_apply separates WHERE quenching acts from WHICH equation computes it.
+      !#   0 = fluorescence diagnostic only. This is what Ranjbar et al. (2024) actually
+      !#       did: NPQ is an observation operator mapping biomass onto the phycocyanin
+      !#       signal a probe would read, and biomass itself is untouched.
+      !#   1 = additionally reduce the PAR handed to the growth engine, on the grounds
+      !#       that quenching physically diverts absorbed excitation away from
+      !#       photochemistry. More mechanistic, but beyond what the paper validated.
+      INTEGER  :: NPQ_apply
+      !# Platt et al. (1980) photoinhibition on the GMK98 P-I curve. 0 = OFF and is
+      !# bit-identical to the un-inhibited curve, so it doubles as the control.
+      AED_REAL :: beta_inh
+      !# Water Research 2022 colony aggregation/disaggregation. simColony 0 = static
+      !# f_colony (unchanged). colony_dD_dtref_h is the time unit of dD in their Eq 10,
+      !# which the paper does not state - see the handoff.
+      INTEGER  :: simColony
+      AED_REAL :: colony_dD_dtref_h, colony_d_max
+      !# 2026-08-19: de-ballasting (density DECREASE, shedding carbohydrate ballast to
+      !# regain buoyancy) was gated on r_dorm - the SAME rate that suppresses general
+      !# C/N/P/Chl maintenance loss while dormant. A particle that ballasts down and then
+      !# goes dormant at the bed needs a genuinely independent recovery rate: r_dorm tuned
+      !# low for general survival makes its one escape route correspondingly slow. Default
+      !# equals the ORIGINAL r_dorm value (0.15), a neutral starting point distinct from
+      !# whatever r_dorm is tuned to for maintenance loss. Appended at the END of the type
+      !# (not inserted mid-structure) after a mid-structure insertion produced unrelated
+      !# runtime corruption elsewhere (see handoff) - append-only is the safe pattern here.
+      AED_REAL :: r_deballast
+      !# 2026-08-19: I_Kb is the light scale of the BUOYANCY (carbohydrate ballasting)
+      !# response, and rho_max is a PER-GROUP density ceiling. Both exist because the
+      !# quantities they replace were global/shared and carried the wrong meaning for
+      !# gas-vacuolate cyanobacteria - see aed_phyto_abm.F90 for the measurements.
+      AED_REAL :: I_Kb, rho_max
+      !# 2026-08-21: rho_min is the PER-GROUP density FLOOR, the mirror of rho_max above.
+      !# Added because the global aed.nml min_rho = 985 was binding on both gas-vacuolate
+      !# groups - they sat at exactly 985.00 - which made real buoyancy regulation
+      !# impossible. Reynolds, Oliver & Walsby (1987) Table 2 gives Anabaena flos-aquae
+      !# (now Dolichospermum) 920-1030 and Oscillatoria rubescens (now Planktothrix
+      !# rubescens) 990-1065, so a single global floor cannot represent both.
+      !# <= 0 falls back to the global min_rho, exactly as rho_max does, so every group is
+      !# bit-identical until a value is set. Appended last to preserve type layout.
+      AED_REAL :: rho_min
+      !# 2026-08-22: Wallace & Hamilton lagged buoyancy regulation. Kromkamp & Walsby (1990)
+      !# and Visser et al. (1997) assume cell density responds to irradiance INSTANTLY; Wallace
+      !# & Hamilton, Limnol. Oceanogr. 44(2):273-281 (1999) measured a ~20 min physiological lag
+      !# while carbohydrate storage ramps up, and Wallace & Hamilton, J. Plankton Res.
+      !# 22(6):1127-1138 (2000) showed that a colony mixed through the light gradient faster
+      !# than that lag never fully ballasts and ends the mixing event MORE buoyant - the
+      !# mechanism behind persistent surface blooms.
+      !#   buoy_model  0 = legacy Webb c1*(1-exp(-I/I_Kb)) - c3   (default; bit-identical)
+      !#               1 = Wallace & Hamilton lagged model, integrated in glm_ptm.c
+      !# Rates are kg/m3/day and irradiance is W/m2, matching ip_par. Converted from the paper's
+      !# kg/m3/min and umol/m2/s with 1 W/m2 = 4.57 umol photons/m2/s; see
+      !# analysis/test_buoyancy_wh.py, which reproduces their Eq 7 and Figs 2-3 and asserts the
+      !# conversion. DO NOT take c1 from the 2000 paper: its 0.146 ug/g/s is exactly 100x low
+      !# (its c3 converts correctly, which is how the typo was identified).
+      !# Appended last to preserve type layout, as rho_min was.
+      INTEGER  :: buoy_model
+      AED_REAL :: c1_buoy, c2_buoy, c3_buoy, KI_buoy, tau_buoy, I_dark, tau_dose
+      !# k_resp: Visser et al. (1997) Eq 3 first-order ballast decay, /day. Appended last.
+      AED_REAL :: k_resp
    END TYPE phyto_param_t
    ! %% END NAMELIST   %% phyto_param_t
 
@@ -201,7 +364,7 @@ SUBROUTINE phyto_internal_phosphorus(phytos,group,npup,phy,IP,primprod,        &
    ELSE
       ! Unknown phosphorus uptake function
       print *,'STOP: unknown simIPDynamics (',phytos(group)%simIPDynamics,') for: ',phytos(group)%p_name
-      STOP
+      ERROR STOP 1
    ENDIF
 
    ! Release of phosphorus due to excretion from phytoplankton and
@@ -265,7 +428,7 @@ SUBROUTINE phyto_internal_nitrogen(phytos,group,do_N2uptake,phy,IN,primprod,   &
    ELSE
       ! Unknown nitrogen uptake function
       print *,'STOP: unknown simINDynamics (',phytos(group)%simINDynamics,') for: ',phytos(group)%p_name
-      STOP
+      ERROR STOP 1
    ENDIF
 
    ! Allocate a portion of N uptake to N fixation, where relevant:
@@ -341,8 +504,12 @@ FUNCTION phyto_fN(phytos, group, IN, din, don) RESULT(fN)
      IF (PRESENT(don) .AND. phytos(group)%simDONUptake == 1) THEN
        nup = nup + don
      ENDIF
+     ! FIX 2026-08-29: the denominator (nup-N_o+K_N) was unguarded, so when
+     ! N_o-nup > K_N it turned negative and fN came out positive; the existing
+     ! upper clamp below then pinned a starved cell to fN=1.0 (max growth)
+     ! instead of 0. Guard the denominator as phyto_fP (~L533) already does.
      fN = (nup-phytos(group)%N_o) / &
-           (nup-phytos(group)%N_o+phytos(group)%K_N)
+           (phytos(group)%K_N + (MAX(zero_, (nup-phytos(group)%N_o))))
    ELSE
      ! Calculate internal nutrient limitation factor
      fN =   phytos(group)%X_nmax*(1.0-phytos(group)%X_nmin/IN) / &
@@ -405,9 +572,15 @@ FUNCTION phyto_fSi(phytos, group, Si) RESULT(fSi)
    fSi = one_
 
    IF (phytos(group)%simSiUptake == 1) THEN
+     ! FIX 2026-08-29: the denominator (Si-Si_0+K_Si) was unguarded, so when
+     ! Si_0-Si > K_Si it went negative and fSi came out POSITIVE and >1 (or
+     ! infinite at the zero crossing) for a silica-starved cell - i.e. maximum
+     ! growth from no silica. Mirror the guard already used by phyto_fP (~L533)
+     ! and add the missing upper clamp, matching phyto_fN / phyto_fP.
      fSi = (Si-phytos(group)%Si_0) / &
-           (Si-phytos(group)%Si_0+phytos(group)%K_Si)
+           (phytos(group)%K_Si + (MAX(zero_, (Si-phytos(group)%Si_0))))
      IF ( fSi < zero_ ) fSi=zero_
+     IF ( fSi > 1.000 ) fSi=1.000
    ENDIF
 END FUNCTION phyto_fSi
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -596,6 +769,7 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
    AED_REAL,PARAMETER  :: A = 5.0, eps = 0.5
    AED_REAL            :: par_t,par_b,par_c
    AED_REAL            :: z1,z2,x
+   LOGICAL,SAVE        :: warned_lightModel = .FALSE.  ! 2026-08-29 : warn-once
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -687,6 +861,27 @@ FUNCTION photosynthesis_irradiance(lightModel, I_K, I_S, par, extc, Io, dz) RESU
         x = par_t/I_K           ! Uses SURFACE light
         fI = one_ - EXP(-x)
 
+      CASE DEFAULT
+        ! FIX 2026-08-29: there was no CASE DEFAULT. An out-of-range lightModel
+        ! (e.g. a typo, or 8/9 which are not implemented) fell through the
+        ! SELECT leaving fI at its initialised 0.0, so the group had zero light
+        ! limitation forever with no message. Warn once and fall back to the
+        ! CASE(0) Webb et al. (1974) integrated form.
+        IF ( .NOT. warned_lightModel ) THEN
+          PRINT *,'WARNING: unsupported lightModel = ',lightModel, &
+                  ' ; falling back to lightModel=0 (Webb et al. 1974, integrated)'
+          warned_lightModel = .TRUE.
+        ENDIF
+
+        z1 = -par_t / I_K
+        z2 = -par_b / I_K
+
+        z1 = exp_integral(z1)
+        z2 = exp_integral(z2)
+
+        fI = 1.0 + (z2 - z1) / MAX(extc * dz,one_e_neg3)
+
+        IF (par_t < 5e-5 .OR. fI < 5e-5) fI = 0.0        ! A simple check
 
   END SELECT
 
