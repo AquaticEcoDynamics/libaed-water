@@ -72,6 +72,7 @@ MODULE aed_zooplankton
       INTEGER  :: id_Nexctarget,id_Nmorttarget
       INTEGER  :: id_Pexctarget,id_Pmorttarget
       INTEGER  :: id_Cexctarget,id_Cmorttarget
+      INTEGER  :: id_DICtarget = 0   ! respired carbon (dic_target_variable); 0 = not routed
       INTEGER  :: id_DOupttarget
       INTEGER  :: id_tem, id_sal, id_oxy, id_tstep
       INTEGER  :: id_grz,id_resp,id_mort
@@ -322,6 +323,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    CHARACTER(len=64)  :: pp_target_variable='' !particulate phosphorus target variable
    CHARACTER(len=64)  :: dc_target_variable='' !dissolved carbon target variable
    CHARACTER(len=64)  :: pc_target_variable='' !particulate carbon target variable
+   CHARACTER(len=64)  :: dic_target_variable='' !respired carbon target variable (e.g. CAR_dic)
    CHARACTER(len=128) :: dbase='aed_zoop_pars.nml'
 
    LOGICAL  :: simZoopFeedback = .TRUE.
@@ -338,6 +340,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    NAMELIST /aed_zooplankton/ num_zoops, the_zoops, &
                     dn_target_variable, pn_target_variable, dp_target_variable, &
                     pp_target_variable, dc_target_variable, pc_target_variable, &
+                    dic_target_variable, &
                     dbase, simZoopFeedback, diag_level
 !-----------------------------------------------------------------------
 !BEGIN
@@ -389,6 +392,15 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    data%simDPexcr = dp_target_variable .NE. ''
    IF (data%simDPexcr) THEN
      data%id_Pexctarget = aed_locate_variable(dp_target_variable)
+   ENDIF
+   !# Respired carbon not sent to faeces (ffecal_zoo) or DOC (fexcr_zoo) goes to
+   !# dic_target_variable, using oxygen one for one. Without a target it is lost
+   !# (harness known issue K16), so warn.
+   IF (dic_target_variable .NE. '') THEN
+     data%id_DICtarget = aed_locate_variable(dic_target_variable)
+   ELSE
+     print *,'    WARNING: aed_zooplankton: dic_target_variable not set - respired carbon'
+     print *,'             (1 - ffecal_zoo - fexcr_zoo) is lost (set it to e.g. ''CAR_dic'')'
    ENDIF
    data%simDCexcr = dc_target_variable .NE. ''
    IF (data%simDCexcr) THEN
@@ -768,6 +780,14 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
             ENDIF
          ENDDO
 
+
+         ! Respired carbon not routed to faeces or DOC: to DIC, consuming O2 (K16)
+         IF (data%id_DICtarget > 0) THEN
+            _FLUX_VAR_(data%id_DICtarget) = _FLUX_VAR_(data%id_DICtarget) +   &
+                 (one_ - data%zoops(zoop_i)%ffecal_zoo - data%zoops(zoop_i)%fexcr_zoo) * respiration * zoo
+            _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) -               &
+                 (one_ - data%zoops(zoop_i)%ffecal_zoo - data%zoops(zoop_i)%fexcr_zoo) * respiration * zoo
+         ENDIF
 
          ! Now manage excretion contributions to DOM
          IF (data%simDCexcr) THEN
