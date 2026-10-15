@@ -83,6 +83,9 @@ MODULE aed_zoop_utils
    TYPE,extends(zoop_param_t) :: zoop_data_t
       INTEGER  :: id_prey(MAX_ZOOP_PREY)
       INTEGER  :: id_phyIN(MAX_ZOOP_PREY),id_phyIP(MAX_ZOOP_PREY)
+      ! fixed N:C and P:C of phytoplankton prey without internal N / P states
+      ! (simINDynamics / simIPDynamics = 0); used when id_phyIN / id_phyIP = 0
+      AED_REAL :: phy_ncon(MAX_ZOOP_PREY) = 0., phy_pcon(MAX_ZOOP_PREY) = 0.
    END TYPE
 
 CONTAINS

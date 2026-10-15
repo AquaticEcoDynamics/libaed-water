@@ -40,7 +40,7 @@ MODULE aed_core
 
    PUBLIC aed_model_data_t, aed_variable_t, aed_column_t, aed_ptm_t
    PUBLIC aed_init_core, aed_core_status
-   PUBLIC aed_get_var, aed_get_var_idx
+   PUBLIC aed_get_var, aed_get_var_idx, aed_find_variable
    PUBLIC aed_set_current_model, aed_set_prefix
    PUBLIC aed_is_const_var, aed_set_const_var
 

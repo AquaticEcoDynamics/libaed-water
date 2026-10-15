@@ -57,6 +57,7 @@ MODULE aed_zooplankton
    USE aed_core
    USE aed_util
    USE aed_zoop_utils
+   USE aed_phytoplankton, ONLY : aed_phytoplankton_data_t
 
    IMPLICIT NONE
 
@@ -72,7 +73,7 @@ MODULE aed_zooplankton
       INTEGER  :: id_Pexctarget,id_Pmorttarget
       INTEGER  :: id_Cexctarget,id_Cmorttarget
       INTEGER  :: id_DOupttarget
-      INTEGER  :: id_tem, id_sal, id_oxy
+      INTEGER  :: id_tem, id_sal, id_oxy, id_tstep
       INTEGER  :: id_grz,id_resp,id_mort
 
 
@@ -375,11 +376,7 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
           !internal nitrogen and phosphorus
           IF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:_PHYLEN_).EQ. _PHYMOD_) THEN
               phy_i = phy_i + 1
-              data%zoops(zoop_i)%id_phyIN(phy_i) = aed_locate_variable( &
-                                       TRIM(data%zoops(zoop_i)%prey(prey_i)%zoop_prey)//'_IN')
-              data%zoops(zoop_i)%id_phyIP(phy_i) = aed_locate_variable( &
-                                       TRIM(data%zoops(zoop_i)%prey(prey_i)%zoop_prey)//'_IP')
-
+              CALL link_phyto_prey(data%zoops(zoop_i), prey_i, phy_i)
           ENDIF
       ENDDO
    ENDDO
@@ -425,7 +422,64 @@ SUBROUTINE aed_define_zooplankton(data, namlst)
    data%id_tem = aed_locate_global('temperature')
    data%id_sal = aed_locate_global('salinity')
    data%id_oxy = aed_locate_variable('OXY_oxy')
+   data%id_tstep = aed_locate_sheet_global('timestep')   ! grazing caps hold over the real step
 END SUBROUTINE aed_define_zooplankton
+
+
+!###############################################################################
+SUBROUTINE link_phyto_prey(zoop, prey_i, phy_i)
+!-------------------------------------------------------------------------------
+! Link a phytoplankton prey's internal N and P. A group with dynamic internal
+! nutrients has <prey>_IN / <prey>_IP states; a fixed-ratio group (simINDynamics
+! or simIPDynamics = 0) has none, and holds X_ncon / X_pcon per unit carbon, which
+! are read from aed_phytoplankton (it must be configured before aed_zooplankton).
+! Previously the _IN/_IP lookup created undefined variables and the model stopped
+! for fixed-ratio prey (harness known issue K6).
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   TYPE(zoop_data_t),INTENT(inout) :: zoop
+   INTEGER,INTENT(in) :: prey_i, phy_i
+!
+!LOCALS
+   CHARACTER(len=64) :: pname
+   TYPE(aed_variable_t),POINTER :: tvar
+   INTEGER :: i
+   LOGICAL :: found
+!
+!-------------------------------------------------------------------------------
+!BEGIN
+   pname = zoop%prey(prey_i)%zoop_prey
+   zoop%id_phyIN(phy_i) = 0 ; zoop%id_phyIP(phy_i) = 0
+   IF ( aed_find_variable(TRIM(pname)//'_IN') /= 0 ) &
+      zoop%id_phyIN(phy_i) = aed_locate_variable(TRIM(pname)//'_IN')
+   IF ( aed_find_variable(TRIM(pname)//'_IP') /= 0 ) &
+      zoop%id_phyIP(phy_i) = aed_locate_variable(TRIM(pname)//'_IP')
+   IF ( zoop%id_phyIN(phy_i) /= 0 .AND. zoop%id_phyIP(phy_i) /= 0 ) RETURN
+
+   found = .FALSE.
+   IF ( zoop%id_prey(prey_i) /= 0 ) THEN
+      IF ( aed_get_var(zoop%id_prey(prey_i), tvar) ) THEN
+         IF ( ASSOCIATED(tvar%model) ) THEN
+            SELECT TYPE ( phy => tvar%model )
+               TYPE IS ( aed_phytoplankton_data_t )
+                  DO i = 1, SIZE(phy%id_p)
+                     IF ( phy%id_p(i) == zoop%id_prey(prey_i) ) THEN
+                        zoop%phy_ncon(phy_i) = phy%phytos(i)%X_ncon
+                        zoop%phy_pcon(phy_i) = phy%phytos(i)%X_pcon
+                        found = .TRUE.
+                     ENDIF
+                  ENDDO
+            END SELECT
+         ENDIF
+      ENDIF
+   ENDIF
+   IF ( .NOT. found ) THEN
+      print *,'ERROR: aed_zooplankton prey ', TRIM(pname), ' has no internal N or P state'
+      print *,'       and is not a group of aed_phytoplankton configured before aed_zooplankton'
+      STOP
+   ENDIF
+END SUBROUTINE link_phyto_prey
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -452,10 +506,16 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
    AED_REAL           :: grazing_n, grazing_p !Grazing on nutrients
    AED_REAL           :: pon_excr, pop_excr, poc_excr !POM excretion rates
    AED_REAL           :: don_excr, dop_excr, doc_excr, delta_C !DOM excretion rates
+   AED_REAL           :: dtl !step over which the grazing caps must hold (s)
+   AED_REAL           :: C_lim !zooplankton carbon growth the grazed N and P can support
 !
 !-------------------------------------------------------------------------------
 !BEGIN
    pon = 0.0 ; poc = 0.0 ; pop = 0.0  !## CAB [-Wmaybe-uninitialized]
+   !# The grazing caps below are concentrations (prey above Cmin_grz_zoo) while
+   !# food and grazing_prey are rates (per second): divide the caps by the step,
+   !# or a scarce prey is grazed straight through zero within one step (K7).
+   dtl = MAX(one_, _STATE_VAR_S_(data%id_tstep))
 
    ! Retrieve current environmental conditions.
    temp = _STATE_VAR_(data%id_tem)      ! local temperature
@@ -520,8 +580,8 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
       IF (Ctotal_prey < data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
          food = zero_
          grazing = food / zoo
-      ELSEIF (food > Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
-         food = Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo
+      ELSEIF (food * dtl > Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo ) THEN
+         food = (Ctotal_prey - data%zoops(zoop_i)%num_prey * data%zoops(zoop_i)%Cmin_grz_zoo) / dtl
          grazing = food / zoo
       ENDIF
 
@@ -540,12 +600,12 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
           DO prey_j = prey_i,data%zoops(zoop_i)%num_prey
              pref_factor = pref_factor + data%zoops(zoop_i)%prey(prey_j)%Pzoo_prey
           ENDDO
-          IF (food * data%zoops(zoop_i)%prey(prey_i)%Pzoo_prey / pref_factor <= &
+          IF (food * data%zoops(zoop_i)%prey(prey_i)%Pzoo_prey / pref_factor * dtl <= &
                         prey(prey_i) - data%zoops(zoop_i)%Cmin_grz_zoo) THEN
              !Take fraction of left over food based on preference factor
              grazing_prey(prey_i) = food * data%zoops(zoop_i)%prey(prey_i)%Pzoo_prey / pref_factor
           ELSEIF (prey(prey_i) > data%zoops(zoop_i)%Cmin_grz_zoo) THEN
-             grazing_prey(prey_i) = prey(prey_i) - data%zoops(zoop_i)%Cmin_grz_zoo
+             grazing_prey(prey_i) = (prey(prey_i) - data%zoops(zoop_i)%Cmin_grz_zoo) / dtl
           ELSE
              grazing_prey(prey_i) = zero_
           ENDIF
@@ -575,8 +635,17 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
             ENDIF
          ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:_PHYLEN_).EQ. _PHYMOD_) THEN
             phy_i = phy_i + 1
-            phy_INcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i))
-            phy_IPcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i))
+            !# fixed-ratio prey (no _IN / _IP state): internal N, P = prey C x X_ncon, X_pcon (K6)
+            IF (data%zoops(zoop_i)%id_phyIN(phy_i) > 0) THEN
+               phy_INcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i))
+            ELSE
+               phy_INcon(phy_i) = prey(prey_i) * data%zoops(zoop_i)%phy_ncon(phy_i)
+            ENDIF
+            IF (data%zoops(zoop_i)%id_phyIP(phy_i) > 0) THEN
+               phy_IPcon(phy_i) = _STATE_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i))
+            ELSE
+               phy_IPcon(phy_i) = prey(prey_i) * data%zoops(zoop_i)%phy_pcon(phy_i)
+            ENDIF
             ! FIX 2026-08-29: the /14.0 and /31.0 were mass-to-mole conversions,
             ! but <phy>_IN / <phy>_IP are registered in aed_phytoplankton.F90 as
             ! 'mmol N/m3' and 'mmol P/m3' already (see ~L428 and ~L451). The
@@ -639,34 +708,21 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
       don_excr = grazing_n - pon_excr - delta_C * data%zoops(zoop_i)%INC_zoo
       dop_excr = grazing_p - pop_excr - delta_C * data%zoops(zoop_i)%IPC_zoo
 
-      !If nutrients are limiting then must excrete doc to maintain balance
-      IF ((don_excr < zero_) .AND. (dop_excr < zero_)) THEN
-         !Determine which nutrient is more limiting
-         IF ((data%zoops(zoop_i)%INC_zoo * (grazing_n - pon_excr) - delta_C) .GT. &
-            (data%zoops(zoop_i)%IPC_zoo * (grazing_p - pop_excr) - delta_C)) THEN
-             don_excr = zero_
-             doc_excr =  (grazing_n - pon_excr) / data%zoops(zoop_i)%INC_zoo - delta_C
-             delta_C = delta_C - doc_excr
-             dop_excr = grazing_p - pop_excr - delta_C*data%zoops(zoop_i)%IPC_zoo
-         ELSE
-             dop_excr = zero_
-             doc_excr = (grazing_p - pop_excr) / data%zoops(zoop_i)%IPC_zoo - delta_C
-             delta_C = delta_C - doc_excr
-             don_excr = grazing_n - pon_excr - delta_C*data%zoops(zoop_i)%INC_zoo
-         ENDIF
-      ELSEIF (don_excr < zero_) THEN !nitrogen limited
-         don_excr = zero_
-         doc_excr = (grazing_n - pon_excr) / data%zoops(zoop_i)%INC_zoo - delta_C
-         delta_C = delta_C - doc_excr
-         dop_excr = grazing_p - pop_excr - delta_C*data%zoops(zoop_i)%IPC_zoo
-      ELSEIF (dop_excr < zero_) THEN !phosphorus limited
-         dop_excr = zero_
-         doc_excr = (grazing_p - pop_excr) / data%zoops(zoop_i)%IPC_zoo - delta_C
-         delta_C = delta_C - doc_excr
-         don_excr = grazing_n - pon_excr - delta_C*data%zoops(zoop_i)%INC_zoo
-      ELSE !just excrete nutrients no need to balance c
-          doc_excr = zero_
-      ENDIF
+      !# If N or P cannot support the carbon growth delta_C at the fixed body
+      !# ratios INC_zoo / IPC_zoo, growth is limited to what the scarcer nutrient
+      !# supports and the surplus carbon is excreted as DOC. The previous code had
+      !# doc_excr with the wrong sign (growth became 2*delta_C - C_lim, gaining N
+      !# or P from nothing) and chose the limiting nutrient by comparing
+      !# INC*(N) - delta_C with IPC*(P) - delta_C, mixing units (K7, K91).
+      C_lim = delta_C
+      IF (data%zoops(zoop_i)%INC_zoo > zero_) &
+         C_lim = MIN(C_lim, (grazing_n - pon_excr) / data%zoops(zoop_i)%INC_zoo)
+      IF (data%zoops(zoop_i)%IPC_zoo > zero_) &
+         C_lim = MIN(C_lim, (grazing_p - pop_excr) / data%zoops(zoop_i)%IPC_zoo)
+      doc_excr = delta_C - C_lim          ! >= 0
+      delta_C  = C_lim
+      don_excr = grazing_n - pon_excr - delta_C * data%zoops(zoop_i)%INC_zoo   ! >= 0
+      dop_excr = grazing_p - pop_excr - delta_C * data%zoops(zoop_i)%IPC_zoo   ! >= 0
 
       !write(*,"(4X,'limitations (f_T,f_Salinity): ',2F8.2)")f_T,f_Salinity
       !write(*,"(4X,'sources/sinks (grazing,respiration,mortaility): ',3F8.2)")grazing,excretion,mortality
@@ -700,9 +756,12 @@ SUBROUTINE aed_calculate_zooplankton(data,column,layer_idx)
                ENDIF
             ELSEIF (data%zoops(zoop_i)%prey(prey_i)%zoop_prey(1:_PHYLEN_).EQ. _PHYMOD_) THEN
                phy_i = phy_i + 1
+               !# a fixed-ratio prey's N and P leave with its carbon (no separate state)
+               IF (data%zoops(zoop_i)%id_phyIN(phy_i) > 0) &
                _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) =                      &
                       _FLUX_VAR_(data%zoops(zoop_i)%id_phyIN(phy_i)) +               &
                       ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_INcon(phy_i))
+               IF (data%zoops(zoop_i)%id_phyIP(phy_i) > 0) &
                _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) =                      &
                       _FLUX_VAR_(data%zoops(zoop_i)%id_phyIP(phy_i)) +               &
                        ( -1.0 * grazing_prey(prey_i) / prey(prey_i) * phy_IPcon(phy_i))
