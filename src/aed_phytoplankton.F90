@@ -651,6 +651,23 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
                                                 minimum=0.001)
    ENDIF
 
+   ! Settled phytoplankton: what the host's settling deposits on the bed goes to
+   ! the organic-matter sediment pools, if they exist (K20). C to sed_poc; N and P
+   ! from the internal stores, or C x the fixed N:C and P:C ratios.
+   DO i = 1, data%num_phytos
+      CALL aed_define_deposition_name(data%id_p(i), 'OGM_sed_poc')
+      IF ( data%id_in(i) > 0 ) THEN
+         CALL aed_define_deposition_name(data%id_in(i), 'OGM_sed_pon')
+      ELSE
+         CALL aed_define_deposition_name(data%id_p(i), 'OGM_sed_pon', data%phytos(i)%X_ncon)
+      ENDIF
+      IF ( data%id_ip(i) > 0 ) THEN
+         CALL aed_define_deposition_name(data%id_ip(i), 'OGM_sed_pop')
+      ELSE
+         CALL aed_define_deposition_name(data%id_p(i), 'OGM_sed_pop', data%phytos(i)%X_pcon)
+      ENDIF
+   ENDDO
+
    ! Register link to nutrient pools, if variable links are provided in namelist
    data%do_Pexc = p_excretion_target_variable .NE. ''
    IF (data%do_Pexc) THEN

@@ -53,6 +53,9 @@ MODULE aed_core
    PUBLIC aed_locate_global,           aed_locate_sheet_global
 
    PUBLIC host_has_cell_vel
+   PUBLIC aed_define_deposition, aed_define_deposition_name
+   PUBLIC aed_n_deposition_routes, aed_get_deposition_route
+   PUBLIC aed_set_host_deposition, aed_host_deposition
    PUBLIC aed_set_timestep, aed_get_timestep
    PUBLIC zero_, one_, nan_, misval_, secs_per_day
    PUBLIC aed_ptm_dt_days
@@ -181,6 +184,20 @@ MODULE aed_core
    CLASS(aed_model_data_t), POINTER :: current_model => null()
 
    LOGICAL :: host_has_cell_vel = .false.
+
+   !# Deposition routes (K19, K20). A module declares that the mass of a water
+   !# state variable that the host's settling deposits on the bed goes to a
+   !# benthic (sheet) state variable, times a scale (e.g. phytoplankton C x N:C
+   !# into a sediment N pool). A host that delivers deposition says so with
+   !# aed_set_host_deposition(.TRUE.); modules then must not add their own
+   !# estimate of it.
+   TYPE aed_dep_route_t
+      INTEGER  :: src = 0, tgt = 0
+      AED_REAL :: scale = 1.
+   END TYPE aed_dep_route_t
+   TYPE(aed_dep_route_t),DIMENSION(:),ALLOCATABLE :: dep_routes
+   INTEGER :: n_dep_routes = 0
+   LOGICAL :: host_deposition = .FALSE.
 
    !# Host timestep (seconds) and substep split factor, set by the API once the
    !# host has handed over its environment. Not available during define.
@@ -1413,5 +1430,85 @@ SUBROUTINE aed_delete(data)
 END SUBROUTINE aed_delete
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+
+!###############################################################################
+SUBROUTINE aed_define_deposition(src, tgt, scale)
+!-------------------------------------------------------------------------------
+! The mass of water variable src that settles onto the bed goes to benthic
+! variable tgt (both AED variable ids), times scale (default 1).
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in) :: src, tgt
+   AED_REAL,INTENT(in),OPTIONAL :: scale
+!
+!LOCALS
+   TYPE(aed_dep_route_t),DIMENSION(:),ALLOCATABLE :: tmp
+!-------------------------------------------------------------------------------
+!BEGIN
+   IF ( src <= 0 .OR. tgt <= 0 ) RETURN
+   IF ( .NOT. ALLOCATED(dep_routes) ) ALLOCATE(dep_routes(16))
+   IF ( n_dep_routes == SIZE(dep_routes) ) THEN
+      ALLOCATE(tmp(2*SIZE(dep_routes))) ; tmp(1:n_dep_routes) = dep_routes(1:n_dep_routes)
+      CALL MOVE_ALLOC(tmp, dep_routes)
+   ENDIF
+   n_dep_routes = n_dep_routes + 1
+   dep_routes(n_dep_routes)%src = src
+   dep_routes(n_dep_routes)%tgt = tgt
+   dep_routes(n_dep_routes)%scale = one_
+   IF ( PRESENT(scale) ) dep_routes(n_dep_routes)%scale = scale
+END SUBROUTINE aed_define_deposition
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_define_deposition_name(src, tgt_name, scale)
+!-------------------------------------------------------------------------------
+! As aed_define_deposition, with the target given by name; no route is made if
+! no such variable has been defined (e.g. the sediment pools are switched off).
+!-------------------------------------------------------------------------------
+!ARGUMENTS
+   INTEGER,INTENT(in) :: src
+   CHARACTER(*),INTENT(in) :: tgt_name
+   AED_REAL,INTENT(in),OPTIONAL :: scale
+!-------------------------------------------------------------------------------
+!BEGIN
+   CALL aed_define_deposition(src, aed_find_variable(tgt_name), scale)
+END SUBROUTINE aed_define_deposition_name
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+INTEGER FUNCTION aed_n_deposition_routes()
+   aed_n_deposition_routes = n_dep_routes
+END FUNCTION aed_n_deposition_routes
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_get_deposition_route(i, src, tgt, scale)
+!ARGUMENTS
+   INTEGER,INTENT(in)   :: i
+   INTEGER,INTENT(out)  :: src, tgt
+   AED_REAL,INTENT(out) :: scale
+!BEGIN
+   src = dep_routes(i)%src ; tgt = dep_routes(i)%tgt ; scale = dep_routes(i)%scale
+END SUBROUTINE aed_get_deposition_route
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_set_host_deposition(on)
+   LOGICAL,INTENT(in) :: on
+   host_deposition = on
+END SUBROUTINE aed_set_host_deposition
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+LOGICAL FUNCTION aed_host_deposition()
+   aed_host_deposition = host_deposition
+END FUNCTION aed_host_deposition
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 END MODULE aed_core

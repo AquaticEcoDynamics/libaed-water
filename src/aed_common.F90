@@ -78,6 +78,7 @@ MODULE aed_common
    PUBLIC aed_init_core, aed_core_status, aed_get_var
    PUBLIC aed_provide_global, aed_provide_sheet_global, aed_thread, aed_n_threads
    PUBLIC aed_set_timestep, aed_get_timestep
+   PUBLIC aed_n_deposition_routes, aed_get_deposition_route, aed_set_host_deposition
    PUBLIC V_STATE, V_DIAGNOSTIC, V_EXTERNAL, V_PARTICLE
 
    !#---------------------------------------------------------------------------

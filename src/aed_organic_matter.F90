@@ -492,6 +492,17 @@ SUBROUTINE aed_define_organic_matter(data, namlst)
                                                   'sediment pop mass',         &
                                                   initial_sedom,               &
                                                   minimum=-1e10)
+
+     !# What the host's settling deposits on the bed goes to these pools (K19).
+     !# Used only by hosts that deliver deposition (aed_host_deposition()).
+     CALL aed_define_deposition(data%id_poc, data%id_sed_poc)
+     CALL aed_define_deposition(data%id_pon, data%id_sed_pon)
+     CALL aed_define_deposition(data%id_pop, data%id_sed_pop)
+     IF ( data%id_cpom > 0 ) THEN
+        CALL aed_define_deposition(data%id_cpom, data%id_sed_poc)
+        CALL aed_define_deposition(data%id_cpom, data%id_sed_pon, data%X_cpom_n)
+        CALL aed_define_deposition(data%id_cpom, data%id_sed_pop, data%X_cpom_p)
+     ENDIF
    ENDIF
 
    ! Register external (linked) state variable dependencies
@@ -1250,6 +1261,12 @@ SUBROUTINE aed_calculate_benthic_organic_matter(data,column,layer_idx)
    ! Set source & sink terms for the sediment pools (change per surface area per second)
    ! Note that this includes fluxes to and from the pelagic.
    IF( data%simSedimentOM>0 ) THEN
+      !# A host that delivers deposition credits the pools with what its settling
+      !# actually removed (aed_define_deposition above); the Psed estimate is then
+      !# not added as well (K19).
+      IF ( aed_host_deposition() ) THEN
+         Psed_poc = zero_ ; Psed_pon = zero_ ; Psed_pop = zero_
+      ENDIF
       _FLUX_VAR_B_(data%id_sed_poc) = _FLUX_VAR_B_(data%id_sed_poc) -(Fsed_poc + Psed_poc)
       _FLUX_VAR_B_(data%id_sed_pon) = _FLUX_VAR_B_(data%id_sed_pon) -(Fsed_pon + Psed_pon)
       _FLUX_VAR_B_(data%id_sed_pop) = _FLUX_VAR_B_(data%id_sed_pop) -(Fsed_pop + Psed_pop)
