@@ -82,7 +82,7 @@ MODULE aed_phyto_abm
       INTEGER,DIMENSION(:),ALLOCATABLE :: id_phyc, id_phyn, id_phyp, id_chl, id_mtopt, id_vtopt, &
                  id_mcdiv, id_vcdiv, id_mlnalpha, id_vlnalpha, &
                  id_cov_ta, id_cov_tl, id_cov_al, id_N_birth,  &
-                 id_N_mutate, id_NPPc, id_cells,      &
+                 id_N_mutate, id_NPPc, id_cells, id_N_fix, &
                  id_N_death
       ! id_IPAR stays a single scalar: it is accumulated daily integrated layer PAR
       ! (an environmental forcing), not a per-species phyto response quantity.
@@ -843,6 +843,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    ALLOCATE(data%id_cum_death_prob(data%num_phytos))
    ALLOCATE(data%id_cum_cells_decayed(data%num_phytos))
    ALLOCATE(data%id_NPPc(data%num_phytos))
+   ALLOCATE(data%id_N_fix(data%num_phytos))
    ALLOCATE(data%id_cells(data%num_phytos))
    ALLOCATE(data%id_d_nit(data%num_phytos))
    ALLOCATE(data%id_d_amm(data%num_phytos))
@@ -923,6 +924,7 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
       ! Additional diagnostics from PIBM Geider_Lag.F90
       ! Includes diagnostic outputs for fluxes to and from layers
       data%id_NPPc(grp_i) = aed_define_diag_variable(TRIM(data%phytos(grp_i)%p_name)//'_NPPc', '(mg C m-3 d-1)', 'C-based phytoplankton production')
+      data%id_N_fix(grp_i) = aed_define_diag_variable(TRIM(data%phytos(grp_i)%p_name)//'_N_fix', 'mmol N/m3/day', 'N fixed from N2 by particles in a layer (0 unless simNFixation)')
       data%id_cells(grp_i) = aed_define_diag_variable(TRIM(data%phytos(grp_i)%p_name)//'_id_cells', 'number', 'cells/m3')
       data%id_d_nit(grp_i) = aed_define_diag_variable(TRIM(data%phytos(grp_i)%p_name)//'_id_d_nit', 'mmol N/m3/day', 'daily flux of NO3 due to particles in a layer')
       data%id_d_amm(grp_i) = aed_define_diag_variable(TRIM(data%phytos(grp_i)%p_name)//'_id_d_amm', 'mmol N/m3/day', 'daily flux of NH4 due to particles in a layer')
@@ -2103,8 +2105,9 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
       !# same factor as the nitrogen that limits them, keeping C:N:Chl coherent.
       !#
       !# An N-fixer's dN is NOT backed by dNO3+dNH4 - GMK98_Ind_TempSizeLight sets
-      !# both to exactly 0 for a fixer (fixation doesn't draw on the DIN pool), so
-      !# the dNO3+dNH4)/dN ratio below would evaluate to 0/positive = 0 and silently
+      !# dNO3 = 0 and dNH4 = -(N respired) <= 0 for a fixer (fixation doesn't draw on
+      !# the DIN pool; respired N returns to it as ammonium), so
+      !# the (dNO3+dNH4)/dN ratio below would evaluate to <= 0 and silently
       !# zero out that particle's carbon AND chlorophyll gain on every productive
       !# step, while leaving losses untouched (they don't hit the `> 0d0` guards).
       !# That is a DIN-rationing mechanism misapplied to nitrogen that was never
@@ -2376,6 +2379,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   DO ng=1,data%num_phytos
      _DIAG_VAR_(data%id_d_nit(ng)) = (pp_ND + RES_NO3 - uptake_NO3(ng))  * secs_per_day    ! mmol/m3/day
      _DIAG_VAR_(data%id_d_amm(ng)) = (pp_ND + RES_NH4 - uptake_NH4(ng))  * secs_per_day    ! mmol/m3/day
+     !# cell N gained that was not taken from NO3 + NH4: fixation (0 for non-fixers, whose dN is reconciled to dNO3 + dNH4)
+     _DIAG_VAR_(data%id_N_fix(ng)) = (uptake(ng) - uptake_NO3(ng) - uptake_NH4(ng)) * secs_per_day ! mmol/m3/day
      _DIAG_VAR_(data%id_d_frp(ng)) = (pp_PD + RES_P - uptake_P(ng))  * secs_per_day    ! mmol/m3/day
      _DIAG_VAR_(data%id_d_pon(ng)) = Pmort(ng) + (pp_DZ - pp_ND) * secs_per_day ! mmol/m3/day
      _DIAG_VAR_(data%id_d_pop(ng)) = Pmort_P(ng) + (pp_DZP - pp_PD) * secs_per_day ! mmol/m3/day
@@ -2606,6 +2611,7 @@ SUBROUTINE aed_calculate_column_phyto_abm(data,column,layer_map)
          _DIAG_VAR_(data%id_cum_death_prob(ng))     = zero_
          _DIAG_VAR_(data%id_cum_cells_decayed(ng))  = zero_
          _DIAG_VAR_(data%id_NPPc(ng))               = zero_
+         _DIAG_VAR_(data%id_N_fix(ng))              = zero_
          _DIAG_VAR_(data%id_cells(ng))              = zero_
          _DIAG_VAR_(data%id_d_nit(ng))              = zero_
          _DIAG_VAR_(data%id_d_amm(ng))              = zero_

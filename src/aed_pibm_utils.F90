@@ -676,7 +676,11 @@ dN = N * (VCN/QN - RNT)
 
 !ML add phyto_pN function call here
 if (simNFixation /= 0) then
-  dNH4 = 0.0
+  !N fixer: the gain N*VCN/QN is fixed from N2 and takes nothing from the water,
+  !but the N respired, N*RNT, is returned to the water as ammonium (negative
+  !uptake). Without it a fixer whose respiration exceeds fixation (at night)
+  !loses N that goes nowhere, destroying N (harness known issue K25).
+  dNH4 = -N * RNT
   dNO3 = 0.0
 else
   pN_ = phyto_pN(NH4, NO3, KN)
