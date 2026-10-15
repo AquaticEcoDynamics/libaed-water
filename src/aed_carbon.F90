@@ -384,7 +384,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
                             'mmol C/m2/d', 'CH4 exchange across atm/water interface', surf=.TRUE.)
          IF ( data%simCH4ebb ) THEN
             data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m3/d', &
-                            'CH4 ebullition release rate', zavg = .TRUE.)
+                            'CH4 ebullition release rate', zavg = .TRUE., bflux = .TRUE.)
             data%id_ch4_ebb_df = aed_define_diag_variable('ch4_ebb_dis','mmol C/m3/d', &
                             'CH4 bubble dissolution rate', zavg= .TRUE.)
             data%id_sed_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_dsf','mmol C/m2/d', &

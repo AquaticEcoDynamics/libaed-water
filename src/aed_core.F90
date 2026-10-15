@@ -128,6 +128,10 @@ MODULE aed_core
       LOGICAL           :: top, bot
       LOGICAL           :: const
       LOGICAL           :: zavg, zavg_req
+      !# bflux: a layer diagnostic set as a benthic flux per m2 divided by the
+      !# layer height (e.g. OXY_oxy_dsfv). With sediment zones the host rebuilds
+      !# it from the zone fluxes with its own bed/volume geometry (K88).
+      LOGICAL           :: bflux = .FALSE.
       INTEGER           :: particle_link
       INTEGER           :: index
       LOGICAL           :: rezero
@@ -690,6 +694,7 @@ FUNCTION aed_create_variable(name, longname, units, place) RESULT(ret)
       all_vars(ret)%found = .false.
       all_vars(ret)%zavg = .false.
       all_vars(ret)%zavg_req = .false.
+      all_vars(ret)%bflux = .false.
       all_vars(ret)%top = .false.
       all_vars(ret)%bot = .false.
       all_vars(ret)%particle_link = 0
@@ -764,11 +769,12 @@ END FUNCTION aed_define_sheet_variable
 
 
 !###############################################################################
-FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(ret)
+FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero, bflux) RESULT(ret)
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    CHARACTER(*),INTENT(in) :: name, longname, units
    LOGICAL,INTENT(in),OPTIONAL :: zavg
+   LOGICAL,INTENT(in),OPTIONAL :: bflux  !# benthic flux / layer height (see aed_variable_t)
    LOGICAL,INTENT(in),OPTIONAL :: rezero !By default, diagnostics get zeroed each timestep,
    										 !use this flag to not rezero
 !
@@ -799,6 +805,9 @@ FUNCTION aed_define_diag_variable(name, units, longname, zavg, rezero) RESULT(re
    ELSE
       all_vars(ret)%rezero = .TRUE.
    ENDIF
+
+   all_vars(ret)%bflux = .FALSE.
+   IF ( PRESENT(bflux) ) all_vars(ret)%bflux = bflux
 END FUNCTION aed_define_diag_variable
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
