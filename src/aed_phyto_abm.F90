@@ -102,6 +102,8 @@ MODULE aed_phyto_abm
       INTEGER,DIMENSION(:),ALLOCATABLE :: id_d_oxy, id_d_nit, id_d_amm, id_d_pon, id_d_frp, id_d_pop, id_d_poc
       INTEGER :: id_d_dc, id_d_dn, id_d_dp
       INTEGER :: id_oxy,id_amm,id_nit,id_frp,id_doc,id_don,id_dop,id_poc,id_pon,id_pop
+      ! carbon source for particle growth (c_uptake_target_variable, e.g. CAR_dic); 0 = none
+      INTEGER :: id_cupt = 0
       INTEGER :: id_lht, id_larea, id_dep, id_tem, id_par, id_I0, id_dens, id_yday, id_depth
       INTEGER :: id_lvol
       INTEGER :: id_timestep   ! host step length (seconds): declared on master, missing on v3.0.1
@@ -949,6 +951,15 @@ SUBROUTINE aed_define_phyto_abm(data, namlst)
    data%id_poc = aed_locate_variable('OGM_poc')
    data%id_pon = aed_locate_variable('OGM_pon')
    data%id_pop = aed_locate_variable('OGM_pop')
+   !# Carbon fixed by the particles is taken from (and respired carbon returned to)
+   !# c_uptake_target_variable, as in aed_phytoplankton. It used to be read and
+   !# ignored, so particle carbon came from nothing (harness known issue K21).
+   IF (c_uptake_target_variable .NE. '') THEN
+      data%id_cupt = aed_locate_variable(c_uptake_target_variable)
+   ELSE
+      print *,'    WARNING: aed_phyto_abm: c_uptake_target_variable not set - particle carbon'
+      print *,'             is fixed from nothing (set it to e.g. ''CAR_dic'' to take it from DIC)'
+   ENDIF
 
    ! Environment variables
    data%id_depth = aed_locate_global('depth')
@@ -2375,6 +2386,8 @@ SUBROUTINE aed_particle_bgc_phyto_abm( data,column,layer_idx,ppid,p )
   _FLUX_VAR_(data%id_pop) = _FLUX_VAR_(data%id_pop)  + SUM(Pmort_P) + (pp_DZP - pp_PD) ! mmol/m3/s CHECK pp_DZP and pp_PD are zooplankton variables
   _FLUX_VAR_(data%id_poc) = _FLUX_VAR_(data%id_poc)  + SUM(Pmort_C)  ! mmol/m3/s CHECK would need to add equivalent zoop variables here if added zoops in
   _FLUX_VAR_(data%id_oxy) = _FLUX_VAR_(data%id_oxy) + SUM(oxy_flux)  ! mmol/m3/s CHECK would need to add equivalent zoop variables here if added zoops in
+  !# oxy_flux is the particles' net carbon change (sum dC x num): the same amount leaves the carbon source
+  IF (data%id_cupt > 0) _FLUX_VAR_(data%id_cupt) = _FLUX_VAR_(data%id_cupt) - SUM(oxy_flux)  ! mmol C/m3/s
 
   DO ng=1,data%num_phytos
      _DIAG_VAR_(data%id_d_nit(ng)) = (pp_ND + RES_NO3 - uptake_NO3(ng))  * secs_per_day    ! mmol/m3/day
