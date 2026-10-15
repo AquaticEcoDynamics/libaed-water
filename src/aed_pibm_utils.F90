@@ -703,8 +703,31 @@ module mGf90
 implicit none
 
 private
-public srand_mtGaus
+public srand_mtGaus, gasdev_get_state, gasdev_set_state
+
+!Polar Box-Muller makes Gaussian variates in pairs; gasdev returns one and keeps
+!the other for the next call. Kept at module level so a model restart can save
+!and restore it along with the intrinsic RNG state (gasdev_get/set_state).
+real, save    :: GSET = 0
+integer, save :: ISET = 0
+
 contains
+
+subroutine gasdev_get_state(iset_out, gset_out)
+implicit none
+integer,          intent(out) :: iset_out
+double precision, intent(out) :: gset_out
+iset_out = ISET
+gset_out = dble(GSET)
+end subroutine gasdev_get_state
+
+subroutine gasdev_set_state(iset_in, gset_in)
+implicit none
+integer,          intent(in) :: iset_in
+double precision, intent(in) :: gset_in
+ISET = iset_in
+GSET = real(gset_in, kind(GSET))
+end subroutine gasdev_set_state
 
 real function srand_mtGaus(N, mean, cvm) result(y)
 implicit none
@@ -738,8 +761,6 @@ real function gasdev() result(gval)
 !This function generates an array of independent Gaussian variates
 implicit none
 real :: FAC, R, V1, V2, X
-real, save :: GSET
-integer, save :: ISET = 0
 
 IF (ISET.EQ.0) THEN
    R = 99
