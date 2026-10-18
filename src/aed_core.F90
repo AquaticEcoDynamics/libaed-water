@@ -87,6 +87,7 @@ MODULE aed_core
          procedure :: calculate_column   => aed_calculate_column
          procedure :: calculate_riparian => aed_calculate_riparian
          procedure :: calculate_dry      => aed_calculate_dry
+         procedure :: calculate_domain   => aed_calculate_domain
          procedure :: equilibrate        => aed_equilibrate
          procedure :: light_extinction   => aed_light_extinction
          procedure :: rain_loss          => aed_rain_loss
@@ -1218,6 +1219,19 @@ SUBROUTINE aed_calculate_dry(data, column, layer_idx)
 !-------------------------------------------------------------------------------
 !print*,"Default aed_calculate_dry ", TRIM(data%aed_model_name)
 END SUBROUTINE aed_calculate_dry
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_calculate_domain(data)
+!-------------------------------------------------------------------------------
+! Called once per host step, after every column has been processed. For modules
+! that work on the whole domain at once (e.g. a coupled groundwater model).
+!-------------------------------------------------------------------------------
+   CLASS (aed_model_data_t),INTENT(inout) :: data
+!-------------------------------------------------------------------------------
+!print*,"Default aed_calculate_domain ", TRIM(data%aed_model_name)
+END SUBROUTINE aed_calculate_domain
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
