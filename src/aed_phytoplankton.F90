@@ -71,6 +71,9 @@ MODULE aed_phytoplankton
       INTEGER,ALLOCATABLE :: id_rho(:)
       INTEGER,ALLOCATABLE :: id_NtoP(:)
       INTEGER,ALLOCATABLE :: id_vvel(:)
+      !# Photon-weighted PAR diagnostic, one per group. Diagnostic only - not read by growth.
+      INTEGER,ALLOCATABLE :: id_par_q(:)
+      INTEGER :: spectral_iop(MAX_PHYTO_TYPES) = 0
       INTEGER,ALLOCATABLE :: id_fT(:), id_fI(:), id_fNit(:), &
                              id_fPho(:), id_fSil(:), id_fSal(:)
 
@@ -127,6 +130,11 @@ MODULE aed_phytoplankton
                                               ! 2 = flux rates, and supporitng
                                               ! 3 = other metrics
                                               !10 = all debug & checking outputs
+
+   !# Cached OAS_afac_iop<n> diagnostic ids, resolved once by aed_phyto_cache_afac_q.
+   !# Module-scope SAVE because aed_calculate_phytoplankton takes `data` as INTENT(in).
+   INTEGER, SAVE :: eul_id_afac(MAX_PHYTO_TYPES) = 0
+   LOGICAL, SAVE :: eul_afac_ready = .FALSE.
 
 !===============================================================================
 CONTAINS
@@ -275,7 +283,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
            print*,"nml format parameter file is deprecated. Please update to CSV format"
            pd%p_name = ''
            open(NEWUNIT=tfil,file=dbase, status='OLD',iostat=status)
-           IF (status /= 0) STOP 'Cannot open phyto_data namelist file'
+           IF (status /= 0) ERROR STOP 'Cannot open phyto_data namelist file'
            read(tfil,nml=phyto_data,iostat=status)
            close(tfil)
            DO i=1,MAX_PHYTO_TYPES
@@ -285,9 +293,12 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        CASE DEFAULT
            print *,'Unknown file type "',TRIM(dbase),'"'; status=1
     END SELECT
-    IF (status /= 0) STOP 'Error reading namelist phyto_data'
+    IF (status /= 0) ERROR STOP 'Error reading namelist phyto_data'
 
     data%num_phytos = 0
+    !# Idempotent define: AED can enter model configuration more than once, and an
+    !# unguarded ALLOCATE aborts with "already allocated". Same fix as aed_phyto_abm.
+    IF (ALLOCATED(data%phytos)) DEALLOCATE(data%phytos)
     ALLOCATE(data%phytos(count))
     ALLOCATE(data%id_p(count)) ; data%id_p(:) = 0
     ALLOCATE(data%id_in(count)) ; data%id_in(:) = 0
@@ -297,6 +308,7 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
     IF ( diag_level >= 10 ) THEN
        ALLOCATE(data%id_fT(count)) ; data%id_fT(:) = 0
        ALLOCATE(data%id_fI(count)) ; data%id_fI(:) = 0
+       ALLOCATE(data%id_par_q(count)) ; data%id_par_q(:) = 0
        ALLOCATE(data%id_fNit(count)) ; data%id_fNit(:) = 0
        ALLOCATE(data%id_fPho(count)) ; data%id_fPho(:) = 0
        ALLOCATE(data%id_fSil(count)) ; data%id_fSil(:) = 0
@@ -460,6 +472,11 @@ SUBROUTINE aed_phytoplankton_load_params(data, dbase, count, list, settling, res
        IF ( diag_level >= 10 ) THEN
           ! Growth controls
           data%id_fI(i)   = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fI'  , '-', 'fI (0-1)')
+          !# What this group would see if light were weighted by its own absorption spectrum
+          !# rather than taken as a flat broadband scalar. par_q/par is exactly the error the
+          !# broadband assumption makes for this organism at this depth and time.
+          data%id_par_q(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_par_q', &
+                             'W/m2', 'PAR weighted by this group spectral absorption (diagnostic only)')
           data%id_fNit(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fNit', '-', 'fNit (0-1)')
           data%id_fPho(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fPho', '-', 'fPho (0-1)')
           data%id_fSil(i) = aed_define_diag_variable( TRIM(data%phytos(i)%p_name)//'_fSil', '-', 'fSil (0-1)')
@@ -574,6 +591,11 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
 !                                             !10 = all debug & checking outputs
 !  %% END NAMELIST
 
+   !# Map each phytoplankton group to an OASIM IOP so its light can be weighted by that
+   !# group's own a*(lambda). Same convention as &aed_phyto_abm's spectral_iop: the value is
+   !# the 1-based POSITION in &aed_oasim's iop_link list. 0 = no spectral weighting.
+   INTEGER  :: spectral_iop(MAX_PHYTO_TYPES) = 0
+
    NAMELIST /aed_phytoplankton/ num_phytos, the_phytos, settling, resuspension,&
                     p_excretion_target_variable,p_mortality_target_variable,   &
                      p1_uptake_target_variable, p2_uptake_target_variable,     &
@@ -588,14 +610,14 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
                     do_mpb, R_mpbg, R_mpbr, I_Kmpb, mpb_max, min_rho, max_rho, &
                     resus_link, n_zones, active_zones, diag_level,             &
                     theta_mpb_growth,theta_mpb_resp,                           &
-                    phyto_particle_link, R_mpbb
+                    phyto_particle_link, R_mpbb, spectral_iop
 !-----------------------------------------------------------------------
 !BEGIN
    print *,"        aed_phytoplankton configuration"
 
    ! Read the main aed namelist, and set module level parameters
    read(namlst,nml=aed_phytoplankton,iostat=status)
-   IF (status /= 0) STOP 'Error reading namelist for &aed_phytoplankton'
+   IF (status /= 0) ERROR STOP 'Error reading namelist for &aed_phytoplankton'
    dtlim = zerolimitfudgefactor
    IF( extra_debug ) extra_diag = .true.       ! legacy use of extra_debug
    IF ( extra_diag ) diag_level = 10
@@ -793,8 +815,37 @@ SUBROUTINE aed_define_phytoplankton(data, namlst)
    data%id_dz      = aed_locate_global('layer_ht')
    data%id_dens    = aed_locate_global('density')
    data%id_par     = aed_locate_global('par')
+   data%spectral_iop(:) = spectral_iop(:)
 
 END SUBROUTINE aed_define_phytoplankton
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+!###############################################################################
+SUBROUTINE aed_phyto_cache_afac_q(data)
+!------------------------------------------------------------------------------+
+! Resolve OAS_afac_iop<n> once per run.
+!
+! aed_find_variable is a linear scan over every registered AED variable (~600 here), and the
+! caller runs per group per layer per timestep, so this must happen exactly once. The cache is
+! module-level SAVE rather than a member of `data` because aed_calculate_phytoplankton takes
+! data as INTENT(in) and cannot write to it.
+!------------------------------------------------------------------------------+
+   CLASS (aed_phytoplankton_data_t),INTENT(in) :: data
+   INTEGER :: i
+   CHARACTER(len=32) :: vname
+!BEGIN
+   DO i = 1, MAX_PHYTO_TYPES
+      eul_id_afac(i) = 0
+      IF ( data%spectral_iop(i) > 0 ) THEN
+         WRITE(vname,'("OAS_afac_iop",I0)') data%spectral_iop(i)
+         !# aed_locate_variable (public) returns the index of a pelagic diagnostic just as aed_find_variable
+         !# does; it only filters external and sheet variables, which OAS_afac_iopN is not.
+         eul_id_afac(i) = aed_locate_variable(TRIM(vname))
+      ENDIF
+   ENDDO
+   eul_afac_ready = .TRUE.
+END SUBROUTINE aed_phyto_cache_afac_q
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -1034,6 +1085,21 @@ SUBROUTINE aed_calculate_phytoplankton(data,column,layer_idx)
          ! Growth controls
          _DIAG_VAR_(data%id_fT(phy_i))   =  fT
          _DIAG_VAR_(data%id_fI(phy_i))   =  fI
+         !# Photon-weighted PAR for this group. afac is dimensionless and exactly 1.0 for a flat
+         !# spectrum, so par_q == par whenever the local spectrum carries no preference.
+         IF ( data%id_par_q(phy_i) > 0 ) THEN
+            IF ( .NOT. eul_afac_ready ) CALL aed_phyto_cache_afac_q(data)
+            !# aed_find_variable returns an index into the GLOBAL all_vars registry, but
+            !# _DIAG_VAR_(id) is column(id)%cell(layer_idx) and `column` is only as wide as the
+            !# host chose to pass. Indexing it with a global id can run off the end, and the
+            !# neighbours are this group's own fNit/fPho/fSil - which is exactly what moved.
+            IF ( eul_id_afac(phy_i) > 0 .AND. eul_id_afac(phy_i) <= SIZE(column) ) THEN
+               _DIAG_VAR_(data%id_par_q(phy_i)) = par * &
+                     MIN(5d0, MAX(0.05d0, _DIAG_VAR_(eul_id_afac(phy_i))))
+            ELSE
+               _DIAG_VAR_(data%id_par_q(phy_i)) = par
+            ENDIF
+         ENDIF
          _DIAG_VAR_(data%id_fNit(phy_i)) =  fNit
          _DIAG_VAR_(data%id_fPho(phy_i)) =  fPho
          _DIAG_VAR_(data%id_fSil(phy_i)) =  fSil
