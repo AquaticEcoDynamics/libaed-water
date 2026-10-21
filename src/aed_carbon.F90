@@ -70,20 +70,18 @@ MODULE aed_carbon
    TYPE,extends(aed_model_data_t) :: aed_carbon_data_t
       !# Variable identifiers
       INTEGER  :: id_dic, id_pH, id_ch4, id_oxy, id_talk, id_ch4_bub
-      INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_ch4_ebb, id_Fstm_ch4
-      INTEGER  :: id_Fsed_dic_dry, id_Fsed_ch4_dry, id_Fsed_ch4_ebb_dry
+      INTEGER  :: id_Fsed_dic, id_Fsed_ch4, id_Fsed_ch4_ebb
       INTEGER  :: id_temp, id_salt
-      INTEGER  :: id_wind, id_windr, id_vel, id_depth
-      INTEGER  :: id_par, id_extc, id_dz, id_tau, id_atemp
+      INTEGER  :: id_wind, id_vel, id_depth
+      INTEGER  :: id_par, id_extc, id_dz, id_tau
       INTEGER  :: id_ch4ox, id_pco2
       INTEGER  :: id_sed_dic, id_sed_ch4, id_sed_ch4_ebb, id_sed_ch4_ebb_3d
       INTEGER  :: id_atm_co2, id_atm_ch4, id_atm_ch4_ebb, id_ch4_ebb_df
-      INTEGER  :: id_stm_ch4, id_stw_ch4, id_stm_areaa, id_stm_areab, id_drytime
 
       !# Model options
-      LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4, use_sed_model_ebb, use_stm_model_ch4
-      LOGICAL  :: simDIC, simCH4, simCH4ebb, simExposed, simStemCH4
-      INTEGER  :: alk_mode, co2_model, ebb_model, dry_model, stem_model
+      LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4, use_sed_model_ebb
+      LOGICAL  :: simDIC, simCH4, simCH4ebb
+      INTEGER  :: alk_mode, co2_model, ebb_model
       INTEGER  :: co2_piston_model, ch4_piston_model
 
       !# Model parameters
@@ -95,22 +93,17 @@ MODULE aed_carbon
       AED_REAL :: ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp
       AED_REAL :: ch4_bub_tau0, ch4_bub_ws
       AED_REAL :: maxMPBProdn, IkMPB
-      AED_REAL :: Fsed_dic_dry, Fsed_ch4_dry, Fsed_ch4_ebb_dry, theta_sed_dry
-      AED_REAL :: Fstm_ch4, theta_stm_ch4
 
      CONTAINS
          PROCEDURE :: define             => aed_define_carbon
          PROCEDURE :: calculate          => aed_calculate_carbon
          PROCEDURE :: calculate_surface  => aed_calculate_surface_carbon
          PROCEDURE :: calculate_benthic  => aed_calculate_benthic_carbon
-         PROCEDURE :: calculate_riparian => aed_calculate_riparian_carbon
-         PROCEDURE :: calculate_dry      => aed_calculate_dry_carbon
          PROCEDURE :: equilibrate        => aed_equilibrate_carbon
 
    END TYPE
 
 ! MODULE GLOBALS
-   AED_REAL, PARAMETER :: DDT = 0.25/24.      ! Currently assuming 15 min timestep
    INTEGER  :: diag_level = 10                ! 0 = no diagnostic outputs
                                              !     except diagnostics required by
                                              !     state calculations/coupling
@@ -180,14 +173,12 @@ SUBROUTINE aed_define_carbon(data, namlst)
    AED_REAL          :: ch4_bub_tau0     = one_
    AED_REAL          :: maxMPBProdn      =  40.0   ! mmolC/m2/day
    AED_REAL          :: IkMPB            = 180.0   ! Light sensitivity of MPB
+   CHARACTER(len=64) :: wind_variable=''           ! e.g. 'VEG_Ug'; default is wind_speed
 
+   ! Moved to aed_intertidal_bgc (libaed-riparian); read only to stop old configs
    LOGICAL           :: simExposed       = .false.
    INTEGER           :: dry_model        = 0
    AED_REAL          :: theta_sed_dry    = one_
-   AED_REAL          :: Fsed_dic_dry     = zero_
-   AED_REAL          :: Fsed_ch4_dry     = zero_
-   AED_REAL          :: Fsed_ch4_ebb_dry = zero_
-
    LOGICAL           :: simStemCH4       = .false.
    INTEGER           :: stem_model       = 0
    AED_REAL          :: theta_stm_ch4    = one_
@@ -218,10 +209,10 @@ SUBROUTINE aed_define_carbon(data, namlst)
                          ch4_bub_aLL,ch4_bub_cLL, ch4_bub_kLL,                 &
                          ch4_bub_disf1, ch4_bub_disf2, ch4_bub_disdp,          &
                          ch4_bub_ws, ch4_bub_tau0,                             &
-                         maxMPBProdn, IkMPB,                                   &
+                         maxMPBProdn, IkMPB, wind_variable, diag_level,        &
                          simExposed,dry_model,theta_sed_dry,                   &
                          simStemCH4,stem_model,theta_stm_ch4,Fstm_ch4,         &
-                         vegetation_stem_density,diag_level,Fstm_ch4_variable
+                         vegetation_stem_density,Fstm_ch4_variable
 
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -231,8 +222,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%simDIC        = .false.
    data%simCH4        = .false.
    data%simCH4ebb     = .false.
-   data%simExposed    = .false.
-   data%simStemCH4    = .false.
 
    !# Read the namelist options
    read(namlst,nml=aed_carbon,iostat=status)
@@ -241,10 +230,15 @@ SUBROUTINE aed_define_carbon(data, namlst)
       STOP
    ENDIF
 
+   IF (simExposed .OR. dry_model>0 .OR. simStemCH4 .OR. stem_model>0) THEN
+      print *,'aed_carbon: exposed-sediment and stem CH4 fluxes have moved to'
+      print *,'  &aed_intertidal_bgc (libaed-riparian); remove simExposed, dry_model,'
+      print *,'  simStemCH4 and stem_model from &aed_carbon'
+      STOP
+   ENDIF
+
    !# Update configuration flags after options read in
    IF (ebb_model>0)  data%simCH4ebb = .true.
-   IF (dry_model>0)  data%simExposed = .true.     ! MH in wrong location?
-   IF (stem_model>0) data%simStemCH4 = .true.
 
    !# Store parameter values in modules own derived type
    !  Note: rates are provided in values per day, and
@@ -280,18 +274,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%maxMPBProdn      = maxMPBProdn   !unused
    data%IkMPB            = IkMPB         !unused
 
-   data%dry_model        = dry_model
-   data%simExposed       = simExposed
-   data%theta_sed_dry    = theta_sed_dry
-   data%Fsed_dic_dry     = Fsed_dic_dry/secs_per_day
-   data%Fsed_ch4_dry     = Fsed_ch4_dry/secs_per_day
-   data%Fsed_ch4_ebb_dry = Fsed_ch4_ebb_dry/secs_per_day
-
-   data%stem_model       = stem_model
-   data%simStemCH4       = simStemCH4
-   data%theta_stm_ch4    = theta_stm_ch4
-   data%Fstm_ch4         = Fstm_ch4/secs_per_day
-
    !# Register state variables
    IF (dic_initial>MISVAL) THEN
       data%simDIC = .true.
@@ -311,7 +293,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
       ENDIF
    ENDIF
 
-   data%id_drytime        = 0
    data%id_sed_dic        = 0
    data%id_atm_co2        = 0
    data%id_ch4ox          = 0
@@ -321,8 +302,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%id_ch4_ebb_df     = 0
    data%id_sed_ch4_ebb    = 0
    data%id_atm_ch4_ebb    = 0
-   data%id_stm_ch4        = 0
-   data%id_stw_ch4        = 0
 
    !# Register external variable dependencies
    data%use_oxy = methane_reactant_variable .NE. '' !i.e., oxygen module engaged
@@ -340,30 +319,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%use_sed_model_ebb = Fsed_ebb_variable .NE. ''
    IF (data%use_sed_model_ebb) &
       data%id_Fsed_ch4_ebb = aed_locate_sheet_variable(Fsed_ebb_variable)
-
-   IF (data%use_sed_model_dic .and. simExposed ) &
-      data%id_Fsed_dic_dry = aed_locate_sheet_variable( TRIM(Fsed_dic_variable)//'_dry' )
-
-   IF (data%use_sed_model_ch4 .and. simExposed ) &
-      data%id_Fsed_ch4_dry = aed_locate_sheet_variable( TRIM(Fsed_ch4_variable)//'_dry' )
-
-   IF (data%use_sed_model_ebb .and. simExposed ) &
-      data%id_Fsed_ch4_ebb_dry = aed_locate_sheet_variable( TRIM(Fsed_ebb_variable)//'_dry' )
-
-   IF (data%stem_model==2 .and. simStemCH4 ) THEN
-      data%id_stm_areaa = aed_locate_sheet_variable( TRIM(vegetation_stem_density)//'_above')
-      data%id_stm_areab = aed_locate_sheet_variable( TRIM(vegetation_stem_density)//'_below')
-      data%id_windr = aed_locate_sheet_variable('VEG_Ug')
-
-      data%use_stm_model_ch4 = Fstm_ch4_variable .NE. ''
-      IF (data%use_stm_model_ch4) &
-         data%id_Fstm_ch4 = aed_locate_sheet_variable(Fstm_ch4_variable)
-   ENDIF
-
-   IF( simExposed ) THEN
-      !data%id_wettime = aed_define_sheet_diag_variable('wettime','d','time cell has been innundated')
-      data%id_drytime = aed_define_sheet_diag_variable('drytime','d','time cell has been exposed', rezero=.FALSE.)
-   ENDIF
 
    !# Register diagnostic variables
    data%id_pco2 = 0
@@ -392,12 +347,6 @@ SUBROUTINE aed_define_carbon(data, namlst)
             data%id_atm_ch4_ebb = aed_define_sheet_diag_variable('ch4_ebb_atm', &
                             'mmol C/m2/d', 'CH4 ebullition across atm/water interface', surf=.TRUE.)
          ENDIF
-         IF( data%simStemCH4 ) THEN
-            data%id_stm_ch4 = aed_define_sheet_diag_variable('ch4_stm','mmol C/m2/d', &
-                              'CH4 release from vegetation to atmosphere') ! surf=.TRUE.??
-            data%id_stw_ch4 = aed_define_sheet_diag_variable('ch4_stw','mmol C/m2/d', &
-                              'CH4 release from vegetation to water') ! surf=.TRUE.??
-         ENDIF
       ENDIF
    ENDIF
 
@@ -411,9 +360,12 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%id_depth= aed_locate_sheet_global('col_depth')
 !   data%id_depth= aed_locate_global('depth')
 !  data%id_depth= aed_locate_global('layer_ht')
-   data%id_wind = aed_locate_sheet_global('wind_speed')
+   IF (wind_variable .NE. '') THEN
+      data%id_wind = aed_locate_sheet_variable(wind_variable)
+   ELSE
+      data%id_wind = aed_locate_sheet_global('wind_speed')
+   ENDIF
    IF( data%simCH4ebb ) data%id_tau  = aed_locate_sheet_global('taub')
-   IF( data%simExposed ) data%id_atemp =  aed_locate_sheet_global('air_temp')
 END SUBROUTINE aed_define_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -510,8 +462,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    !----------------------------------------------------------------------------
    !# Get dependent state variables from physical driver
    windHt = 10.
-   wind   = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m above surface (m/s)
-   IF( data%stem_model==2 .and. data%simStemCH4) wind   = _STATE_VAR_S_(data%id_windr) ! Reduced wind impacted by vegetation
+   wind   = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m (or wind_variable, e.g. reduced by vegetation) (m/s)
    temp   = _STATE_VAR_(data%id_temp)   ! Temperature (degrees Celsius)
    salt   = _STATE_VAR_(data%id_salt)   ! Salinity (psu)
    depth  = MAX( _STATE_VAR_S_(data%id_depth), one_ )
@@ -843,156 +794,6 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    ! Note that this must include the fluxes to and from the pelagic.
    !_FLUX_VAR_B_(data%id_ben_dic) = _FLUX_VAR_B_(data%id_ben_dic) + (-dic_flux/secs_per_day)
 END SUBROUTINE aed_calculate_benthic_carbon
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-SUBROUTINE aed_calculate_dry_carbon(data,column,layer_idx)
-!-------------------------------------------------------------------------------
-! Atmospheric component of the AED implementation of the OASIM model
-! Note DRY cells only refer to 2D (sheet) variables
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CLASS (aed_carbon_data_t),INTENT(in) :: data
-   TYPE (aed_column_t),INTENT(inout) :: column(:)
-   INTEGER,INTENT(in) :: layer_idx
-!
-!LOCALS
-   AED_REAL :: Fsed_ch4, Fsed_ch4_ebb, ch4_flux, ebb_flux
-   AED_REAL :: Fsed_dic, co2_flux
-   AED_REAL :: temp, wind, dry, fU, fDry
-!
-!-------------------------------------------------------------------------------
-!BEGIN
-   IF (.NOT. data%simExposed ) RETURN
-
-   ! Set column time/location and environmenal properties
-   temp = _STATE_VAR_S_(data%id_atemp)  ! local air temperature
-   dry  = _DIAG_VAR_S_(data%id_drytime) ! how long has cell been dry
-   wind   = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m above surface (m/s)
-   IF( data%stem_model==2 .and. data%simStemCH4) wind   = _STATE_VAR_S_(data%id_windr) ! Reduced wind impacted by vegetation
-
-   !# CO2 exposed-sediment to air flux
-   IF(data%simDIC) THEN
-
-      IF ( data%use_sed_model_dic ) THEN
-         Fsed_dic = _DIAG_VAR_S_(data%id_Fsed_dic_dry) / secs_per_day
-      ELSE
-         Fsed_dic = data%Fsed_dic_dry
-      ENDIF
-
-      co2_flux = Fsed_dic * (data%theta_sed_dry**(temp-20.0))
-
-      ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
-      IF (data%id_sed_dic>0) _DIAG_VAR_S_(data%id_sed_dic) = co2_flux * secs_per_day
-
-      !# Store CO2 flux across the soil-atm interface into
-      !  diagnostic variable (mmmol/m2/d)
-      IF (data%id_atm_co2>0) _DIAG_VAR_S_(data%id_atm_co2) = co2_flux * secs_per_day
-   ENDIF
-
-   !# CH4 exposed-sediment to air flux
-   IF(data%simCH4) THEN
-      IF ( data%use_sed_model_ch4 ) THEN
-         Fsed_ch4 = _DIAG_VAR_S_(data%id_Fsed_ch4_dry) / secs_per_day
-         IF( data%simCH4ebb ) Fsed_ch4_ebb = _DIAG_VAR_S_(data%id_Fsed_ch4_ebb_dry) / secs_per_day
-      ELSE
-         Fsed_ch4 = data%Fsed_ch4_dry
-         IF( data%simCH4ebb ) Fsed_ch4_ebb = data%Fsed_ch4_ebb_dry
-      ENDIF
-
-      fU = wind/(wind+2.0)
-      fDry = 2.0/(dry+2.0)
-      ch4_flux = Fsed_ch4 * (data%theta_sed_dry**(temp-20.0)) * fU * fDry
-      IF( data%simCH4ebb ) THEN
-           ebb_flux = Fsed_ch4_ebb * (data%theta_sed_dry**(temp-20.0))
-      ENDIF
-
-      ! Store sediment-air flux as diagnostic variable (flux per surface area, per day)
-      IF (data%id_sed_ch4>0) _DIAG_VAR_S_(data%id_sed_ch4) = ch4_flux * secs_per_day
-      IF (data%simCH4ebb .and. data%id_sed_ch4_ebb>0) _DIAG_VAR_S_(data%id_sed_ch4_ebb) = ebb_flux * secs_per_day
-
-      !# Store CH4 flux across the soil-atm interface into
-      !  diagnostic variable (mmmol/m2/d)
-      !print *,'CHECKKKK', data%use_sed_model_ch4 , ch4_flux * secs_per_day
-
-      IF (data%id_atm_ch4>0) _DIAG_VAR_S_(data%id_atm_ch4) = ch4_flux * secs_per_day
-      IF (data%simCH4ebb .and. data%id_atm_ch4_ebb>0) _DIAG_VAR_S_(data%id_atm_ch4_ebb) = ebb_flux * secs_per_day
-   END IF
-END SUBROUTINE aed_calculate_dry_carbon
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-!###############################################################################
-SUBROUTINE aed_calculate_riparian_carbon(data, column, layer_idx, pc_wet)
-!-------------------------------------------------------------------------------
-! Flux calculations for riparian elements of carbon flxues (eg vegetation)
-!-------------------------------------------------------------------------------
-!ARGUMENTS
-   CLASS (aed_carbon_data_t),INTENT(in)    :: data
-   TYPE (aed_column_t),      INTENT(inout) :: column(:)
-   INTEGER,                  INTENT(in)    :: layer_idx
-   AED_REAL,                 INTENT(in)    :: pc_wet
-!
-!LOCALS
-   AED_REAL :: atemp,wtemp,water_depth
-   AED_REAL :: Fstm_ch4,stm_flux
-
-!-------------------------------------------------------------------------------
-!BEGIN
-   IF ( data%simExposed ) THEN
-      ! Inundation time counter and wetness checker
-      IF( pc_wet < 0.1 ) THEN
-         _DIAG_VAR_S_(data%id_drytime) = _DIAG_VAR_S_(data%id_drytime) + DDT
-         !IF( _DIAG_VAR_S_(data%id_drytime)>2. ) _DIAG_VAR_S_(data%id_wettime) = zero_
-      ELSE
-         !_DIAG_VAR_S_(data%id_wettime) = _DIAG_VAR_S_(data%id_wettime) + DDT
-         !IF( _DIAG_VAR_S_(data%id_wettime)>2. )_DIAG_VAR_S_(data%id_drytime) = zero_
-         _DIAG_VAR_S_(data%id_drytime) = zero_
-      ENDIF
-
-      ! Set column time/location and environmenal properties
-      atemp = _STATE_VAR_S_(data%id_atemp) ! local air temperature
-   ELSE
-      atemp = zero_
-   ENDIF
-
-   IF (.NOT. data%simStemCH4 ) RETURN
-
-   IF ( data%stem_model==2 .and. data%use_stm_model_ch4 ) THEN
-      Fstm_ch4 = _DIAG_VAR_S_(data%id_Fstm_ch4) / secs_per_day
-   ELSE
-      Fstm_ch4 = data%Fstm_ch4
-   ENDIF
-
-   ! Compute flux from stem area above water
-   stm_flux = zero_
-   IF( data%stem_model == 1 ) THEN
-     stm_flux = Fstm_ch4 * (data%theta_stm_ch4**(atemp-20.0))
-   ELSEIF ( data%stem_model == 2 ) THEN
-     stm_flux = _DIAG_VAR_S_(data%id_stm_areaa) * Fstm_ch4
-     stm_flux = stm_flux * (data%theta_stm_ch4**(atemp-20.0))
-   ENDIF
-    IF (data%id_stm_ch4>0) _DIAG_VAR_S_(data%id_stm_ch4) = stm_flux * secs_per_day
-
-
-   IF (pc_wet<0.1) RETURN
-
-   ! Compute flux from stem area below water (biofilms)
-   water_depth = _STATE_VAR_S_(data%id_depth) ! local water depth
-   wtemp = _STATE_VAR_(data%id_temp)          ! local water temperature
-
-   stm_flux = zero_
-   IF( data%stem_model == 1 ) THEN
-     stm_flux = Fstm_ch4 * (data%theta_stm_ch4**(wtemp-20.0))
-   ELSEIF ( data%stem_model == 2 ) THEN
-     stm_flux = _DIAG_VAR_S_(data%id_stm_areab) * Fstm_ch4
-     stm_flux = stm_flux * (data%theta_stm_ch4**(wtemp-20.0))
-   ENDIF
-
-   _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (stm_flux / water_depth)
-   IF (data%id_stw_ch4>0) _DIAG_VAR_S_(data%id_stw_ch4) = stm_flux * secs_per_day
-END SUBROUTINE aed_calculate_riparian_carbon
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
