@@ -51,12 +51,18 @@ incdir=include
 ifeq ($(F90),)
   F90=gfortran
 endif
+## 2026-07: left commented on purpose. GLM/Makefile DOES promote MDEBUG to DEBUG;
+## libaed does not. Uncommenting would change what a default debug build emits, so
+## it is only noted here. See the ifeq ($(MDEBUG),true) block further down.
 #ifeq ($(MDEBUG),true)
 #  DEBUG=true
 #endif
 
 #INCLUDES+=-I${incdir}
-MDBG_FFLAGS=""
+## 2026-07 fix: was MDBG_FFLAGS="" -- make passes the two literal quote characters
+## through as an empty shell argument, and ifort/flang then error with
+## "no such file or directory: ''". A bare assignment is genuinely empty.
+MDBG_FFLAGS=
 
 ifeq ($(OSTYPE),Darwin)
   SHARED=-dynamiclib -undefined dynamic_lookup
@@ -122,9 +128,14 @@ else
   FFLAGS+=-Wno-missing-include-dirs
   ifeq ($(WITH_CHECKS),true)
     FFLAGS+=-fcheck=all
-  else
-    FFLAGS+=-fno-range-check -Wno-integer-division
   endif
+  # 2026-08-23: -fno-range-check was inside the `else` above, so WITH_CHECKS=true removed it and
+  # the tree stopped compiling at aed_core.F90:217, `nan_ = zero_ / zero_` — a deliberate
+  # compile-time 0/0 that gfortran rejects without this flag. The two settings are unrelated
+  # (verified: `gfortran -fcheck=all -fno-range-check` accepts it), so the flag is unconditional
+  # now. Before this, WITH_CHECKS=true could not build at all, which is why no bounds-checked run
+  # had ever been made.
+  FFLAGS+=-fno-range-check -Wno-integer-division
   FFLAGS+=-fdefault-real-8 -fdefault-double-8
 endif
 FFLAGS+=$(DEFINES) $(INCLUDES)
@@ -153,7 +164,20 @@ else
   FFLAGS+=$(OPT_FFLAGS)
 endif
 
-ifeq ($MDEBUG),true)
+## 2026-07 fix: this was written "ifeq ($MDEBUG),true)" - "$M" expanded to nothing
+## and the parens were unbalanced, so the condition never matched and MDBG_FFLAGS
+## has never been applied to ANY AED Fortran source. Corrected to proper syntax.
+##
+## NOTE: on the MinGW-w64 toolchain used for the Windows build (gcc 16.1.0) there
+## are NO sanitizer runtimes shipped - linking with -fsanitize=address fails with
+## "cannot find -lasan". So MDEBUG=true is only useful on a Linux build. Now that
+## the conditional actually works, setting MDEBUG=true on Windows will break the
+## link rather than being silently ignored as before.
+##
+## See also the commented-out "MDEBUG implies DEBUG" promotion near the top of this
+## file (GLM/Makefile does have it). It is left commented deliberately - enabling it
+## would change what a default debug build produces.
+ifeq ($(MDEBUG),true)
   FFLAGS+=$(MDBG_FFLAGS)
 endif
 
