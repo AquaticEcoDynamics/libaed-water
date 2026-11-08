@@ -323,6 +323,9 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
    !---------------------------------------------------------------------------+
    ! Register external state variable dependencies
+   ! id_oxy and id_ph are tested (> 0) in calculate whether or not linked:
+   ! give them a defined value first
+   data%id_oxy = 0 ; data%id_ph = 0
    data%use_oxy = nitrif_reactant_variable .NE. '' !Check for link to OXY module
    IF (data%use_oxy) data%id_oxy = aed_locate_variable(nitrif_reactant_variable)
    data%use_ph = nitrif_ph_variable .NE. ''        !Check for link to CAR module

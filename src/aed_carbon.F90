@@ -387,9 +387,8 @@ SUBROUTINE aed_calculate_carbon(data,column,layer_idx)
 !-------------------------------------------------------------------------------
 !BEGIN
 
-   IF(data%simDIC .AND. data%simCH4) THEN
+   IF(data%simCH4) THEN    ! CH4 oxidation runs without DIC; the product only goes to DIC if simulated
       ! Retrieve current (local) state variable values.
-      dic = _STATE_VAR_(data%id_dic)    ! DIC
       ch4 = _STATE_VAR_(data%id_ch4)    ! CH4
 
       !# Retrieve current dependent state variable values.
@@ -406,7 +405,7 @@ SUBROUTINE aed_calculate_carbon(data,column,layer_idx)
       ch4oxidation = aed_carbon_fch4ox(data%use_oxy,data%Rch4ox,data%Kch4ox,data%vTch4ox,oxy,temp)
 
       !# Set temporal derivatives
-      _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (ch4*ch4oxidation)
+      IF (data%simDIC) _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (ch4*ch4oxidation)
       _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (-ch4*ch4oxidation)
 
       !# If a linked oxygen pool is present, take oxidation from it assume 1:1 stoichometry
@@ -703,7 +702,7 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    ebb_flux = zero_
    Fsed_ch4_ebb = zero_
 
-   IF(.NOT.data%simDIC) RETURN
+   IF(.NOT.data%simDIC .AND. .NOT.data%simCH4) RETURN   ! sediment CH4 flux also runs without DIC
 
    ! Retrieve current environmental conditions for the bottom pelagic layer.
    temp = _STATE_VAR_(data%id_temp) ! local temperature
@@ -713,13 +712,15 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
    extc = _STATE_VAR_(data%id_extc) ! local extinction
 
     ! Retrieve current (local) state variable values.
-   dic  = _STATE_VAR_(data%id_dic) ! carbon
-   pH   = _STATE_VAR_(data%id_pH)  ! pH
-
-   IF ( data%use_sed_model_dic ) THEN
-      Fsed_dic = _STATE_VAR_S_(data%id_Fsed_dic) / secs_per_day
-   ELSE
-      Fsed_dic = data%Fsed_dic
+   Fsed_dic = zero_
+   IF (data%simDIC) THEN
+      dic  = _STATE_VAR_(data%id_dic) ! carbon
+      pH   = _STATE_VAR_(data%id_pH)  ! pH
+      IF ( data%use_sed_model_dic ) THEN
+         Fsed_dic = _STATE_VAR_S_(data%id_Fsed_dic) / secs_per_day
+      ELSE
+         Fsed_dic = data%Fsed_dic
+      ENDIF
    ENDIF
    IF ( data%use_sed_model_ch4 ) THEN
       Fsed_ch4 = _STATE_VAR_S_(data%id_Fsed_ch4) / secs_per_day
@@ -760,7 +761,7 @@ SUBROUTINE aed_calculate_benthic_carbon(data,column,layer_idx)
 
    ! Set bottom fluxes for the pelagic (flux per surface area, per second)
    ! Increment sediment flux value into derivative of water column variable
-   _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
+   IF( data%simDIC ) _FLUX_VAR_(data%id_dic) = _FLUX_VAR_(data%id_dic) + (dic_flux)
    IF( data%simCH4 ) _FLUX_VAR_(data%id_ch4) = _FLUX_VAR_(data%id_ch4) + (ch4_flux)
 
    ! Store dissolved sediment fluxes as diagnostic variables (flux per surface area, per day)
