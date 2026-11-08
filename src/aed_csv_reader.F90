@@ -358,8 +358,10 @@ LOGICAL FUNCTION next_symbol(aedr, sym)
       sym%sym(j:j)=aedr%buf(i:i)
       j=j+1
    ENDDO
-   IF ( sym%sym(1) == ',' .AND. sym%length == 1 ) THEN
-      sym%length=0
+   ! nested: Fortran .AND. does not short-circuit, and sym%sym(1) is out of
+   ! bounds for an empty field (e.g. '' in a CSV), which has length 0
+   IF ( sym%length == 1 ) THEN
+      IF ( sym%sym(1) == ',' ) sym%length=0
    ENDIF
 
    IF (quot .NE. CNUL) e1=e1+1
