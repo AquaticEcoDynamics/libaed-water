@@ -47,7 +47,10 @@ MODULE aed_util
 !
    PUBLIC aed_real2str, aed_int2str, qsort, exp_integral
    PUBLIC water_viscosity
-   PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat
+   PUBLIC aed_gas_piston_velocity, aed_oxygen_sat, aed_n2o_sat, MAX_PISTON
+
+   !# longest list of piston models averaged by aed_gas_piston_velocity (namelist arrays)
+   INTEGER,PARAMETER :: MAX_PISTON = 5
    PUBLIC aed_bio_temp_function,fTemp_function, fSal_function
    PUBLIC PO4AdsorptionFraction, in_zone_set
    PUBLIC InitialTemp, SoilTemp
@@ -372,9 +375,17 @@ END FUNCTION water_viscosity
 
 !###############################################################################
 PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
-                                   epsilon,kin_vsc,LA,schmidt_model,piston_model)
+                                   epsilon,kin_vsc,LA,schmidt_model,piston_model, &
+                                   piston_models)
 !-------------------------------------------------------------------------------
 ! Atmospheric-surface water exchange piston velocity for O2, CO2, N2O, CH4 etc
+!
+! piston_models: optional list of piston models; the velocity is the mean over the
+! entries > 0 (e.g. 4, 7, 11 = the mean of the three mangrove-estuary k600 laws of
+! Ho 2016, Rosentreter 2017 and Jeffrey 2018). If given with any entry > 0 it
+! replaces piston_model.
+! Current-based laws (4, 6, 7, 8, 11) take the current speed vel in m/s and convert
+! it to cm/s, the unit of the published fits; depth in m.
 !-------------------------------------------------------------------------------
 !ARGUMENTS
    AED_REAL,INTENT(IN)           :: wshgt,wind
@@ -383,14 +394,17 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    AED_REAL,INTENT(IN),OPTIONAL  :: epsilon,kin_vsc
    AED_REAL,INTENT(IN),OPTIONAL  :: LA
    INTEGER, INTENT(IN),OPTIONAL  :: schmidt_model, piston_model
+   INTEGER, INTENT(IN),OPTIONAL  :: piston_models(:)
 !
 !LOCALS
    ! Temporary variables
-   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,a,x,c,windsp,vel_l
-   INTEGER  :: schmidt_model_l,piston_model_l
+   AED_REAL :: schmidt,k_wind,k_flow,temp,salt,hgtCorrx,windsp,vel_l,vel_cm,dep_l
+   AED_REAL :: sc_sea,sc_fresh
+   INTEGER  :: schmidt_model_l,i,n_used
    LOGICAL  :: have_la
    ! Parameters
    AED_REAL,PARAMETER :: roughlength = 0.000114  ! momn roughness length (m)
+   AED_REAL,PARAMETER :: min_depth = 0.01        ! m, keeps depth^-0.5 finite in films
 !
 !-------------------------------------------------------------------------------
 !BEGIN
@@ -400,10 +414,11 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    ! Decide on models to apply
    schmidt_model_l = 2 ! default
    IF (PRESENT(schmidt_model)) schmidt_model_l = schmidt_model
-   piston_model_l  = 1 ! default
-   IF (PRESENT(piston_model)) piston_model_l = piston_model
    vel_l = zero_
-   IF (PRESENT(vel)) vel_l = vel
+   IF (PRESENT(vel)) vel_l = ABS(vel)
+   vel_cm = 100.0 * vel_l
+   dep_l = min_depth
+   IF (PRESENT(depth)) dep_l = MAX(depth, min_depth)
 
    ! These parameterizations assume 10m windspeed, and must be scaled by hgtCorrx
    ! Adjust the windspeed if the sensor height is not 10m
@@ -412,7 +427,6 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
 
    !-----------------------------------------------
    ! Compute k_wind
- ! IF (PRESENT(LA) .AND. LA > 0.0) THEN
    have_la = .false.
    IF (PRESENT(LA)) have_la= (LA > 0.0)
    IF (have_la) THEN
@@ -457,67 +471,42 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
       CASE (6)
          ! N2O from Sturm et al. 2014 (ex Wanninkhof, 1992)
          schmidt = 2055.6 - (137.11*temp) + (4.3173*temp*temp) - (0.054350*temp*temp*temp)
+      CASE (7:10)
+         ! Wanninkhof 2014 (Table 1), seawater (35) and freshwater fits blended linearly by salinity:
+         ! 7 = CH4, 8 = N2O, 9 = O2, 10 = CO2
+         SELECT CASE (schmidt_model_l)
+         CASE (7)
+            sc_sea   = sc_poly(2101.2, -131.54, 4.4931, -0.08676,  0.00070663)
+            sc_fresh = sc_poly(1909.4, -120.78, 4.1555, -0.080578, 0.00065777)
+         CASE (8)
+            sc_sea   = sc_poly(2356.2, -166.38, 6.3952, -0.13422,  0.0011506)
+            sc_fresh = sc_poly(2141.2, -152.56, 5.8963, -0.12411,  0.0010655)
+         CASE (9)
+            sc_sea   = sc_poly(1920.4, -135.6,  5.2122, -0.10939,  0.00093777)
+            sc_fresh = sc_poly(1745.1, -124.34, 4.8055, -0.10115,  0.00086842)
+         CASE DEFAULT
+            sc_sea   = sc_poly(2116.8, -136.25, 4.7353, -0.092307, 0.0007555)
+            sc_fresh = sc_poly(1923.6, -125.06, 4.3773, -0.085681, 0.00070284)
+         END SELECT
+         schmidt = sc_fresh + MIN(salt, 35.0)/35.0 * (sc_sea - sc_fresh)
       END SELECT
 
-
-      ! Gas transfer velocity (cm/hr)
-      SELECT CASE (piston_model_l)
-      CASE (1)
-        ! k = a u^2 (Sc/660)^-x : Wanninkhof 1992
-        a = 0.31
-        x = 0.50
-        IF( windsp <3.) x = 0.66
-        k_wind = a * (windsp**2) * (schmidt/660.0)**(-x)
-      CASE (2)
-        ! k = a u^2 (Sc/660)^-x : Wanninkhof 2014
-        a = 0.251
-        x = 0.50
-        k_wind = a * (windsp**2) * (schmidt/660.0)**(-x)
-      CASE (3)
-        ! k = a u^2 (Sc/600)^-x : Ho et al., 2011
-        a = 0.26
-        x = 0.50
-        k_wind = a * (windsp**2) * (schmidt/600.0)**(-x)
-      CASE (4)
-        ! k = K (Sc/600)^-x : Ho et al., 2016
-        a = 0.266
-        x = 0.50
-        k_wind = ((0.77*vel_l**x)*(depth**(-x)) + a*(windsp)**2) * (schmidt/600.0)**(-x)
-      CASE (5)
-        ! k = K (Sc/600)^-x : Raymond and Cole, 2001
-        a = 1.91
-        x = 0.50
-        k_wind = 1.91*exp(0.35*windsp) * (schmidt/600.0)**(-x)
-      CASE (6)
-        ! k = K (Sc/600)^-x : Borge et al., 2004
-        a = 2.58
-        x = 0.50
-        k_wind = (1.0 + (1.719*vel_l**x)*(depth**x) + a*windsp) * (schmidt/600.0)**(-x)
-      CASE (7)
-        ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CO2
-        x = 0.50
-        k_wind = (-0.08 + 0.26*vel_l + 0.83*windsp +0.59*depth ) * (schmidt/600.0)**(-x)
-      CASE (8)
-        ! k = K (Sc/600)^-x : Rosentreter et al., 2016 CH4
-        x = 0.50
-        k_wind = (-1.07 + 0.36*vel_l + 0.99*windsp +0.87*depth ) * (schmidt/600.0)**(-x)
-      CASE (9)
-        ! k = K (Sc/600)^-x : Liss and Merlivat, 1986
-        x = 0.50
-        IF (windsp <3) THEN
-          a = 0.17*windsp
-        ELSE IF (windsp <13) THEN
-          a = 2.85*windsp - 9.65
-        ELSE
-          a = 5.9*windsp - 49.3
-        ENDIF
-        k_wind = a * (schmidt/600.0)**(-x)
-      CASE (10)
-        c = 0.50
-        x = 0.50
-        k_wind = c*(epsilon*kin_vsc)**(0.25)*(schmidt)**(-x) ! this is in m/s
-        k_wind = k_wind * 3.6e5
-      END SELECT
+      ! Gas transfer velocity (cm/hr): one model, or the mean of a list
+      n_used = 0
+      IF (PRESENT(piston_models)) THEN
+         DO i = 1, SIZE(piston_models)
+            IF (piston_models(i) > 0) THEN
+               k_wind = k_wind + k_one(piston_models(i)) ; n_used = n_used + 1
+            ENDIF
+         ENDDO
+      ENDIF
+      IF (n_used > 0) THEN
+         k_wind = k_wind / n_used
+      ELSE IF (PRESENT(piston_model)) THEN
+         k_wind = k_one(piston_model)
+      ELSE
+         k_wind = k_one(1)
+      ENDIF
 
    ENDIF
 
@@ -531,6 +520,83 @@ PURE AED_REAL FUNCTION aed_gas_piston_velocity(wshgt,wind,tem,sal,vel,depth,  &
    !-----------------------------------------------
    ! piston velocity is the sum due to flow and wind
    aed_gas_piston_velocity = k_flow + k_wind
+
+CONTAINS
+
+   !# Schmidt number polynomial in temperature (deg C), Wanninkhof 2014 form
+   PURE AED_REAL FUNCTION sc_poly(a0, a1, a2, a3, a4)
+      AED_REAL,INTENT(in) :: a0, a1, a2, a3, a4
+      sc_poly = a0 + temp*(a1 + temp*(a2 + temp*(a3 + temp*a4)))
+   END FUNCTION sc_poly
+
+   !# k (cm/h) of one piston model; never negative (the linear estuary fits can be at low wind,
+   !# current and depth)
+   PURE AED_REAL FUNCTION k_one(model)
+      INTEGER,INTENT(in) :: model
+      AED_REAL :: a, x
+      k_one = zero_
+      SELECT CASE (model)
+      CASE (1)
+        ! k = a u^2 (Sc/660)^-x : Wanninkhof 1992
+        a = 0.31
+        x = 0.50
+        IF( windsp <3.) x = 0.66
+        k_one = a * (windsp**2) * (schmidt/660.0)**(-x)
+      CASE (2)
+        ! k = a u^2 (Sc/660)^-x : Wanninkhof 2014
+        a = 0.251
+        x = 0.50
+        k_one = a * (windsp**2) * (schmidt/660.0)**(-x)
+      CASE (3)
+        ! k = a u^2 (Sc/600)^-x : Ho et al., 2011
+        a = 0.26
+        x = 0.50
+        k_one = a * (windsp**2) * (schmidt/600.0)**(-x)
+      CASE (4)
+        ! k600 = 0.77 v^0.5 h^-0.5 + 0.266 U10^2 : Ho et al., 2016 (v cm/s, h m)
+        a = 0.266
+        x = 0.50
+        k_one = ((0.77*vel_cm**x)*(dep_l**(-x)) + a*(windsp)**2) * (schmidt/600.0)**(-x)
+      CASE (5)
+        ! k = K (Sc/600)^-x : Raymond and Cole, 2001
+        a = 1.91
+        x = 0.50
+        k_one = 1.91*exp(0.35*windsp) * (schmidt/600.0)**(-x)
+      CASE (6)
+        ! k600 = 1 + 1.719 v^0.5 h^-0.5 + 2.58 U10 : Borges et al., 2004 (v cm/s, h m)
+        a = 2.58
+        x = 0.50
+        k_one = (1.0 + (1.719*vel_cm**x)*(dep_l**(-x)) + a*windsp) * (schmidt/600.0)**(-x)
+      CASE (7)
+        ! k600 = -0.08 + 0.26 v + 0.83 U10 + 0.59 h : Rosentreter et al., 2017 CO2 (v cm/s, h m)
+        x = 0.50
+        k_one = (-0.08 + 0.26*vel_cm + 0.83*windsp +0.59*dep_l ) * (schmidt/600.0)**(-x)
+      CASE (8)
+        ! k600 = -1.07 + 0.36 v + 0.99 U10 + 0.87 h : Rosentreter et al., 2017 CH4 (v cm/s, h m)
+        x = 0.50
+        k_one = (-1.07 + 0.36*vel_cm + 0.99*windsp +0.87*dep_l ) * (schmidt/600.0)**(-x)
+      CASE (9)
+        ! k = K (Sc/600)^-x : Liss and Merlivat, 1986
+        x = 0.50
+        IF (windsp <3) THEN
+          a = 0.17*windsp
+        ELSE IF (windsp <13) THEN
+          a = 2.85*windsp - 9.65
+        ELSE
+          a = 5.9*windsp - 49.3
+        ENDIF
+        k_one = a * (schmidt/600.0)**(-x)
+      CASE (10)
+        ! surface renewal from dissipation: k = c (epsilon nu)^0.25 Sc^-0.5 (m/s -> cm/h)
+        IF (PRESENT(epsilon) .AND. PRESENT(kin_vsc)) &
+           k_one = 0.50*(epsilon*kin_vsc)**(0.25)*(schmidt)**(-0.50) * 3.6e5
+      CASE (11)
+        ! k600 = -0.175 + 0.7 U10 + 1.28 h + 0.467 v : Jeffrey et al., 2018 (v cm/s, h m)
+        x = 0.50
+        k_one = (-0.175 + 0.7*windsp + 1.28*dep_l + 0.467*vel_cm) * (schmidt/600.0)**(-x)
+      END SELECT
+      k_one = MAX(k_one, zero_)
+   END FUNCTION k_one
 
 END FUNCTION aed_gas_piston_velocity
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

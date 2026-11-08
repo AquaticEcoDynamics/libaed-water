@@ -60,7 +60,7 @@ MODULE aed_oxygen
 !-------------------------------------------------------------------------------
    USE aed_core
 
-   USE aed_util,  ONLY: aed_gas_piston_velocity, aed_oxygen_sat
+   USE aed_util,  ONLY: aed_gas_piston_velocity, aed_oxygen_sat, MAX_PISTON
 
    IMPLICIT NONE
 
@@ -81,7 +81,8 @@ MODULE aed_oxygen
 
       !# Model parameters
       AED_REAL :: Fsed_oxy,Ksed_oxy,theta_sed_oxy
-      INTEGER  :: oxy_piston_model
+      INTEGER  :: oxy_piston_model(MAX_PISTON), oxy_schmidt_model, id_k_oxy
+      AED_REAL :: piston_min_depth
       LOGICAL  :: use_sed_model
       AED_REAL :: altitude
 
@@ -176,7 +177,11 @@ SUBROUTINE aed_define_oxygen(data, namlst)
                                                   !-     model for Fsed_oxy; use this option to allow for
                                                   !-     spatial or temperal variation
 
-   INTEGER           :: oxy_piston_model  = 1     !% specifies the atm exchange piston model
+   INTEGER           :: oxy_piston_model(MAX_PISTON) = (/ 1, 0, 0, 0, 0 /)  !% atm exchange piston model, or a
+                                                  !% list averaged by aed_gas_piston_velocity (e.g. 4, 7, 11)
+   INTEGER           :: oxy_schmidt_model = 2     ! Schmidt option (9 = O2, Wanninkhof 2014)
+   AED_REAL          :: piston_min_depth  = 1.0   ! m, depth floor passed to the piston models
+   CHARACTER(len=64) :: wind_variable     = ''    ! e.g. 'VEG_Ug' (canopy wind); default is wind_speed
                                                   !% -
                                                   !% integer
                                                   !% 1
@@ -203,6 +208,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    NAMELIST /aed_oxygen/ oxy_initial, oxy_min, oxy_max,            &
                           Fsed_oxy, Ksed_oxy, theta_sed_oxy,       &
                           Fsed_oxy_variable, oxy_piston_model,     &
+                          oxy_schmidt_model, piston_min_depth, wind_variable, &
                           altitude,                                &
                           diag_level
 !
@@ -222,6 +228,8 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%theta_sed_oxy = theta_sed_oxy
    data%use_sed_model = Fsed_oxy_variable .NE. ''
    data%oxy_piston_model = oxy_piston_model
+   data%oxy_schmidt_model = oxy_schmidt_model
+   data%piston_min_depth = piston_min_depth
    data%altitude = altitude
 
    ! Register state variables
@@ -230,6 +238,7 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 
    data%id_oxy_sat = 0
    data%id_sed_oxy = 0
+   data%id_k_oxy = 0
    data%id_atm_oxy_exch = 0
    data%id_sed_oxy_pel = 0
    data%id_atm_oxy_exch3d = 0
@@ -247,6 +256,8 @@ SUBROUTINE aed_define_oxygen(data, namlst)
 
      data%id_atm_oxy_exch = aed_define_sheet_diag_variable(        &
                      'oxy_atm', 'mmol O2/m2/d', 'O2 exchange across atm/water interface', surf=.TRUE.)
+     data%id_k_oxy = aed_define_sheet_diag_variable(               &
+                     'oxy_k', 'm/d', 'O2 gas transfer velocity', surf=.TRUE.)
     IF (diag_level>9) THEN
      data%id_sed_oxy_pel = aed_define_diag_variable(               &
                      'oxy_dsfv', 'mmol O2/m3/d', 'O2 conc. change due to sediment oxygen demand', zavg=.TRUE.)
@@ -260,11 +271,15 @@ SUBROUTINE aed_define_oxygen(data, namlst)
    data%id_temp = aed_locate_global('temperature') ! Temperature (degrees Celsius)
    data%id_salt = aed_locate_global('salinity') ! Salinity (psu)
 !  data%id_pres = aed_locate_sheet_global('pressure') ! Pressure (dbar = 10 kPa)
-   data%id_wind = aed_locate_sheet_global('wind_speed') ! Wind speed at 10 m above surface (m/s)
+   IF ( wind_variable /= '' ) THEN
+      data%id_wind = aed_locate_sheet_variable(wind_variable)
+   ELSE
+      data%id_wind = aed_locate_sheet_global('wind_speed') ! Wind speed at 10 m above surface (m/s)
+   ENDIF
 !  data%id_larea = aed_locate_global('layer_area')
    data%id_lht = aed_locate_global('layer_ht')
    data%id_cell_vel = -1
-   IF( oxy_piston_model>3 )data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
+   IF( ANY(oxy_piston_model>3) )data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
 END SUBROUTINE aed_define_oxygen
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -301,7 +316,7 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    salt  = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
    wind  = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10 m above surface (m/s)
    windHt= 10.                          ! Assumed wind height of 10m
-   depth = MAX( _STATE_VAR_(data%id_lht), one_ )
+   depth = MAX( _STATE_VAR_(data%id_lht), data%piston_min_depth )
    IF (data%id_cell_vel > 0 )  vel = _STATE_VAR_(data%id_cell_vel)
 
    ! Retrieve current (local) state variable values.
@@ -311,8 +326,9 @@ SUBROUTINE aed_calculate_surface_oxygen(data,column,layer_idx)
    koxy_trans = aed_gas_piston_velocity(windHt,wind,temp,salt,               &
                                          vel=vel,                             &
                                          depth=depth,                         &
-                                         schmidt_model=2,                     &
-                                         piston_model=data%oxy_piston_model)
+                                         schmidt_model=data%oxy_schmidt_model, &
+                                         piston_models=data%oxy_piston_model)
+   IF (data%id_k_oxy>0) _DIAG_VAR_S_(data%id_k_oxy) = koxy_trans*secs_per_day
 
    ! First get the oxygen concentration in the air phase at the interface
    ! (taken from Riley and Skirrow, 1974)

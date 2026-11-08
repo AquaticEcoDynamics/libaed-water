@@ -59,7 +59,7 @@ MODULE aed_carbon
 !-------------------------------------------------------------------------------
    USE aed_core
 
-   USE aed_util,  ONLY: aed_gas_piston_velocity
+   USE aed_util,  ONLY: aed_gas_piston_velocity, MAX_PISTON
 
    IMPLICIT NONE
 
@@ -82,7 +82,10 @@ MODULE aed_carbon
       LOGICAL  :: use_oxy, use_sed_model_dic, use_sed_model_ch4, use_sed_model_ebb
       LOGICAL  :: simDIC, simCH4, simCH4ebb
       INTEGER  :: alk_mode, co2_model, ebb_model
-      INTEGER  :: co2_piston_model, ch4_piston_model
+      INTEGER  :: co2_piston_model(MAX_PISTON), ch4_piston_model(MAX_PISTON)
+      INTEGER  :: co2_schmidt_model, ch4_schmidt_model
+      INTEGER  :: id_k_co2, id_k_ch4
+      AED_REAL :: piston_min_depth
 
       !# Model parameters
       AED_REAL :: Fsed_dic, Ksed_dic, theta_sed_dic
@@ -155,8 +158,12 @@ SUBROUTINE aed_define_carbon(data, namlst)
    INTEGER           :: co2_model        = 1
    INTEGER           :: alk_mode         = 1
    INTEGER           :: ebb_model        = 0
-   INTEGER           :: co2_piston_model = 1
-   INTEGER           :: ch4_piston_model = 1
+   ! piston model, or a list averaged by aed_gas_piston_velocity (e.g. 4, 7, 11); a single value works as before
+   INTEGER           :: co2_piston_model(MAX_PISTON) = (/ 1, 0, 0, 0, 0 /)
+   INTEGER           :: ch4_piston_model(MAX_PISTON) = (/ 1, 0, 0, 0, 0 /)
+   INTEGER           :: co2_schmidt_model = 5    ! aed_gas_piston_velocity Schmidt option (10 = CO2, Wanninkhof 2014)
+   INTEGER           :: ch4_schmidt_model = 5    ! (7 = CH4, Wanninkhof 2014)
+   AED_REAL          :: piston_min_depth = 1.0   ! m, depth floor passed to the piston models
 
    LOGICAL           :: simCH4    = .false.
    LOGICAL           :: simCH4ebb
@@ -204,6 +211,7 @@ SUBROUTINE aed_define_carbon(data, namlst)
                          Fsed_ch4,Ksed_ch4,theta_sed_ch4,Fsed_ch4_variable,    &
                          atm_co2,atm_ch4,                                      &
                          co2_piston_model, ch4_piston_model,                   &
+                         co2_schmidt_model, ch4_schmidt_model, piston_min_depth, &
                          co2_model, alk_mode, ebb_model,                       &
                          Fsed_ch4_ebb, Fsed_ebb_variable,                      &
                          ch4_bub_aLL,ch4_bub_cLL, ch4_bub_kLL,                 &
@@ -251,6 +259,9 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%alk_mode         = alk_mode
    data%atm_co2          = atm_co2
    data%co2_piston_model = co2_piston_model
+   data%co2_schmidt_model = co2_schmidt_model
+   data%ch4_schmidt_model = ch4_schmidt_model
+   data%piston_min_depth = piston_min_depth
 
    data%Fsed_ch4         = Fsed_ch4/secs_per_day
    data%Ksed_ch4         = Ksed_ch4
@@ -298,6 +309,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
    data%id_ch4ox          = 0
    data%id_sed_ch4        = 0
    data%id_atm_ch4        = 0
+   data%id_k_co2          = 0
+   data%id_k_ch4          = 0
    data%id_sed_ch4_ebb_3d = 0
    data%id_ch4_ebb_df     = 0
    data%id_sed_ch4_ebb    = 0
@@ -330,6 +343,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
                             'CO2 exchange across sed/water interface')
       data%id_atm_co2 = aed_define_sheet_diag_variable('atm_co2_flux',          &
                             'mmol C/m2/d', 'CO2 exchange across atm/water interface', surf=.TRUE.)
+      IF ( data%simDIC ) data%id_k_co2 = aed_define_sheet_diag_variable('co2_k', 'm/d', &
+                            'CO2 gas transfer velocity', surf=.TRUE.)
 
       IF ( data%simCH4 ) THEN
          data%id_ch4ox   = aed_define_diag_variable('ch4ox','mmol C/m3/d', 'methane oxidation rate')
@@ -337,6 +352,8 @@ SUBROUTINE aed_define_carbon(data, namlst)
                             'CH4 exchange across sed/water interface')
          data%id_atm_ch4 = aed_define_sheet_diag_variable('ch4_atm',        &
                             'mmol C/m2/d', 'CH4 exchange across atm/water interface', surf=.TRUE.)
+         data%id_k_ch4 = aed_define_sheet_diag_variable('ch4_k', 'm/d', &
+                            'CH4 gas transfer velocity', surf=.TRUE.)
          IF ( data%simCH4ebb ) THEN
             data%id_sed_ch4_ebb_3d = aed_define_diag_variable('ch4_ebb_dsfv','mmol C/m3/d', &
                             'CH4 ebullition release rate', zavg = .TRUE.)
@@ -464,7 +481,7 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
    wind   = _STATE_VAR_S_(data%id_wind) ! Wind speed at 10 m (or wind_variable, e.g. reduced by vegetation) (m/s)
    temp   = _STATE_VAR_(data%id_temp)   ! Temperature (degrees Celsius)
    salt   = _STATE_VAR_(data%id_salt)   ! Salinity (psu)
-   depth  = MAX( _STATE_VAR_S_(data%id_depth), one_ )
+   depth  = MAX( _STATE_VAR_S_(data%id_depth), data%piston_min_depth )
    IF (data%id_vel > 0 ) THEN
       vel = _STATE_VAR_(data%id_vel)
    ELSE
@@ -609,7 +626,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
       !# Now compute piston velocity, k
       ! P. Huang changed the schmidt_model from 2 to 5, consistent to Brisbane GHG model
       kCO2 = aed_gas_piston_velocity(windHt,wind,temp,salt,                     &
-          vel=vel,depth=depth,schmidt_model=5,piston_model=data%co2_piston_model)
+          vel=vel,depth=depth,schmidt_model=data%co2_schmidt_model,piston_models=data%co2_piston_model)
+      IF (data%id_k_co2>0) _DIAG_VAR_S_(data%id_k_co2) = kCO2*secs_per_day
 
       !# Now compute the CO2 flux
       !  FCO2 = kCO2 * Ko * (pCO2 - PCO2a)
@@ -639,7 +657,8 @@ SUBROUTINE aed_calculate_surface_carbon(data,column,layer_idx)
       ! P. Huang changed the schmidt_model from 2 to 5, consistent to Brisbane GHG model
       ! the schmidt model 4 has an error by /600; has been corrected in aed_util.F90
       kCH4 = aed_gas_piston_velocity(windHt,wind,temp,salt, &
-          vel=vel,depth=depth,schmidt_model=5,piston_model=data%ch4_piston_model)
+          vel=vel,depth=depth,schmidt_model=data%ch4_schmidt_model,piston_models=data%ch4_piston_model)
+      IF (data%id_k_ch4>0) _DIAG_VAR_S_(data%id_k_ch4) = kCH4*secs_per_day
 
       ! Solubility, Ko (mol/L/atm)
       atm = data%atm_ch4   ! 1.76 e-6 !## recent atmospheric CH4 from NOAA (in atm)
