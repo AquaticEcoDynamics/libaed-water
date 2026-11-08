@@ -51,7 +51,7 @@ MODULE aed_nitrogen
 ! Nitrogen module contains equations for nitrification and denitrification
 !------------------------------------------------------------------------------+
    USE aed_core
-   USE aed_util,  ONLY: aed_gas_piston_velocity, aed_n2o_sat
+   USE aed_util,  ONLY: aed_gas_piston_velocity, aed_n2o_sat, MAX_PISTON
 
    IMPLICIT NONE
 
@@ -85,7 +85,9 @@ MODULE aed_nitrogen
       LOGICAL  :: simNitrfpH,simNitrfLight,simNitrfSal
       LOGICAL  :: simDryDeposition,simWetDeposition
 
-      INTEGER  :: oxy_lim, simN2O, n2o_piston_model, Fsed_nit_model
+      INTEGER  :: oxy_lim, simN2O, Fsed_nit_model
+      INTEGER  :: n2o_piston_model(MAX_PISTON), n2o_schmidt_model, id_k_n2o
+      AED_REAL :: piston_min_depth
       INTEGER  :: sal_model
 
 
@@ -175,7 +177,11 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
    INTEGER           :: simN2O  = 0
    INTEGER           :: oxy_lim = 1
-   INTEGER           :: n2o_piston_model = 4
+   ! piston model, or a list averaged by aed_gas_piston_velocity (e.g. 4, 7, 11); a single value works as before
+   INTEGER           :: n2o_piston_model(MAX_PISTON) = (/ 4, 0, 0, 0, 0 /)
+   INTEGER           :: n2o_schmidt_model = 2    ! aed_gas_piston_velocity Schmidt option (8 = N2O, Wanninkhof 2014)
+   AED_REAL          :: piston_min_depth = 1.0   ! m, depth floor passed to the piston models
+   CHARACTER(len=64) :: wind_variable = ''       ! e.g. 'VEG_Ug' (canopy wind); default is wind_speed
    INTEGER           :: Fsed_nit_model = 1
 
    LOGICAL           :: simNitrfpH = .false.
@@ -217,6 +223,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
                 nitrif_reactant_variable,denit_product_variable,nitrif_ph_variable,&
                 Fsed_amm_variable,Fsed_nit_variable,Fsed_n2o_variable,Fsed_no2_variable,&
                 simN2O, atm_n2o, oxy_lim, Rn2o, Fsed_n2o, Ksed_n2o, n2o_piston_model,&
+                n2o_schmidt_model, piston_min_depth, wind_variable,            &
                 Ranammox,kanammox, Rdnra, Kanmx_nit, Kanmx_amm, Kdnra_oxy,              &
                 simNitrfpH, simNitrfLight, simNitrfSal, K_sal, S0,             &
                 simDryDeposition, simWetDeposition, &
@@ -273,6 +280,8 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
    data%atm_n2o          = atm_n2o
    data%n2o_piston_model = n2o_piston_model
+   data%n2o_schmidt_model = n2o_schmidt_model
+   data%piston_min_depth = piston_min_depth
 
    data%Fsed_amm         = Fsed_amm/secs_per_day
    data%Fsed_nit         = Fsed_nit/secs_per_day
@@ -350,6 +359,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
   data%id_sed_amm = 0 ; data%id_sed_nit = 0 ; data%id_sed_n2o = 0 ; data%id_sed_no2 = 0
   data%id_nitrf   = 0 ; data%id_denit   = 0 ; data%id_n2op    = 0 ; data%id_anammox = 0
   data%id_dnra    = 0 ; data%id_atm_n2o = 0 ; data%id_atm_dep = 0
+  data%id_k_n2o   = 0
 
    !---------------------------------------------------------------------------+
    ! Register diagnostic variables
@@ -367,6 +377,7 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
 
     IF( simN2O>0 ) THEN
      data%id_atm_n2o = aed_define_sheet_diag_variable('n2o_atm','mmol N/m2/d','n2o atmospheric flux', surf=.TRUE.)
+     data%id_k_n2o = aed_define_sheet_diag_variable('n2o_k','m/d','N2O gas transfer velocity', surf=.TRUE.)
     ENDIF
     IF( simWetDeposition .OR. simDryDeposition ) THEN
      data%id_atm_dep = aed_define_sheet_diag_variable('din_atm','mmol N/m2/d','din atmospheric deposition flux', surf=.TRUE.)
@@ -378,7 +389,11 @@ SUBROUTINE aed_define_nitrogen(data, namlst)
    data%id_temp    = aed_locate_global('temperature')
    data%id_salt    = aed_locate_global('salinity')
    IF( simWetDeposition ) data%id_e_rain  = aed_locate_sheet_global('rain')
-   IF( simN2O>0 )         data%id_wind    = aed_locate_sheet_global('wind_speed')
+   IF( simN2O>0 .AND. wind_variable /= '' ) THEN
+                          data%id_wind    = aed_locate_sheet_variable(wind_variable)
+   ELSEIF( simN2O>0 ) THEN
+                          data%id_wind    = aed_locate_sheet_global('wind_speed')
+   ENDIF
    IF( simN2O>0 )         data%id_e_depth = aed_locate_global('layer_ht')
    IF( simN2O>0 )         data%id_cell_vel= aed_locate_global('cell_vel')! needed for k600
   !IF( simN2O>0 )         data%id_E_tau   = aed_locate_global('taub')    ! tau to be converted to velocity
@@ -594,7 +609,7 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
      wind = _STATE_VAR_S_(data%id_wind)  ! Wind speed at 10m above surface (m/s)
      temp = _STATE_VAR_(data%id_temp)    ! Temperature (degrees Celsius)
      salt = _STATE_VAR_(data%id_salt)    ! Salinity (psu)
-     depth = MAX( _STATE_VAR_(data%id_E_depth), one_ )
+     depth = MAX( _STATE_VAR_(data%id_E_depth), data%piston_min_depth )
      IF (data%id_cell_vel > 0 ) vel = _STATE_VAR_(data%id_cell_vel)
 
      !-----------------------------------------------
@@ -606,7 +621,8 @@ SUBROUTINE aed_calculate_surface_nitrogen(data,column,layer_idx)
      ! transfer velocity k of Ho et al. 2016
      !kn2o_trans = 0.77*( (vel**0.5)*(depth**(-0.5)) + 0.266*wind**2. ) / 3.6e5
      kn2o_trans = aed_gas_piston_velocity(wind_hgt,wind,temp,salt,vel=vel,    &
-                 depth=depth,schmidt_model=2,piston_model=data%n2o_piston_model)
+                 depth=depth,schmidt_model=data%n2o_schmidt_model,piston_models=data%n2o_piston_model)
+     IF (data%id_k_n2o>0) _DIAG_VAR_S_(data%id_k_n2o) = kn2o_trans*secs_per_day
 
      !-----------------------------------------------
      ! First get the N2O concentration in the air-phase at atm interface
